@@ -11,7 +11,20 @@ modded class SCR_AudioSettingsSubMenu
 
 		bind.LoadEntry(m_wScroll, false, true);
 		bind.GetEntryChangedInvoker().Insert(OnMenuItemChanged);
+
+		Print("[EC29-DBG][RadioMenu] Inserting radio beeps checkbox (default off)", LogLevel.NORMAL);
+		SCR_SettingBindingGameplay beepBind = new SCR_SettingBindingGameplay("EC29_RadioSettings", "RadioBeepsEnabled", "RadioBeeps");
+		m_aSettingsBindings.Insert(beepBind);
+
+		beepBind.LoadEntry(m_wScroll, false, true);
+		beepBind.GetEntryChangedInvoker().Insert(OnMenuItemChanged);
 	}
+}
+
+class EC29_RadioSettings extends ModuleGameSettings
+{
+	[Attribute(defvalue: "0", uiwidget: UIWidgets.CheckBox, desc: "Play radio TX/RX beeps (squelch, key-up confirmation)")]
+	bool RadioBeepsEnabled;
 }
 
 class EC29_EarplugSettings extends ModuleGameSettings

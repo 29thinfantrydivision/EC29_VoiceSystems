@@ -108,8 +108,28 @@ class EC29_RadioBeepHelper
         PlayRouted(eventName, transceiver);
     }
 
+    //! Master switch, persisted in game settings (Audio tab, 29th ID section).
+    //! Default OFF - beeps are opt-in. The per-radio beep type (K in the radial
+    //! menu) still selects the style once enabled.
+    static bool EC29_AreBeepsEnabled()
+    {
+        BaseContainer radioSettings = GetGame().GetGameUserSettings().GetModule("EC29_RadioSettings");
+        if (!radioSettings)
+            return false;
+
+        bool enabled;
+        radioSettings.Get("RadioBeepsEnabled", enabled);
+        return enabled;
+    }
+
     protected static void PlayRouted(string eventName, BaseTransceiver transceiver)
     {
+        if (!EC29_AreBeepsEnabled())
+        {
+            Print("[EC29-DBG][RadioBeep] Beep suppressed - RadioBeepsEnabled setting is off");
+            return;
+        }
+
         EC29_RadioEarSettings settings = EC29_RadioEarSettings.GetInstance();
         EC29EarRouting routing = settings.GetRouting(transceiver);
 

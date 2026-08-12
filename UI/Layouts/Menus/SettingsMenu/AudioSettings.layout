@@ -30,6 +30,18 @@ HorizontalLayoutWidgetClass {
         }
        }
       }
+      ButtonWidgetClass "{684601EE00000201}" : "{5D5055E10FD00549}UI/layouts/WidgetLibrary/ToolBoxes/WLib_Checkbox.layout" {
+       Name "RadioBeeps"
+       Slot LayoutSlot "{684601EE00000202}" {
+        Padding 4 4 4 4
+       }
+       components {
+        SCR_CheckboxComponent "{684601EE00000203}" {
+         m_sLabel "#EC29-Settings_RadioBeeps"
+         m_sLabelLayout "{F003823FF141983C}UI/layouts/Menus/SettingsMenu/CustomWidgets/SettingsLabel.layout"
+        }
+       }
+      }
       VerticalLayoutWidgetClass "{58B33058AD55320C}" {
        Prefab "{58B33058AD55320C}"
        components {
