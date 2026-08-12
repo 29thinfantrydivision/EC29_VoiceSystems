@@ -23,10 +23,25 @@ class EC29_RadioEarSettings
     protected int m_iAlternateFrequency = -1;
     protected bool m_bTransmittingOnAlternate = false;
 
+    //! World-lifecycle guard: the maps key raw BaseTransceiver pointers, which are
+    //! only meaningful within one world; statics survive mission restart / server
+    //! hop, so a stale instance would leak dead keys (and could mis-apply settings
+    //! if the engine recycles component addresses). Weak member nulls with its
+    //! world; mismatch rebuilds the singleton empty.
+    protected BaseWorld m_OwnerWorld;
+
     static EC29_RadioEarSettings GetInstance()
     {
-        if (!s_Instance)
+        BaseWorld currentWorld = GetGame().GetWorld();
+
+        if (!s_Instance || s_Instance.m_OwnerWorld != currentWorld)
+        {
+            if (s_Instance)
+                Print("[EC29-DBG][RadioEar] World changed - resetting ear/beep/volume settings singleton", LogLevel.NORMAL);
+
             s_Instance = new EC29_RadioEarSettings();
+            s_Instance.m_OwnerWorld = currentWorld;
+        }
 
         return s_Instance;
     }
@@ -52,6 +67,7 @@ class EC29_RadioEarSettings
 
     EC29EarRouting CycleRouting(BaseTransceiver transceiver)
     {
+        Print("[EC29-DBG][RadioEar] CycleRouting pressed");
         if (!transceiver)
             return EC29EarRouting.CENTER;
 
@@ -113,6 +129,7 @@ class EC29_RadioEarSettings
 
     EC29BeepType CycleBeepType(BaseTransceiver transceiver)
     {
+        Print("[EC29-DBG][RadioEar] CycleBeepType pressed");
         if (!transceiver)
             return EC29BeepType.ACE_HIGH;
 
@@ -181,6 +198,7 @@ class EC29_RadioEarSettings
 
     float AdjustVolume(BaseTransceiver transceiver, float delta)
     {
+        PrintFormat("[EC29-DBG][RadioEar] AdjustVolume delta=%1", delta);
         float current = GetVolume(transceiver);
         float newVolume = Math.Clamp(current + delta, 0.0, 1.0);
         SetVolume(transceiver, newVolume);
@@ -223,6 +241,7 @@ class EC29_RadioEarSettings
 
     bool ToggleAlternate(BaseTransceiver transceiver)
     {
+        Print("[EC29-DBG][RadioEar] ToggleAlternate pressed");
         if (!transceiver)
             return false;
 

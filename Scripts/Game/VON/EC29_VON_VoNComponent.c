@@ -22,6 +22,28 @@ modded class SCR_VoNComponent
 	// Debug: last gain logged per speaker so OnReceive logging doesn't spam every voice packet.
 	protected static ref map<int, float> s_mEC29DbgLastGain = new map<int, float>();
 
+	// World-lifecycle guard for the static caches above: playerIds and component
+	// pointers are world-scoped, statics are not. Weak member nulls with its world;
+	// a mismatch clears the caches and re-arms the one-shot audio-variable probes.
+	protected static BaseWorld s_EC29OwnerWorld;
+
+	protected static void EC29_CheckWorldReset()
+	{
+		BaseWorld currentWorld = GetGame().GetWorld();
+		if (s_EC29OwnerWorld == currentWorld)
+			return;
+
+		if (s_EC29OwnerWorld)
+			Print("[EC29-DBG][VoN] World changed - clearing static player/VoN caches and re-arming audio-var probes", LogLevel.NORMAL);
+
+		s_EC29OwnerWorld = currentWorld;
+		s_mEC29PlayerVon.Clear();
+		s_mEC29PlayerVonEntity.Clear();
+		s_mEC29DbgLastGain.Clear();
+		s_bEC29VarChecked = false;
+		s_bEC29RadioVarsChecked = false;
+	}
+
 	[RplProp(onRplName: "EC29_OnVoiceRangeReplicated")]
 	protected EC29_EVoiceRange m_eEC29VoiceRange = EC29_EVoiceRange.NORMAL;
 
@@ -118,11 +140,24 @@ modded class SCR_VoNComponent
 	//------------------------------------------------------------------------------------------------
 	override protected event void OnReceive(int playerId, bool isSenderEditor, BaseTransceiver receiver, int frequency, float quality)
 	{
-		EC29_ApplyRangeGain(playerId);
-		EC29_ApplyRadioAudioVars(playerId, receiver, frequency);
+		EC29_CheckWorldReset();
 
-		if (receiver)
+		// Packet-type gate keeps the two systems from stomping each other's global
+		// audio variables: direct packets (receiver == null) own EC29_VonRange,
+		// radio packets own the ear-routing/quality/jam/volume set. Without the
+		// gate, a far-away radio speaker drags the direct-falloff gain to the
+		// floor mid-conversation, and a nearby direct speaker resets ear routing
+		// to CENTER mid-radio-stream (the latter was a latent bug in the 506th
+		// original, which wrote its variables on every packet type).
+		if (!receiver)
+		{
+			EC29_ApplyRangeGain(playerId);
+		}
+		else
+		{
+			EC29_ApplyRadioAudioVars(playerId, receiver, frequency);
 			EC29_TrackIncomingTransmission(receiver, frequency, playerId);
+		}
 
 		super.OnReceive(playerId, isSenderEditor, receiver, frequency, quality);
 	}

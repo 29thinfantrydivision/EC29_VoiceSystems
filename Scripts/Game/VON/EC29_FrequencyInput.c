@@ -16,6 +16,7 @@ class EC29_FrequencyInput
     //------------------------------------------------------------------------------------------------
     void Open(BaseTransceiver transceiver, SCR_VONEntryRadio radioEntry)
     {		
+        Print("[EC29-DBG][RadioFreq] Frequency input dialog OPEN");
         if (m_bIsOpen)
             return;
         
@@ -91,6 +92,7 @@ class EC29_FrequencyInput
     //------------------------------------------------------------------------------------------------
     protected void Submit(string input)
     {
+        PrintFormat("[EC29-DBG][RadioFreq] Frequency input SUBMIT: raw='%1'", input);
         if (!m_Transceiver)
             return;
         

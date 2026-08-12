@@ -46,6 +46,13 @@ class EC29_JammerToggleUserAction : ScriptedUserAction
 	{
 		super.PerformAction(pOwnerEntity, pUserEntity);
 
+		// User actions execute on server AND clients; only the authority may
+		// mutate, otherwise a stale client copy can race the server and flip the
+		// jammer back (RplProp round-trip). Offline/editor (no replication) also
+		// counts as authority.
+		if (Replication.IsRunning() && !Replication.IsServer())
+			return;
+
 		if (!m_JammerComponent)
 			return;
 

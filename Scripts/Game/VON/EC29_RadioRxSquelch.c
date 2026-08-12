@@ -44,11 +44,25 @@ class EC29_RadioRxSquelch
     protected static const int TICK_INTERVAL_MS = 150;
     protected bool m_bTicking = false;
 
+    //! World-lifecycle guard: script statics survive mission restart / server hop,
+    //! but the CallLater ticker and world clock do not. Weak member (no ref) nulls
+    //! when its world is destroyed; a mismatch means stale channel timestamps and
+    //! a stranded m_bTicking flag, so GetInstance() rebuilds the singleton fresh.
+    protected BaseWorld m_OwnerWorld;
+
     //------------------------------------------------------------------------------------------------
     static EC29_RadioRxSquelch GetInstance()
     {
-        if (!s_Instance)
+        BaseWorld currentWorld = GetGame().GetWorld();
+
+        if (!s_Instance || s_Instance.m_OwnerWorld != currentWorld)
+        {
+            if (s_Instance)
+                Print("[EC29-DBG][RadioSquelch] World changed - resetting squelch singleton (stale channels + ticker flag dropped)", LogLevel.NORMAL);
+
             s_Instance = new EC29_RadioRxSquelch();
+            s_Instance.m_OwnerWorld = currentWorld;
+        }
 
         return s_Instance;
     }
@@ -176,6 +190,7 @@ class EC29_RadioRxSquelch
     //------------------------------------------------------------------------------------------------
     protected void Open(EC29_RxChannelState state, BaseTransceiver transceiver, float nowMs)
     {
+        PrintFormat("[EC29-DBG][RadioSquelch] Channel OPEN (squelch beep) t=%1", nowMs);
         if (state.m_bOpen)
             return;
 
@@ -190,6 +205,7 @@ class EC29_RadioRxSquelch
     //------------------------------------------------------------------------------------------------
     protected void Close(EC29_RxChannelState state, int frequency, float nowMs)
     {
+        PrintFormat("[EC29-DBG][RadioSquelch] Channel CLOSE freq=%1 t=%2", frequency, nowMs);
         if (!state.m_bOpen)
             return;
 

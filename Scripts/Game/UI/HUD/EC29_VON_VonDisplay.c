@@ -82,7 +82,9 @@ modded class SCR_VonDisplay
 		// Radio port (506th): outgoing entries show CYAN frequency while the alternate
 		// channel is keyed, WHITE otherwise (the reset un-cyans after alt-PTT release).
 		// EC29 never colors m_wFrequency, so this owns that widget exclusively.
-		if (!IsReceiving && radioTransceiver && data && data.m_Widgets && data.m_Widgets.m_wFrequency)
+		// Coexistence: when the real 506IRRU mod is co-loaded its own display mod
+		// owns this widget - our WHITE reset would erase its CYAN indicator.
+		if (!IsReceiving && radioTransceiver && !EC29_CoexistenceGuard.ShouldYieldRadio() && data && data.m_Widgets && data.m_Widgets.m_wFrequency)
 		{
 			EC29_RadioEarSettings earSettings = EC29_RadioEarSettings.GetInstance();
 			if (earSettings.IsTransmittingOnAlternate())

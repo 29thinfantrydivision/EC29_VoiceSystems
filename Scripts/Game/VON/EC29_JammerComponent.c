@@ -155,6 +155,7 @@ class EC29_JammerComponent : ScriptComponent
 
 	protected void OnActiveChanged()
 	{
+		PrintFormat("[EC29-DBG][Jammer] Active state replicated: %1 (range=%2 cone=%3)", m_bActive, m_fRange, m_fConeAngle);
 	}
 
 	float GetRange()

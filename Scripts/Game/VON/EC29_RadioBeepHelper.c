@@ -18,6 +18,7 @@ class EC29_RadioBeepHelper
 
     static void PlayTxStart(BaseTransceiver transceiver)
     {
+        Print("[EC29-DBG][RadioBeep] TX start beep requested");
         if (!transceiver)
             return;
 
@@ -38,6 +39,7 @@ class EC29_RadioBeepHelper
 
     static void PlayTxEnd(BaseTransceiver transceiver)
     {
+        Print("[EC29-DBG][RadioBeep] TX end beep requested");
         if (!transceiver)
             return;
 

@@ -14,6 +14,20 @@ class EC29_RFPropagationSettings
     //------------------------------------------------------------------------------------------------
     static EC29_RFPropagationSettings GetInstance()
     {
+        // Only the server's copy is ever consumed (values replicate via
+        // EC29_RFPropagationNetworkComponent RplProps). Clients must not read or
+        // CREATE $profile:EC29_RFPropagation.json - return inert defaults instead.
+        if (Replication.IsRunning() && !Replication.IsServer())
+        {
+            if (!s_Instance)
+            {
+                s_Instance = new EC29_RFPropagationSettings();
+                Print("[EC29-DBG][RadioNet] CLIENT RF settings instance created with defaults (no profile JSON IO on clients)");
+            }
+
+            return s_Instance;
+        }
+
         if (!s_Instance)
         {
             s_Instance = new EC29_RFPropagationSettings();

@@ -479,6 +479,7 @@ modded class SCR_VONController
 
         m_bAlternatePTTActive = true;
         settings.SetTransmittingOnAlternate(true);
+        PrintFormat("[EC29-DBG][RadioAlt] Alternate PTT START on freq %1 (primary entry saved)", altFrequency);
 
         m_SavedPrimaryEntry = m_ActiveEntry;
         m_ActiveEntry = altEntry;
@@ -493,6 +494,7 @@ modded class SCR_VONController
         EC29_RadioEarSettings settings = EC29_RadioEarSettings.GetInstance();
         settings.SetTransmittingOnAlternate(false);
         m_bAlternatePTTActive = false;
+        Print("[EC29-DBG][RadioAlt] Alternate PTT END (primary entry restored)");
 
         DeactivateVON(EVONTransmitType.CHANNEL);
 

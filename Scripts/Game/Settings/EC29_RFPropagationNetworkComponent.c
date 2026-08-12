@@ -29,6 +29,15 @@ class EC29_RFPropagationNetworkComponent : SCR_BaseGameModeComponent
 	protected ref map<int, ref EC29_PendingKeyStop> m_mEC29_PendingStops = new map<int, ref EC29_PendingKeyStop>();
 	protected static const int EC29_KEY_STOP_DEBOUNCE_MS = 300;
 
+	//! Server-side sanity bounds for client-supplied key-state RPCs: a tampered
+	//! client must not amplify garbage into reliable broadcasts to every player.
+	protected static const int EC29_MIN_FREQUENCY_KHZ = 1000;
+	protected static const int EC29_MAX_FREQUENCY_KHZ = 1000000;
+	protected static const float EC29_MAX_RANGE_M = 50000;
+	protected static const int EC29_RELAY_RATE_MAX = 10;
+	protected static const float EC29_RELAY_RATE_WINDOW_MS = 4000;
+	protected ref map<int, ref array<float>> m_mEC29_RelayTimesByPlayer = new map<int, ref array<float>>();
+
 
 	//------------------------------------------------------------------------------------------------
 	override void OnPostInit(IEntity owner)
@@ -90,6 +99,20 @@ class EC29_RFPropagationNetworkComponent : SCR_BaseGameModeComponent
 		if (!Replication.IsServer())
 			return;
 
+		// Validate client-supplied values before amplifying them into broadcasts.
+		if (frequency < EC29_MIN_FREQUENCY_KHZ || frequency > EC29_MAX_FREQUENCY_KHZ)
+		{
+			PrintFormat("[EC29-DBG][RadioNet] SERVER rejected key-state from player %1: frequency %2 out of bounds", senderPlayerId, frequency, level: LogLevel.WARNING);
+			return;
+		}
+
+		range = Math.Clamp(range, 0, EC29_MAX_RANGE_M);
+
+		if (!EC29_CheckRelayRate(senderPlayerId))
+			return;
+
+		PrintFormat("[EC29-DBG][RadioNet] SERVER relay key-state: player=%1 freq=%2 range=%3 keyed=%4", senderPlayerId, frequency, range, keyed);
+
 		if (keyed)
 		{
 			EC29_PendingKeyStop pending;
@@ -116,6 +139,36 @@ class EC29_RFPropagationNetworkComponent : SCR_BaseGameModeComponent
 			m_mEC29_PendingStops.Set(senderPlayerId, pending);
 			GetGame().GetCallqueue().CallLater(EC29_FlushPendingStop, EC29_KEY_STOP_DEBOUNCE_MS, false, senderPlayerId);
 		}
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Server-side key-rate limiter mirroring the client-side EC29_KEY_SPAM_* lockout;
+	//! a compliant client is throttled by its own lockout first and never trips this.
+	protected bool EC29_CheckRelayRate(int playerId)
+	{
+		float nowMs = GetGame().GetWorld().GetWorldTime();
+
+		array<float> times;
+		if (!m_mEC29_RelayTimesByPlayer.Find(playerId, times))
+		{
+			times = new array<float>();
+			m_mEC29_RelayTimesByPlayer.Set(playerId, times);
+		}
+
+		for (int i = times.Count() - 1; i >= 0; i--)
+		{
+			if (nowMs - times[i] > EC29_RELAY_RATE_WINDOW_MS)
+				times.Remove(i);
+		}
+
+		if (times.Count() >= EC29_RELAY_RATE_MAX)
+		{
+			PrintFormat("[EC29-DBG][RadioNet] SERVER rate-limited key-state relay from player %1 (%2 in window)", playerId, times.Count(), level: LogLevel.WARNING);
+			return false;
+		}
+
+		times.Insert(nowMs);
+		return true;
 	}
 
 	//------------------------------------------------------------------------------------------------
