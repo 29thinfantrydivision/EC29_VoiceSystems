@@ -11,8 +11,8 @@ class EC29_RadioBeepHelper
     static const string EVENT_BEEP_HIGH = "EC29_BEEP_HIGH";
     static const string EVENT_BEEP_LOW = "EC29_BEEP_LOW";
     static const string EVENT_CLICK_OFF = "EC29_CLICK_OFF";
-    static const string EVENT_GRS_START = "EC29_GRS_START";
-    static const string EVENT_GRS_END = "EC29_GRS_END";
+    static const string EVENT_CLASSIC_START = "EC29_CLASSIC_START";
+    static const string EVENT_CLASSIC_END = "EC29_CLASSIC_END";
     //! Sound node must exist with this exact name in EC29_beep.acp
     static const string EVENT_SQUELCH_TAIL = "EC29_SQUELCH_TAIL";
 
@@ -23,14 +23,14 @@ class EC29_RadioBeepHelper
             return;
 
         EC29_RadioEarSettings settings = EC29_RadioEarSettings.GetInstance();
-        EC29BeepType beepType = settings.GetBeepType(transceiver);
+        EC29_EBeepType beepType = settings.GetBeepType(transceiver);
 
         string eventName;
         switch (beepType)
         {
-            case EC29BeepType.ACE_HIGH: eventName = EVENT_BEEP_HIGH; break;
-            case EC29BeepType.ACE_LOW: eventName = EVENT_BEEP_LOW; break;
-            case EC29BeepType.GRS: eventName = EVENT_GRS_START; break;
+            case EC29_EBeepType.HIGH: eventName = EVENT_BEEP_HIGH; break;
+            case EC29_EBeepType.LOW: eventName = EVENT_BEEP_LOW; break;
+            case EC29_EBeepType.CLASSIC: eventName = EVENT_CLASSIC_START; break;
             default: return;
         }
 
@@ -44,17 +44,17 @@ class EC29_RadioBeepHelper
             return;
 
         EC29_RadioEarSettings settings = EC29_RadioEarSettings.GetInstance();
-        EC29BeepType beepType = settings.GetBeepType(transceiver);
+        EC29_EBeepType beepType = settings.GetBeepType(transceiver);
 
         string eventName;
         switch (beepType)
         {
-            case EC29BeepType.ACE_HIGH:
-            case EC29BeepType.ACE_LOW:
+            case EC29_EBeepType.HIGH:
+            case EC29_EBeepType.LOW:
                 eventName = EVENT_CLICK_OFF;
                 break;
-            case EC29BeepType.GRS:
-                eventName = EVENT_GRS_END;
+            case EC29_EBeepType.CLASSIC:
+                eventName = EVENT_CLASSIC_END;
                 break;
             default:
                 return;
@@ -69,17 +69,17 @@ class EC29_RadioBeepHelper
             return;
 
         EC29_RadioEarSettings settings = EC29_RadioEarSettings.GetInstance();
-        EC29BeepType beepType = settings.GetBeepType(transceiver);
+        EC29_EBeepType beepType = settings.GetBeepType(transceiver);
 
         string eventName;
         switch (beepType)
         {
-            case EC29BeepType.ACE_HIGH:
-            case EC29BeepType.ACE_LOW:
+            case EC29_EBeepType.HIGH:
+            case EC29_EBeepType.LOW:
                 eventName = EVENT_SQUELCH_TAIL;
                 break;
-            case EC29BeepType.GRS:
-                eventName = EVENT_GRS_START;
+            case EC29_EBeepType.CLASSIC:
+                eventName = EVENT_CLASSIC_START;
                 break;
             default:
                 return;
@@ -94,14 +94,14 @@ class EC29_RadioBeepHelper
             return;
 
         EC29_RadioEarSettings settings = EC29_RadioEarSettings.GetInstance();
-        EC29BeepType beepType = settings.GetBeepType(transceiver);
+        EC29_EBeepType beepType = settings.GetBeepType(transceiver);
 
         string eventName;
         switch (beepType)
         {
-            case EC29BeepType.ACE_HIGH: eventName = EVENT_BEEP_HIGH; break;
-            case EC29BeepType.ACE_LOW: eventName = EVENT_BEEP_LOW; break;
-            case EC29BeepType.GRS: eventName = EVENT_GRS_END; break;
+            case EC29_EBeepType.HIGH: eventName = EVENT_BEEP_HIGH; break;
+            case EC29_EBeepType.LOW: eventName = EVENT_BEEP_LOW; break;
+            case EC29_EBeepType.CLASSIC: eventName = EVENT_CLASSIC_END; break;
             default: return;
         }
 
@@ -131,7 +131,7 @@ class EC29_RadioBeepHelper
         }
 
         EC29_RadioEarSettings settings = EC29_RadioEarSettings.GetInstance();
-        EC29EarRouting routing = settings.GetRouting(transceiver);
+        EC29_EEarRouting routing = settings.GetRouting(transceiver);
 
         AudioSystem.SetVariableByName("EC29_EarRouting", routing, EAR_ROUTING_CONFIG);
 

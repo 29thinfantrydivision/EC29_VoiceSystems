@@ -1,24 +1,24 @@
-enum EC29EarRouting
+enum EC29_EEarRouting
 {
     CENTER = 0,
     RIGHT = 1,
     LEFT = 2
 }
 
-enum EC29BeepType
+enum EC29_EBeepType
 {
     OFF = 0,
-    ACE_HIGH = 1,
-    ACE_LOW = 2,
-    GRS = 3
+    HIGH = 1,
+    LOW = 2,
+    CLASSIC = 3
 }
 
 class EC29_RadioEarSettings
 {
     private static ref EC29_RadioEarSettings s_Instance;
 
-    protected ref map<BaseTransceiver, EC29EarRouting> m_mRoutingByTransceiver = new map<BaseTransceiver, EC29EarRouting>();
-    protected ref map<BaseTransceiver, EC29BeepType> m_mBeepTypeByTransceiver = new map<BaseTransceiver, EC29BeepType>();
+    protected ref map<BaseTransceiver, EC29_EEarRouting> m_mRoutingByTransceiver = new map<BaseTransceiver, EC29_EEarRouting>();
+    protected ref map<BaseTransceiver, EC29_EBeepType> m_mBeepTypeByTransceiver = new map<BaseTransceiver, EC29_EBeepType>();
     protected ref map<BaseTransceiver, float> m_mVolumeByTransceiver = new map<BaseTransceiver, float>();
     protected int m_iAlternateFrequency = -1;
     protected bool m_bTransmittingOnAlternate = false;
@@ -46,18 +46,18 @@ class EC29_RadioEarSettings
         return s_Instance;
     }
 
-    EC29EarRouting GetRouting(BaseTransceiver transceiver)
+    EC29_EEarRouting GetRouting(BaseTransceiver transceiver)
     {
         if (!transceiver)
-            return EC29EarRouting.CENTER;
+            return EC29_EEarRouting.CENTER;
 
         if (!m_mRoutingByTransceiver.Contains(transceiver))
-            return EC29EarRouting.CENTER;
+            return EC29_EEarRouting.CENTER;
 
         return m_mRoutingByTransceiver.Get(transceiver);
     }
 
-    void SetRouting(BaseTransceiver transceiver, EC29EarRouting routing)
+    void SetRouting(BaseTransceiver transceiver, EC29_EEarRouting routing)
     {
         if (!transceiver)
             return;
@@ -65,41 +65,41 @@ class EC29_RadioEarSettings
         m_mRoutingByTransceiver.Set(transceiver, routing);
     }
 
-    EC29EarRouting CycleRouting(BaseTransceiver transceiver)
+    EC29_EEarRouting CycleRouting(BaseTransceiver transceiver)
     {
         Print("[EC29-DBG][RadioEar] CycleRouting pressed");
         if (!transceiver)
-            return EC29EarRouting.CENTER;
+            return EC29_EEarRouting.CENTER;
 
-        EC29EarRouting current = GetRouting(transceiver);
-        EC29EarRouting next;
+        EC29_EEarRouting current = GetRouting(transceiver);
+        EC29_EEarRouting next;
 
         switch (current)
         {
-            case EC29EarRouting.CENTER:
-                next = EC29EarRouting.LEFT;
+            case EC29_EEarRouting.CENTER:
+                next = EC29_EEarRouting.LEFT;
                 break;
-            case EC29EarRouting.LEFT:
-                next = EC29EarRouting.RIGHT;
+            case EC29_EEarRouting.LEFT:
+                next = EC29_EEarRouting.RIGHT;
                 break;
-            case EC29EarRouting.RIGHT:
-                next = EC29EarRouting.CENTER;
+            case EC29_EEarRouting.RIGHT:
+                next = EC29_EEarRouting.CENTER;
                 break;
             default:
-                next = EC29EarRouting.CENTER;
+                next = EC29_EEarRouting.CENTER;
         }
 
         SetRouting(transceiver, next);
         return next;
     }
 
-    string GetRoutingDisplayText(EC29EarRouting routing)
+    string GetRoutingDisplayText(EC29_EEarRouting routing)
     {
         switch (routing)
         {
-            case EC29EarRouting.LEFT:
+            case EC29_EEarRouting.LEFT:
                 return "L";
-            case EC29EarRouting.RIGHT:
+            case EC29_EEarRouting.RIGHT:
                 return "R";
             default:
                 return "C";
@@ -108,18 +108,18 @@ class EC29_RadioEarSettings
         return "C";
     }
 
-    EC29BeepType GetBeepType(BaseTransceiver transceiver)
+    EC29_EBeepType GetBeepType(BaseTransceiver transceiver)
     {
         if (!transceiver)
-            return EC29BeepType.ACE_HIGH;
+            return EC29_EBeepType.HIGH;
 
         if (!m_mBeepTypeByTransceiver.Contains(transceiver))
-            return EC29BeepType.ACE_HIGH;
+            return EC29_EBeepType.HIGH;
 
         return m_mBeepTypeByTransceiver.Get(transceiver);
     }
 
-    void SetBeepType(BaseTransceiver transceiver, EC29BeepType beepType)
+    void SetBeepType(BaseTransceiver transceiver, EC29_EBeepType beepType)
     {
         if (!transceiver)
             return;
@@ -127,54 +127,54 @@ class EC29_RadioEarSettings
         m_mBeepTypeByTransceiver.Set(transceiver, beepType);
     }
 
-    EC29BeepType CycleBeepType(BaseTransceiver transceiver)
+    EC29_EBeepType CycleBeepType(BaseTransceiver transceiver)
     {
         Print("[EC29-DBG][RadioEar] CycleBeepType pressed");
         if (!transceiver)
-            return EC29BeepType.ACE_HIGH;
+            return EC29_EBeepType.HIGH;
 
-        EC29BeepType current = GetBeepType(transceiver);
-        EC29BeepType next;
+        EC29_EBeepType current = GetBeepType(transceiver);
+        EC29_EBeepType next;
 
         switch (current)
         {
-            case EC29BeepType.OFF:
-                next = EC29BeepType.ACE_HIGH;
+            case EC29_EBeepType.OFF:
+                next = EC29_EBeepType.HIGH;
                 break;
-            case EC29BeepType.ACE_HIGH:
-                next = EC29BeepType.ACE_LOW;
+            case EC29_EBeepType.HIGH:
+                next = EC29_EBeepType.LOW;
                 break;
-            case EC29BeepType.ACE_LOW:
-                next = EC29BeepType.GRS;
+            case EC29_EBeepType.LOW:
+                next = EC29_EBeepType.CLASSIC;
                 break;
-            case EC29BeepType.GRS:
-                next = EC29BeepType.OFF;
+            case EC29_EBeepType.CLASSIC:
+                next = EC29_EBeepType.OFF;
                 break;
             default:
-                next = EC29BeepType.ACE_LOW;
+                next = EC29_EBeepType.LOW;
         }
 
         SetBeepType(transceiver, next);
         return next;
     }
 
-    string GetBeepTypeDisplayText(EC29BeepType beepType)
+    string GetBeepTypeDisplayText(EC29_EBeepType beepType)
     {
         switch (beepType)
         {
-            case EC29BeepType.OFF:
+            case EC29_EBeepType.OFF:
                 return "OFF";
-            case EC29BeepType.ACE_HIGH:
-                return "ACE-H";
-            case EC29BeepType.ACE_LOW:
-                return "ACE-L";
-            case EC29BeepType.GRS:
-                return "GRS";
+            case EC29_EBeepType.HIGH:
+                return "HI";
+            case EC29_EBeepType.LOW:
+                return "LO";
+            case EC29_EBeepType.CLASSIC:
+                return "CLS";
             default:
-                return "ACE-L";
+                return "LO";
         }
 
-        return "ACE-H";
+        return "HI";
     }
 
     float GetVolume(BaseTransceiver transceiver)

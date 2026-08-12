@@ -1,8 +1,8 @@
 modded class SCR_VONController
 {
-    const string EC29_SOUND_CYCLE = "{19696BC8C5ECE170}Sounds/VON/GL_Sounds/RadioCycle.wav";
-    const string EC29_SOUND_LOCAL_OFF = "{AFA775D58D24308A}Sounds/VON/GL_Sounds/RadioLocalOff.wav";
-    const string EC29_SOUND_LOCAL_ON = "{E21F58D501028C63}Sounds/VON/GL_Sounds/RadioLocalOn.wav";
+    const string EC29_SOUND_CYCLE = "{19696BC8C5ECE170}Sounds/VON/EC29_FX/RadioCycle.wav";
+    const string EC29_SOUND_LOCAL_OFF = "{AFA775D58D24308A}Sounds/VON/EC29_FX/RadioLocalOff.wav";
+    const string EC29_SOUND_LOCAL_ON = "{E21F58D501028C63}Sounds/VON/EC29_FX/RadioLocalOn.wav";
     const string EC29_SOUND_ERROR = "{7065D8DD8ADFA3DE}Sounds/EC29_Sound/errorbeep.wav";
     const string EC29_SOUND_ROGER = "{CD44EABA985BFDF1}Sounds/EC29_Sound/rogerbeep.wav";
 
@@ -163,8 +163,8 @@ modded class SCR_VONController
         m_AudioHandleError = AudioSystem.PlaySound(EC29_SOUND_ERROR);
     }
 
-    //! One-time radio check on first spawn: tells the player the Enhanced Radio
-    //! mod is up, TFAR/ACRE style. The VON controller instance lives exactly one
+    //! One-time radio check on first spawn: confirms the voice systems are up
+    //! with a roger beep + chat line. The VON controller instance lives exactly one
     //! server session on the client, so the flag resets naturally on reconnect
     //! and never replays on respawn.
     protected void EC29_TryPlayRadioCheck()

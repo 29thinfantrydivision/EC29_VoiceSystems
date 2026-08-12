@@ -3,13 +3,13 @@ modded class SCR_VoNComponent
 	static const string EC29_VAR_NAME   = "EC29_VonRange";
 	static const string EC29_VAR_CONFIG = "{33A27275C95E0302}Sounds/VON/EC29_LocalVariables_VON.conf";
 
-	// Radio path (506th Enhanced Radio port): ear routing / signal quality / jamming /
-	// per-channel volume audio variables. Boundary rule: EC29_VonRange gain applies to
-	// DIRECT speech falloff, the radio variables apply to the RADIO path - the two sets
-	// never touch the same audio variable.
+	// Radio path: ear routing / signal quality / jamming / per-channel volume
+	// audio variables. Boundary rule: EC29_VonRange gain applies to DIRECT speech
+	// falloff, the radio variables apply to the RADIO path - the two sets never
+	// touch the same audio variable.
 	protected static const string EC29_EAR_ROUTING_CONFIG = "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf";
 	protected static bool s_bEC29RadioVarsChecked;
-	protected static bool s_bEC29EarRoutingValid;
+	protected static bool s_bEC29_EEarRoutingValid;
 	protected static bool s_bEC29SignalQualityValid;
 	protected static bool s_bEC29JamStrengthValid;
 	protected static bool s_bEC29ChannelVolumeValid;
@@ -147,8 +147,7 @@ modded class SCR_VoNComponent
 		// radio packets own the ear-routing/quality/jam/volume set. Without the
 		// gate, a far-away radio speaker drags the direct-falloff gain to the
 		// floor mid-conversation, and a nearby direct speaker resets ear routing
-		// to CENTER mid-radio-stream (the latter was a latent bug in the 506th
-		// original, which wrote its variables on every packet type).
+		// to CENTER mid-radio-stream.
 		if (!receiver)
 		{
 			EC29_ApplyRangeGain(playerId);
@@ -163,7 +162,7 @@ modded class SCR_VoNComponent
 	}
 
 	//------------------------------------------------------------------------------------------------
-	//! Direct-speech falloff gain (WCS VON range port). Writes EC29_VonRange only.
+	//! Direct-speech falloff gain (whisper/normal/yell). Writes EC29_VonRange only.
 	protected void EC29_ApplyRangeGain(int playerId)
 	{
 		// One-time AudioSystem variable lookup so we can early-out cleanly when the conf isn't loaded.
@@ -216,7 +215,7 @@ modded class SCR_VoNComponent
 	}
 
 	//------------------------------------------------------------------------------------------------
-	//! Radio-path audio variables (506th Enhanced Radio port): ear routing, RF signal
+	//! Radio-path audio variables: ear routing, RF signal
 	//! quality, jammer strength, per-channel volume. All are global external variables
 	//! consumed by the merged von.acp graph; they must be refreshed per incoming packet.
 	protected void EC29_ApplyRadioAudioVars(int playerId, BaseTransceiver receiver, int frequency)
@@ -227,17 +226,17 @@ modded class SCR_VoNComponent
 		if (!s_bEC29RadioVarsChecked)
 		{
 			s_bEC29RadioVarsChecked = true;
-			s_bEC29EarRoutingValid    = (AudioSystem.GetVariableIDByName("EC29_EarRouting", EC29_EAR_ROUTING_CONFIG) != -1);
+			s_bEC29_EEarRoutingValid    = (AudioSystem.GetVariableIDByName("EC29_EarRouting", EC29_EAR_ROUTING_CONFIG) != -1);
 			s_bEC29SignalQualityValid = (AudioSystem.GetVariableIDByName("EC29_SignalQuality", EC29_EAR_ROUTING_CONFIG) != -1);
 			s_bEC29JamStrengthValid   = (AudioSystem.GetVariableIDByName("EC29_JamStrength", EC29_EAR_ROUTING_CONFIG) != -1);
 			s_bEC29ChannelVolumeValid = (AudioSystem.GetVariableIDByName("EC29_ChannelVolume", EC29_EAR_ROUTING_CONFIG) != -1);
 			EC29_RFPropagationSettings.GetInstance();
 
 			PrintFormat("[EC29-DBG][Radio] audio var probe: earRouting=%1 signalQuality=%2 jamStrength=%3 channelVolume=%4",
-				s_bEC29EarRoutingValid, s_bEC29SignalQualityValid, s_bEC29JamStrengthValid, s_bEC29ChannelVolumeValid);
+				s_bEC29_EEarRoutingValid, s_bEC29SignalQualityValid, s_bEC29JamStrengthValid, s_bEC29ChannelVolumeValid);
 		}
 
-		if (s_bEC29EarRoutingValid)
+		if (s_bEC29_EEarRoutingValid)
 		{
 			float earRouting = EC29_GetEarRoutingForTransceiver(receiver);
 			AudioSystem.SetVariableByName("EC29_EarRouting", earRouting, EC29_EAR_ROUTING_CONFIG);
@@ -291,7 +290,7 @@ modded class SCR_VoNComponent
 	protected float EC29_GetEarRoutingForTransceiver(BaseTransceiver transceiver)
 	{
 		EC29_RadioEarSettings settings = EC29_RadioEarSettings.GetInstance();
-		EC29EarRouting routing = settings.GetRouting(transceiver);
+		EC29_EEarRouting routing = settings.GetRouting(transceiver);
 		return routing;
 	}
 

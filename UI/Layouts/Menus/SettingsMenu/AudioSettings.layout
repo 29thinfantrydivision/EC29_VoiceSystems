@@ -7,12 +7,12 @@ HorizontalLayoutWidgetClass {
      Prefab "{00000000C099DEEF}"
      {
       VerticalLayoutWidgetClass "{685354209F36EFEF}" : "{FEEEB639F2735BA1}UI/layouts/Menus/SettingsMenu/CustomWidgets/SettingsTitle.layout" {
-       Name "TitleWCS"
+       Name "Title29th"
        Slot LayoutSlot "{685354234AC6FBB8}" {
        }
        components {
         SCR_LabelComponent "{6853542375F01898}" {
-         m_sLabel "#EC29-Settings_Title_WCS"
+         m_sLabel "#EC29-Settings_Title_29th"
         }
        }
       }

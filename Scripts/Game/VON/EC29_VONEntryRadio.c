@@ -20,8 +20,8 @@ modded class SCR_VONEntryRadio
             return;
 
         EC29_RadioEarSettings settings = EC29_RadioEarSettings.GetInstance();
-        EC29EarRouting routing = settings.GetRouting(m_RadioTransceiver);
-        EC29BeepType beepType = settings.GetBeepType(m_RadioTransceiver);
+        EC29_EEarRouting routing = settings.GetRouting(m_RadioTransceiver);
+        EC29_EBeepType beepType = settings.GetBeepType(m_RadioTransceiver);
         int volume = settings.GetVolumePercent(m_RadioTransceiver);
         bool isAlternate = settings.IsAlternate(m_RadioTransceiver);
 
@@ -30,10 +30,10 @@ modded class SCR_VONEntryRadio
         string beepText;
         switch (beepType)
         {
-            case EC29BeepType.OFF: beepText = "-"; break;
-            case EC29BeepType.ACE_HIGH: beepText = "BH"; break;
-            case EC29BeepType.ACE_LOW: beepText = "BL"; break;
-            case EC29BeepType.GRS: beepText = "GRS"; break;
+            case EC29_EBeepType.OFF: beepText = "-"; break;
+            case EC29_EBeepType.HIGH: beepText = "BH"; break;
+            case EC29_EBeepType.LOW: beepText = "BL"; break;
+            case EC29_EBeepType.CLASSIC: beepText = "CLS"; break;
             default: beepText = "BH";
         }
 

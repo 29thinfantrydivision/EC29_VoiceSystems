@@ -40,7 +40,7 @@ class EC29_RadioRxSquelch
     //! Single-ticker rule: this singleton owns its own 150ms Tick loop. Both feed
     //! paths (voice packets via SCR_VoNComponent, key-state RPCs via
     //! EC29_RFPropagationNetworkComponent) call EnsureTicking() instead of running
-    //! their own CallLater loops - the 506th original ran two concurrent tickers.
+    //! their own CallLater loops, so the state machine is never double-ticked.
     protected static const int TICK_INTERVAL_MS = 150;
     protected bool m_bTicking = false;
 

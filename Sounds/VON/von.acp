@@ -4,7 +4,7 @@ AudioClass {
    id 30733
    name "Signal 1"
    tl -776.622 -515.118
-   res "{CF1F9C4B120DE5F8}Sounds/VON/EC29Von.sig"
+   res "{CF1F9C4B120DE5F8}Sounds/VON/EC29_Von.sig"
    conns {
     IOPConnectionClass iopConnection {
      port 1
@@ -36,7 +36,7 @@ AudioClass {
    inputvaluesmax {
     1
    }
-   path "{CF1F9C4B120DE5F8}Sounds/VON/EC29Von.sig"
+   path "{CF1F9C4B120DE5F8}Sounds/VON/EC29_Von.sig"
   }
   SignalClass "66573" {
    id 66573
@@ -86,7 +86,7 @@ AudioClass {
    id 95245
    name "Routing Signal"
    tl 122.001 -545.02
-   res "{4D6CC8A4D1FED38F}Sounds/VON/EC29routing.sig"
+   res "{4D6CC8A4D1FED38F}Sounds/VON/EC29_Routing.sig"
    conns {
     IOPConnectionClass iopConnection {
      port 1
@@ -118,7 +118,7 @@ AudioClass {
    inputvaluesmax {
     1
    }
-   path "{4D6CC8A4D1FED38F}Sounds/VON/EC29routing.sig"
+   path "{4D6CC8A4D1FED38F}Sounds/VON/EC29_Routing.sig"
   }
   SignalClass "105485" {
    id 105485

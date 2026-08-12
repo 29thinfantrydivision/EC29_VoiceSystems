@@ -2,7 +2,7 @@ GameProject {
  ID "EC29_VoiceSystems"
  GUID "481849A4E0D88BEA"
  TITLE "EC29 Voice Systems (VON Range + Earplugs + Radio)"
- AUTHOR "29th ID / Goldwep"
+ AUTHOR "Goldwep"
  VERSION "1.1.0"
  Dependencies {
   "58D0FB3206B6F859"
@@ -15,55 +15,55 @@ GameProject {
       Languages {
        LanguageDefinition {
         Code "cs_cz"
-        StringTableRuntime "{C5DD1A0E44A06ED6}Language/wcs_von_localization.cs_cz.conf"
+        StringTableRuntime "{C5DD1A0E44A06ED6}Language/EC29_von_localization.cs_cz.conf"
        }
        LanguageDefinition {
         Code "de_de"
-        StringTableRuntime "{DF5440A06A13DDF2}Language/wcs_von_localization.de_de.conf"
+        StringTableRuntime "{DF5440A06A13DDF2}Language/EC29_von_localization.de_de.conf"
        }
        LanguageDefinition {
         Code "en_us"
-        StringTableRuntime "{B50620FA15B80463}Language/wcs_von_localization.en_us.conf"
+        StringTableRuntime "{B50620FA15B80463}Language/EC29_von_localization.en_us.conf"
        }
        LanguageDefinition {
         Code "es_es"
-        StringTableRuntime "{19CC91A3882FA74F}Language/wcs_von_localization.es_es.conf"
+        StringTableRuntime "{19CC91A3882FA74F}Language/EC29_von_localization.es_es.conf"
        }
        LanguageDefinition {
         Code "fr_fr"
-        StringTableRuntime "{A21C1CD936C15C77}Language/wcs_von_localization.fr_fr.conf"
+        StringTableRuntime "{A21C1CD936C15C77}Language/EC29_von_localization.fr_fr.conf"
        }
        LanguageDefinition {
         Code "it_it"
-        StringTableRuntime "{C11F6D64DD7CF88F}Language/wcs_von_localization.it_it.conf"
+        StringTableRuntime "{C11F6D64DD7CF88F}Language/EC29_von_localization.it_it.conf"
        }
        LanguageDefinition {
         Code "ja_jp"
-        StringTableRuntime "{5BD776334072D104}Language/wcs_von_localization.ja_jp.conf"
+        StringTableRuntime "{5BD776334072D104}Language/EC29_von_localization.ja_jp.conf"
        }
        LanguageDefinition {
         Code "ko_kr"
-        StringTableRuntime "{8D29CE5FE6E4E0C4}Language/wcs_von_localization.ko_kr.conf"
+        StringTableRuntime "{8D29CE5FE6E4E0C4}Language/EC29_von_localization.ko_kr.conf"
        }
        LanguageDefinition {
         Code "pl_pl"
-        StringTableRuntime "{BE6DC19CF536B566}Language/wcs_von_localization.pl_pl.conf"
+        StringTableRuntime "{BE6DC19CF536B566}Language/EC29_von_localization.pl_pl.conf"
        }
        LanguageDefinition {
         Code "pt_br"
-        StringTableRuntime "{FE9FC2E5D8D91AE5}Language/wcs_von_localization.pt_br.conf"
+        StringTableRuntime "{FE9FC2E5D8D91AE5}Language/EC29_von_localization.pt_br.conf"
        }
        LanguageDefinition {
         Code "ru_ru"
-        StringTableRuntime "{0259246701962CC2}Language/wcs_von_localization.ru_ru.conf"
+        StringTableRuntime "{0259246701962CC2}Language/EC29_von_localization.ru_ru.conf"
        }
        LanguageDefinition {
         Code "uk_ua"
-        StringTableRuntime "{8C1764898648D2DC}Language/wcs_von_localization.uk_ua.conf"
+        StringTableRuntime "{8C1764898648D2DC}Language/EC29_von_localization.uk_ua.conf"
        }
        LanguageDefinition {
         Code "zh_cn"
-        StringTableRuntime "{DD69DB1400FA3877}Language/wcs_von_localization.zh_cn.conf"
+        StringTableRuntime "{DD69DB1400FA3877}Language/EC29_von_localization.zh_cn.conf"
        }
       }
      }
@@ -71,55 +71,55 @@ GameProject {
       Languages {
        LanguageDefinition {
         Code "cs_cz"
-        StringTableRuntime "{F3322783FF88B7A1}Langauge/wcs_earplugs_localization.cs_cz.conf"
+        StringTableRuntime "{F3322783FF88B7A1}Language/EC29_earplugs_localization.cs_cz.conf"
        }
        LanguageDefinition {
         Code "de_de"
-        StringTableRuntime "{2B144CBE2C9028DD}Langauge/wcs_earplugs_localization.de_de.conf"
+        StringTableRuntime "{2B144CBE2C9028DD}Language/EC29_earplugs_localization.de_de.conf"
        }
        LanguageDefinition {
         Code "en_us"
-        StringTableRuntime "{305C9992137A2E2F}Langauge/wcs_earplugs_localization.en_us.conf"
+        StringTableRuntime "{305C9992137A2E2F}Language/EC29_earplugs_localization.en_us.conf"
        }
        LanguageDefinition {
         Code "es_es"
-        StringTableRuntime "{CFAF3BC4A0D0CC83}Langauge/wcs_earplugs_localization.es_es.conf"
+        StringTableRuntime "{CFAF3BC4A0D0CC83}Language/EC29_earplugs_localization.es_es.conf"
        }
        LanguageDefinition {
         Code "fr_fr"
-        StringTableRuntime "{E6C7DDEC9BB8C0C4}Langauge/wcs_earplugs_localization.fr_fr.conf"
+        StringTableRuntime "{E6C7DDEC9BB8C0C4}Language/EC29_earplugs_localization.fr_fr.conf"
        }
        LanguageDefinition {
         Code "it_it"
-        StringTableRuntime "{FB843F6E573DC457}Langauge/wcs_earplugs_localization.it_it.conf"
+        StringTableRuntime "{FB843F6E573DC457}Language/EC29_earplugs_localization.it_it.conf"
        }
        LanguageDefinition {
         Code "ja_jp"
-        StringTableRuntime "{BD286974378D1CDE}Langauge/wcs_earplugs_localization.ja_jp.conf"
+        StringTableRuntime "{BD286974378D1CDE}Language/EC29_earplugs_localization.ja_jp.conf"
        }
        LanguageDefinition {
         Code "ko_kr"
-        StringTableRuntime "{230384825208EE15}Langauge/wcs_earplugs_localization.ko_kr.conf"
+        StringTableRuntime "{230384825208EE15}Language/EC29_earplugs_localization.ko_kr.conf"
        }
        LanguageDefinition {
         Code "pl_pl"
-        StringTableRuntime "{4BDA8A78D1D773D1}Langauge/wcs_earplugs_localization.pl_pl.conf"
+        StringTableRuntime "{4BDA8A78D1D773D1}Language/EC29_earplugs_localization.pl_pl.conf"
        }
        LanguageDefinition {
         Code "pt_br"
-        StringTableRuntime "{E2AB0C7B182DB9AF}Langauge/wcs_earplugs_localization.pt_br.conf"
+        StringTableRuntime "{E2AB0C7B182DB9AF}Language/EC29_earplugs_localization.pt_br.conf"
        }
        LanguageDefinition {
         Code "ru_ru"
-        StringTableRuntime "{F29F24EC86FDD57F}Langauge/wcs_earplugs_localization.ru_ru.conf"
+        StringTableRuntime "{F29F24EC86FDD57F}Language/EC29_earplugs_localization.ru_ru.conf"
        }
        LanguageDefinition {
         Code "uk_ua"
-        StringTableRuntime "{D1530D1CFB0CF2D8}Langauge/wcs_earplugs_localization.uk_ua.conf"
+        StringTableRuntime "{D1530D1CFB0CF2D8}Language/EC29_earplugs_localization.uk_ua.conf"
        }
        LanguageDefinition {
         Code "zh_cn"
-        StringTableRuntime "{C59A9A787D24D534}Langauge/wcs_earplugs_localization.zh_cn.conf"
+        StringTableRuntime "{C59A9A787D24D534}Language/EC29_earplugs_localization.zh_cn.conf"
        }
       }
      }

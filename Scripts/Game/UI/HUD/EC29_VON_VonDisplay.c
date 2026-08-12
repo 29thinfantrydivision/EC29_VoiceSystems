@@ -79,7 +79,7 @@ modded class SCR_VonDisplay
 		if (!result)
 			return false;
 
-		// Radio port (506th): outgoing entries show CYAN frequency while the alternate
+		// Radio overlay: outgoing entries show CYAN frequency while the alternate
 		// channel is keyed, WHITE otherwise (the reset un-cyans after alt-PTT release).
 		// EC29 never colors m_wFrequency, so this owns that widget exclusively.
 		// Coexistence: when the real 506IRRU mod is co-loaded its own display mod

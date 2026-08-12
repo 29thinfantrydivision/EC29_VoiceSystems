@@ -4,7 +4,7 @@ AudioClass {
    id 8205
    name "Routing Signal"
    tl 115.468 -456.121
-   res "{4D6CC8A4D1FED38F}Sounds/VON/EC29routing.sig"
+   res "{4D6CC8A4D1FED38F}Sounds/VON/EC29_Routing.sig"
    conns {
     IOPConnectionClass "iop:1" {
      port 1
@@ -105,7 +105,7 @@ AudioClass {
   }
   SoundClass "17417" {
    id 17417
-   name "EC29_GRS_START"
+   name "EC29_CLASSIC_START"
    version 5
    tl 542.699 -4.274
    ins {
@@ -123,7 +123,7 @@ AudioClass {
   }
   SoundClass "19465" {
    id 19465
-   name "EC29_GRS_END"
+   name "EC29_CLASSIC_END"
    version 5
    tl 546.654 113.269
    ins {
@@ -408,7 +408,7 @@ AudioClass {
    tl 88.043 -247.33
    Samples {
     AudioBankSampleClass "beep_high.wav" {
-     Filename "{1ADFC1E8AF584F50}Sounds/ACE_Radio/beep_high.wav"
+     Filename "{1ADFC1E8AF584F50}Sounds/EC29_Beeps/beep_high.wav"
     }
    }
   }
@@ -419,7 +419,7 @@ AudioClass {
    tl 89.223 -122.351
    Samples {
     AudioBankSampleClass "beep_low.wav" {
-     Filename "{A08EB2587E7B515E}Sounds/ACE_Radio/beep_low.wav"
+     Filename "{A08EB2587E7B515E}Sounds/EC29_Beeps/beep_low.wav"
     }
    }
   }
@@ -430,7 +430,7 @@ AudioClass {
    tl 109.665 -355.743
    Samples {
     AudioBankSampleClass "click_off.wav" {
-     Filename "{E43AE4FF96A1BFE6}Sounds/ACE_Radio/click_off.wav"
+     Filename "{E43AE4FF96A1BFE6}Sounds/EC29_Beeps/click_off.wav"
     }
    }
   }
@@ -441,7 +441,7 @@ AudioClass {
    tl 94.209 0.851
    Samples {
     AudioBankSampleClass "StartRadioTransmissionBeep.wav" {
-     Filename "{FFCC0497F888301F}Sounds/VON/GL_Sounds/StartRadioTransmissionBeep.wav"
+     Filename "{FFCC0497F888301F}Sounds/VON/EC29_FX/StartRadioTransmissionBeep.wav"
     }
    }
   }
@@ -452,7 +452,7 @@ AudioClass {
    tl 91.525 121.032
    Samples {
     AudioBankSampleClass "EndRadioTransmission2.wav" {
-     Filename "{A5C6D2BF6A2C871D}Sounds/VON/GL_Sounds/EndRadioTransmission2.wav"
+     Filename "{A5C6D2BF6A2C871D}Sounds/VON/EC29_FX/EndRadioTransmission2.wav"
     }
    }
   }
