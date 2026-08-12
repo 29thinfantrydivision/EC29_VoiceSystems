@@ -79,6 +79,18 @@ modded class SCR_VonDisplay
 		if (!result)
 			return false;
 
+		// Radio port (506th): outgoing entries show CYAN frequency while the alternate
+		// channel is keyed, WHITE otherwise (the reset un-cyans after alt-PTT release).
+		// EC29 never colors m_wFrequency, so this owns that widget exclusively.
+		if (!IsReceiving && radioTransceiver && data && data.m_Widgets && data.m_Widgets.m_wFrequency)
+		{
+			EC29_RadioEarSettings earSettings = EC29_RadioEarSettings.GetInstance();
+			if (earSettings.IsTransmittingOnAlternate())
+				data.m_Widgets.m_wFrequency.SetColor(Color.FromInt(Color.CYAN));
+			else
+				data.m_Widgets.m_wFrequency.SetColor(Color.FromInt(Color.WHITE));
+		}
+
 		if (!data || data.m_bIsAdditional)
 			return result;
 

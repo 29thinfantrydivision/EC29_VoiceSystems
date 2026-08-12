@@ -3,5 +3,7 @@ SCR_BaseGameMode {
  components {
   EC29_VONSettingsComponent "{6933A1B7C5E4E001}" {
   }
+  EC29_RFPropagationNetworkComponent "{684601EE43B5AC59}" {
+  }
  }
 }

@@ -29,8 +29,6 @@ class EC29_RFPropagationNetworkComponent : SCR_BaseGameModeComponent
 	protected ref map<int, ref EC29_PendingKeyStop> m_mEC29_PendingStops = new map<int, ref EC29_PendingKeyStop>();
 	protected static const int EC29_KEY_STOP_DEBOUNCE_MS = 300;
 
-	protected static const int EC29_SQUELCH_TICK_MS = 150;
-	protected bool m_bEC29_SquelchTickerRunning = false;
 
 	//------------------------------------------------------------------------------------------------
 	override void OnPostInit(IEntity owner)
@@ -156,31 +154,11 @@ class EC29_RFPropagationNetworkComponent : SCR_BaseGameModeComponent
 	{
 		EC29_RadioRxSquelch.GetInstance().OnRemoteKeyState(senderPlayerId, frequency, range, keyed, senderPos);
 
-		// Dead-key channels produce no voice packets, so the VoNComponent ticker
-		// may never run; keep timeouts advancing from here as well.
+		// Dead-key channels produce no voice packets, so the voice-packet feed path
+		// may never run; keep timeouts advancing from here as well. The squelch
+		// singleton owns the ticker (single-ticker rule).
 		if (GetGame().GetPlayerController())
-			EC29_EnsureSquelchTicker();
-	}
-
-	//------------------------------------------------------------------------------------------------
-	protected void EC29_EnsureSquelchTicker()
-	{
-		if (m_bEC29_SquelchTickerRunning)
-			return;
-
-		m_bEC29_SquelchTickerRunning = true;
-		GetGame().GetCallqueue().CallLater(EC29_SquelchTick, EC29_SQUELCH_TICK_MS, false);
-	}
-
-	//------------------------------------------------------------------------------------------------
-	protected void EC29_SquelchTick()
-	{
-		float nowMs = GetGame().GetWorld().GetWorldTime();
-
-		if (EC29_RadioRxSquelch.GetInstance().Tick(nowMs))
-			GetGame().GetCallqueue().CallLater(EC29_SquelchTick, EC29_SQUELCH_TICK_MS, false);
-		else
-			m_bEC29_SquelchTickerRunning = false;
+			EC29_RadioRxSquelch.GetInstance().EnsureTicking();
 	}
 
 	//------------------------------------------------------------------------------------------------

@@ -37,6 +37,13 @@ class EC29_RadioRxSquelch
 
     protected ref map<int, ref EC29_RxChannelState> m_mChannels = new map<int, ref EC29_RxChannelState>();
 
+    //! Single-ticker rule: this singleton owns its own 150ms Tick loop. Both feed
+    //! paths (voice packets via SCR_VoNComponent, key-state RPCs via
+    //! EC29_RFPropagationNetworkComponent) call EnsureTicking() instead of running
+    //! their own CallLater loops - the 506th original ran two concurrent tickers.
+    protected static const int TICK_INTERVAL_MS = 150;
+    protected bool m_bTicking = false;
+
     //------------------------------------------------------------------------------------------------
     static EC29_RadioRxSquelch GetInstance()
     {
@@ -44,6 +51,27 @@ class EC29_RadioRxSquelch
             s_Instance = new EC29_RadioRxSquelch();
 
         return s_Instance;
+    }
+
+    //------------------------------------------------------------------------------------------------
+    void EnsureTicking()
+    {
+        if (m_bTicking)
+            return;
+
+        m_bTicking = true;
+        GetGame().GetCallqueue().CallLater(EC29_TickLoop, TICK_INTERVAL_MS, false);
+    }
+
+    //------------------------------------------------------------------------------------------------
+    protected void EC29_TickLoop()
+    {
+        float nowMs = GetGame().GetWorld().GetWorldTime();
+
+        if (Tick(nowMs))
+            GetGame().GetCallqueue().CallLater(EC29_TickLoop, TICK_INTERVAL_MS, false);
+        else
+            m_bTicking = false;
     }
 
     //------------------------------------------------------------------------------------------------
