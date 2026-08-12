@@ -82,6 +82,11 @@ class EC29_Earplugs_System extends WorldSystem
 	void OnKeybindPressed()
 	{
 		Print("[EC29-DBG][Earplugs] F2 keybind FIRED (EC29_ToggleEarplugs action works)", LogLevel.NORMAL);
+
+		// Coexistence: real WCS_Earplugs also toggles on F2; both firing would cancel out.
+		if (EC29_CoexistenceGuard.ShouldYieldEarplugs())
+			return;
+
 		EngineUserSettings = GetGame().GetEngineUserSettings();
 		ToggleSFXVolume();
 	}

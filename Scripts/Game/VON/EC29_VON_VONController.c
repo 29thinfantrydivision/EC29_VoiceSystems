@@ -56,6 +56,10 @@ modded class SCR_VONController
     protected void EC29_ActionVoiceRangeCycle(float value, EActionTrigger reason = EActionTrigger.UP)
     {
         Print("[EC29-DBG][VONCtrl] F3 keybind FIRED (EC29_VONVoiceRangeCycle action works)", LogLevel.NORMAL);
+
+        // Coexistence: real WCS_VON also cycles on F3; firing both would double-cycle.
+        if (EC29_CoexistenceGuard.ShouldYieldVoiceRange())
+            return;
         if (!m_VONComp)
         {
             PrintFormat("[EC29_VON] Cycle pressed but no SCR_VoNComponent on controlled entity", level: LogLevel.WARNING);
@@ -104,7 +108,7 @@ modded class SCR_VONController
     override void SetActiveTransmit(notnull SCR_VONEntry entry)
     {
         SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(entry);
-        if (radioEntry)
+        if (radioEntry && !EC29_CoexistenceGuard.ShouldYieldRadio())
         {
             // Denied key-ups never reach super, so no transmission starts, no
             // TX beep plays and no key RPC is sent - just the deny tone.
@@ -177,16 +181,26 @@ modded class SCR_VONController
             return;
 
         m_bEC29_RadioCheckPlayed = true;
-        AudioSystem.PlaySound(EC29_SOUND_ROGER);
 
         SCR_ChatComponent chatComponent = SCR_ChatComponent.Cast(playerController.FindComponent(SCR_ChatComponent));
+
+        string conflictNotice = EC29_CoexistenceGuard.GetConflictNotice();
+        if (!conflictNotice.IsEmpty())
+        {
+            if (chatComponent)
+                chatComponent.ShowMessage(conflictNotice);
+            return;
+        }
+
+        AudioSystem.PlaySound(EC29_SOUND_ROGER);
+
         if (chatComponent)
-            chatComponent.ShowMessage("***ENHANCED RADIO INITIALIZED***");
+            chatComponent.ShowMessage("***EC29 VOICE SYSTEMS INITIALIZED***");
     }
 
     override void DeactivateVON(EVONTransmitType transmitType = EVONTransmitType.NONE)
     {
-        if (m_bIsActive && transmitType != EVONTransmitType.DIRECT)
+        if (m_bIsActive && transmitType != EVONTransmitType.DIRECT && !EC29_CoexistenceGuard.ShouldYieldRadio())
         {
             SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(m_ActiveEntry);
             if (radioEntry)
@@ -259,6 +273,9 @@ modded class SCR_VONController
 
         super.ActionVONProximityToggle(value, reason);
 
+        if (EC29_CoexistenceGuard.ShouldYieldRadio())
+            return;
+
         if (m_bIsToggledDirect && !wasToggled)
         {
             if (m_AudioHandleLocalOn != 0 && AudioSystem.IsSoundPlayed(m_AudioHandleLocalOn))
@@ -277,7 +294,7 @@ modded class SCR_VONController
 
     override protected void ActionVONTransceiverCycle(float value, EActionTrigger reason = EActionTrigger.UP)
     {
-        if (reason == EActionTrigger.DOWN)
+        if (reason == EActionTrigger.DOWN && !EC29_CoexistenceGuard.ShouldYieldRadio())
         {
             if (m_AudioHandleCycle != 0 && AudioSystem.IsSoundPlayed(m_AudioHandleCycle))
                 AudioSystem.TerminateSound(m_AudioHandleCycle);
@@ -294,6 +311,10 @@ modded class SCR_VONController
 
         if (!m_bEC29_RadioCheckPlayed)
             EC29_TryPlayRadioCheck();
+
+        // Coexistence: the real 506IRRU mod polls the same default keys; ours yields.
+        if (EC29_CoexistenceGuard.ShouldYieldRadio())
+            return;
 
         InputManager inputMgr = GetGame().GetInputManager();
         if (inputMgr)

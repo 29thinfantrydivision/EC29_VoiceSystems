@@ -186,6 +186,9 @@ modded class SCR_VoNComponent
 	//! consumed by the merged von.acp graph; they must be refreshed per incoming packet.
 	protected void EC29_ApplyRadioAudioVars(int playerId, BaseTransceiver receiver, int frequency)
 	{
+		if (EC29_CoexistenceGuard.ShouldYieldRadio())
+			return;
+
 		if (!s_bEC29RadioVarsChecked)
 		{
 			s_bEC29RadioVarsChecked = true;
@@ -239,6 +242,9 @@ modded class SCR_VoNComponent
 	//! path and the key-state RPC path just ensure it is running (single-ticker rule).
 	protected void EC29_TrackIncomingTransmission(BaseTransceiver receiver, int frequency, int senderPlayerId)
 	{
+		if (EC29_CoexistenceGuard.ShouldYieldRadio())
+			return;
+
 		PlayerController playerController = GetGame().GetPlayerController();
 		if (playerController && playerController.GetPlayerId() == senderPlayerId)
 			return;
