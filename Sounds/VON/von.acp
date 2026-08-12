@@ -3,13 +3,29 @@ AudioClass {
   SignalClass "30733" {
    id 30733
    name "Signal 1"
-   tl -768 -512
-   res "{CF1F9C4B120DE5F8}Sounds/VON/Von.sig"
+   tl -776.622 -515.118
+   res "{CF1F9C4B120DE5F8}Sounds/VON/EC29Von.sig"
+   conns {
+    IOPConnectionClass iopConnection {
+     port 1
+     conn {
+      ConnectionsClass connections {
+       id 26
+       links {
+        ConnectionClass "100382:65" {
+         id 100382
+         port 65
+        }
+       }
+      }
+     }
+    }
+   }
    inputsport {
     1
    }
    outputsport {
-    5 8 12
+    5 8 12 18 20 22
    }
    inputvalues {
     1
@@ -20,7 +36,7 @@ AudioClass {
    inputvaluesmax {
     1
    }
-   path "{CF1F9C4B120DE5F8}Sounds/VON/Von.sig"
+   path "{CF1F9C4B120DE5F8}Sounds/VON/EC29Von.sig"
   }
   SignalClass "66573" {
    id 66573
@@ -34,7 +50,7 @@ AudioClass {
     36
    }
    inputvalues {
-    1 0 0 16000
+    0 0 0 16000
    }
    inputvaluesmin {
     0 0 0 0
@@ -56,7 +72,7 @@ AudioClass {
     39 105 107 106 110
    }
    inputvalues {
-    100 1 16000
+    100 0 16000
    }
    inputvaluesmin {
     0 0 0
@@ -66,13 +82,89 @@ AudioClass {
    }
    path "{76CBB40EF7F227B6}Sounds/_SharedData/Signals/Reverb/Reverb_Base.sig"
   }
+  SignalClass "95245" {
+   id 95245
+   name "Routing Signal"
+   tl 122.001 -545.02
+   res "{4D6CC8A4D1FED38F}Sounds/VON/EC29routing.sig"
+   conns {
+    IOPConnectionClass iopConnection {
+     port 1
+     conn {
+      ConnectionsClass connections {
+       id 26
+       links {
+        ConnectionClass "98334:65" {
+         id 98334
+         port 65
+        }
+       }
+      }
+     }
+    }
+   }
+   inputsport {
+    1
+   }
+   outputsport {
+    2 22
+   }
+   inputvalues {
+    1
+   }
+   inputvaluesmin {
+    0
+   }
+   inputvaluesmax {
+    1
+   }
+   path "{4D6CC8A4D1FED38F}Sounds/VON/EC29routing.sig"
+  }
+  SignalClass "105485" {
+   id 105485
+   name "Signal 103"
+   tl -780.6 -266.008
+   res "{D59B06686BE2B58F}Sounds/VON/EC29_SignalQuality.sig"
+   conns {
+    IOPConnectionClass iopConnection {
+     port 1
+     conn {
+      ConnectionsClass connections {
+       id 26
+       links {
+        ConnectionClass "104478:65" {
+         id 104478
+         port 65
+        }
+       }
+      }
+     }
+    }
+   }
+   inputsport {
+    1
+   }
+   outputsport {
+    2 3 7
+   }
+   inputvalues {
+    0.2
+   }
+   inputvaluesmin {
+    0
+   }
+   inputvaluesmax {
+    1
+   }
+   path "{D59B06686BE2B58F}Sounds/VON/EC29_SignalQuality.sig"
+  }
  }
  filters {
   FilterClass "33814" {
    id 33814
    name "Filter Bitcrusher"
    version 5
-   tl -512 -592
+   tl -522.05 -645.606
    ins {
     ConnectionsClass "con:0" {
      id 0
@@ -157,7 +249,7 @@ AudioClass {
    id 63510
    name "Filter HP"
    version 5
-   tl -512 -512
+   tl -520.392 -581.538
    pi {
     1 0
    }
@@ -172,9 +264,20 @@ AudioClass {
    id 64534
    name "Filter LP"
    version 5
-   tl -512 -352
+   tl -520.92 -420.633
+   ins {
+    ConnectionsClass "con:2" {
+     id 2
+     links {
+      ConnectionClass "105485:3" {
+       id 105485
+       port 3
+      }
+     }
+    }
+   }
    pi {
-    1 0
+    5 0
    }
    volume_dB 2
    DSPObject BiquadDSPTypeClass dsp {
@@ -186,9 +289,20 @@ AudioClass {
    id 88086
    name "Filter Clipper"
    version 5
-   tl -512 -432
+   tl -518.05 -513.85
+   ins {
+    ConnectionsClass "con:2" {
+     id 2
+     links {
+      ConnectionClass "105485:2" {
+       id 105485
+       port 2
+      }
+     }
+    }
+   }
    pi {
-    1 0
+    5 0
    }
    DSPObject DistortionDSPTypeClass dsp {
     distortionType HardClipper
@@ -202,7 +316,7 @@ AudioClass {
    name "FilterChain"
    comment "Dont use compressor here. Creates panorama movement when DIRECT and RADIO are mixed."
    version 5
-   tl -256 -416
+   tl -262.174 -580.984
    ctl 0 -21
    ins {
     ConnectionsClass "con:1" {
@@ -243,9 +357,9 @@ AudioClass {
     }
    }
    pi {
-    30 0
+    62 0
    }
-   ports 4
+   ports 5
   }
   FilterChainClass "53271" {
    id 53271
@@ -315,14 +429,61 @@ AudioClass {
     }
    }
   }
+  VariableClass "98334" {
+   id 98334
+   name "Routing Selection"
+   comment "0 = Center, 1 = Right, 2 = Left"
+   version 5
+   tl -57.996 -545.274
+   ctl 0 -24
+   varName "EC29_EarRouting"
+   varResource "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf"
+  }
+  VariableClass "100382" {
+   id 100382
+   name "Jamming Strength"
+   comment "0 = highest level of jamming"
+   version 5
+   tl -1029.777 -511.682
+   ctl 0 -24
+   varName "EC29_JamStrength"
+   varResource "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf"
+  }
+  VariableClass "104478" {
+   id 104478
+   name "Signal Quality"
+   comment "RF PROPAGATION MODEL ONLY"
+   version 5
+   tl -1021.022 -267.922
+   ctl 0 -24
+   varName "EC29_SignalQuality"
+   varResource "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf"
+  }
+  VariableClass "108574" {
+   id 108574
+   name "EC29_ChannelVolume"
+   version 5
+   tl -59.702 -470.737
+   varName "EC29_ChannelVolume"
+   varResource "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf"
+  }
  }
  sounds {
   SoundClass "27657" {
    id 27657
    name "VON_RADIO"
    version 5
-   tl 256 -256
+   tl 252.735 -263.01
    ins {
+    ConnectionsClass "con:1" {
+     id 1
+     links {
+      ConnectionClass "105485:7" {
+       id 105485
+       port 7
+      }
+     }
+    }
     ConnectionsClass "con:64" {
      id 64
      links {
@@ -337,6 +498,9 @@ AudioClass {
      }
     }
    }
+   pi {
+    2 0
+   }
    varName "VON_Radio"
    varResource "{A60F08955792B575}Sounds/_SharedData/Variables/GlobalVariables.conf"
    outState 13323
@@ -346,7 +510,7 @@ AudioClass {
    id 45065
    name "SOUND_ROGER_BEEP"
    version 5
-   tl 256 0
+   tl 256.658 0.572
    ins {
     ConnectionsClass "con:64" {
      id 64
@@ -362,6 +526,7 @@ AudioClass {
      }
     }
    }
+   volume_dB -60
    outState 13323
    outStatePort 77831
   }
@@ -407,9 +572,9 @@ AudioClass {
  buses {
   BusClass "50183" {
    id 50183
-   name "Bus Voice + Noise"
+   name "Bus Jamming Noise Only"
    version 7
-   tl -256 -256
+   tl -247.452 -102.799
    ins {
     ConnectionsClass "con:0" {
      id 0
@@ -432,12 +597,12 @@ AudioClass {
     ConnectionsClass "con:64" {
      id 64
      links {
-      ConnectionClass "52231:65" {
-       id 52231
-       port 65
-      }
       ConnectionClass "36869:65" {
        id 36869
+       port 65
+      }
+      ConnectionClass "103429:65" {
+       id 103429
        port 65
       }
      }
@@ -515,13 +680,127 @@ AudioClass {
     1 0
    }
   }
+  BusClass "94215" {
+   id 94215
+   name "Routing Bus"
+   version 7
+   tl 2.675 -380.032
+   ins {
+    ConnectionsClass "con:2" {
+     id 2
+     links {
+      ConnectionClass "95245:22" {
+       id 95245
+       port 22
+      }
+     }
+    }
+    ConnectionsClass "con:3" {
+     id 3
+     links {
+      ConnectionClass "95245:2" {
+       id 95245
+       port 2
+      }
+     }
+    }
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "50183:65" {
+       id 50183
+       port 65
+      }
+      ConnectionClass "101383:65" {
+       id 101383
+       port 65
+      }
+     }
+    }
+   }
+   pi {
+    1020 0
+   }
+   channels "2"
+   channelVolume 1
+  }
+  BusClass "101383" {
+   id 101383
+   name "Bus Voice Only"
+   version 7
+   tl -249.59 -233.825
+   ins {
+    ConnectionsClass "con:0" {
+     id 0
+     links {
+      ConnectionClass "30733:18" {
+       id 30733
+       port 18
+      }
+     }
+    }
+    ConnectionsClass "con:1" {
+     id 1
+     links {
+      ConnectionClass "32791:65" {
+       id 32791
+       port 65
+      }
+     }
+    }
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "52231:65" {
+       id 52231
+       port 65
+      }
+     }
+    }
+   }
+   pi {
+    3 0
+   }
+   pu {
+    1 0
+   }
+  }
+  BusClass "107527" {
+   id 107527
+   name "Channel Control Volume"
+   version 7
+   tl -2.57 -243.754
+   ins {
+    ConnectionsClass "con:0" {
+     id 0
+     links {
+      ConnectionClass "108574:65" {
+       id 108574
+       port 65
+      }
+     }
+    }
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "94215:65" {
+       id 94215
+       port 65
+      }
+     }
+    }
+   }
+   pi {
+    1 0
+   }
+  }
  }
  generators {
   GeneratorClass "36869" {
    id 36869
    name "Generator Noise"
    version 6
-   tl -512 -256
+   tl -511.271 -158.705
    ins {
     ConnectionsClass "con:1" {
      id 1
@@ -540,6 +819,34 @@ AudioClass {
     2 0
    }
    function BrownianNoise
+   volume 0.2
+   volume_dB -14
+   time 10
+   infinite 1
+  }
+  GeneratorClass "103429" {
+   id 103429
+   name "Generator Noise"
+   version 6
+   tl -513.496 -94.844
+   ins {
+    ConnectionsClass "con:1" {
+     id 1
+     links {
+      ConnectionClass "30733:8" {
+       id 30733
+       port 8
+      }
+     }
+    }
+   }
+   pi {
+    2 0
+   }
+   pu {
+    2 0
+   }
+   function PinkNoise
    volume 0.2
    volume_dB -14
    time 10
@@ -660,18 +967,22 @@ AudioClass {
    id 46098
    name "Shader Radio"
    version 5
-   tl 0 -256
+   tl -6.805 -117.658
    ins {
     ConnectionsClass "con:64" {
      id 64
      links {
-      ConnectionClass "50183:65" {
-       id 50183
+      ConnectionClass "107527:65" {
+       id 107527
        port 65
       }
      }
     }
    }
+   pi {
+    8 0
+   }
+   Enable 1
   }
   ShaderClass "57362" {
    id 57362
@@ -731,7 +1042,7 @@ AudioClass {
    id 26641
    name "Stream 1"
    version 5
-   tl -768 -768
+   tl -765.217 -764.522
   }
  }
  banks_local {
