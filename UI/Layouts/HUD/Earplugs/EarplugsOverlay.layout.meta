@@ -1,0 +1,17 @@
+MetaFileClass {
+ Name "{C3E88B05F8FF93CF}UI/layouts/HUD/Earplugs/EarplugsOverlay.layout"
+ Configurations {
+  LayoutResourceClass PC {
+  }
+  LayoutResourceClass XBOX_ONE : PC {
+  }
+  LayoutResourceClass XBOX_SERIES : PC {
+  }
+  LayoutResourceClass PS4 : PC {
+  }
+  LayoutResourceClass PS5 : PC {
+  }
+  LayoutResourceClass HEADLESS : PC {
+  }
+ }
+}

@@ -1,0 +1,15 @@
+SCR_ChimeraCharacter {
+ ID "520EC961A090B1EE"
+ components {
+  SCR_BaseHUDComponent "{520EA1D2DB118134}" {
+   InfoDisplays {
+    EC29_Earplugs_Info "{612F654A27B3849F}" {
+     VisibleAtParent 1
+     m_LayoutPath "{C3E88B05F8FF93CF}UI/layouts/HUD/Earplugs/EarplugsOverlay.layout"
+     m_eLayer LOW
+     m_bShowWhenCreated 1
+    }
+   }
+  }
+ }
+}

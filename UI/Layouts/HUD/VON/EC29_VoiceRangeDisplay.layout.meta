@@ -1,0 +1,17 @@
+MetaFileClass {
+ Name "{46BDC60D3C6EC544}UI/Layouts/HUD/VON/EC29_VoiceRangeDisplay.layout"
+ Configurations {
+  LayoutResourceClass PC {
+  }
+  LayoutResourceClass XBOX_ONE : PC {
+  }
+  LayoutResourceClass XBOX_SERIES : PC {
+  }
+  LayoutResourceClass PS4 : PC {
+  }
+  LayoutResourceClass PS5 : PC {
+  }
+  LayoutResourceClass HEADLESS : PC {
+  }
+ }
+}

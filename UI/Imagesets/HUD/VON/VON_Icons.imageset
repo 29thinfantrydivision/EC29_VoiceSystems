@@ -1,0 +1,32 @@
+ImageSetClass {
+ RefSize 72 204
+ Textures {
+  ImageSetTextureClass "{6934606E5730A03B}" {
+   screenSize FHD
+   size 72 204
+   path "{6D33087BEE3E4827}UI/Imagesets/HUD/VON/VON_Icons-100_atlas.edds"
+  }
+  ImageSetTextureClass "{6314919BD4DE0676}" {
+   screenSize FHD
+   size 136 396
+   path "{957EBFEB1A10AB62}UI/Imagesets/HUD/VON/VON_Icons-200_atlas.edds"
+  }
+ }
+ Images {
+  ImageSetDefClass EC29_VON_Normal {
+   Pos 2 2
+   Size 64 64
+   Flags 0 0
+  }
+  ImageSetDefClass EC29_VON_Whisper {
+   Pos 2 68
+   Size 64 64
+   Flags 0 0
+  }
+  ImageSetDefClass EC29_VON_Yelling {
+   Pos 2 134
+   Size 64 64
+   Flags 0 0
+  }
+ }
+}

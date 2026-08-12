@@ -1,0 +1,9 @@
+FrameWidgetClass "{1A5B43EF83D7B6D0}" {
+ Name "EC29_VoiceRangeRoot"
+ {
+  ImageWidgetClass "{1A5B43EF83D7B6D1}" {
+   Name "VoiceRangeIcon"
+   Color 1 1 1 1
+  }
+ }
+}

@@ -1,0 +1,17 @@
+MetaFileClass {
+ Name "{6D33087BEE3E4827}UI/Imagesets/HUD/VON/VON_Icons-100_atlas.edds"
+ Configurations {
+  EDDSResourceClass PC {
+  }
+  EDDSResourceClass XBOX_ONE : PC {
+  }
+  EDDSResourceClass XBOX_SERIES : PC {
+  }
+  EDDSResourceClass PS4 : PC {
+  }
+  EDDSResourceClass PS5 : PC {
+  }
+  EDDSResourceClass HEADLESS : PC {
+  }
+ }
+}

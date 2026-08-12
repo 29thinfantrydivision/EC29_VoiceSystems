@@ -1,0 +1,32 @@
+FrameWidgetClass {
+ Name "rootFrame"
+ {
+  OverlayWidgetClass "{612F654A6B35C5C7}" {
+   Name "Overlay0"
+   Slot FrameWidgetSlot "{612F654A6B35C5EF}" {
+    Anchor 1 0.5 1 0.5
+    PositionX -75
+    OffsetLeft -75
+    PositionY -25
+    OffsetTop -25
+    SizeX 50
+    OffsetRight 25
+    SizeY 50
+    OffsetBottom -25
+   }
+   {
+    ImageWidgetClass "{612F654A0D16010C}" {
+     Name "Image0"
+     Slot OverlayWidgetSlot "{612F654A0D16012E}" {
+      HorizontalAlign 3
+      VerticalAlign 3
+     }
+     Opacity 0
+     Texture "{1A95414B2C82DB8C}UI/Textures/HUD/Earplugs/Earplugs_UI.edds"
+     Size 500 500
+     "Blend Mode" Additive
+    }
+   }
+  }
+ }
+}

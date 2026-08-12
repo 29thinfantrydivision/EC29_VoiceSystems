@@ -1,0 +1,8 @@
+GameProject {
+ ID "EC29_VoiceSystems"
+ GUID "481849A4E0D88BEA"
+ TITLE "EC29 Voice Systems (VON Range + Earplugs)"
+ Dependencies {
+  "58D0FB3206B6F859"
+ }
+}

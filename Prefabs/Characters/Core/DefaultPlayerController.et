@@ -1,0 +1,13 @@
+SCR_PlayerController {
+ ID "1A9BA6BEFA06E3B1"
+ components {
+  SCR_HUDManagerComponent "{2FDC275D9EBCDB8B}" {
+   InfoDisplays {
+    EC29_VoiceRangeDisplay "{6933A1B7C5E4A001}" {
+     m_LayoutPath "{46BDC60D3C6EC544}UI/layouts/HUD/VON/EC29_VoiceRangeDisplay.layout"
+     m_eLayer ALWAYS_TOP
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,17 @@
+MetaFileClass {
+ Name "{1A95414B2C82DB8C}UI/Textures/HUD/Earplugs/Earplugs_UI.edds"
+ Configurations {
+  EDDSResourceClass PC {
+  }
+  EDDSResourceClass XBOX_ONE : PC {
+  }
+  EDDSResourceClass XBOX_SERIES : PC {
+  }
+  EDDSResourceClass PS4 : PC {
+  }
+  EDDSResourceClass PS5 : PC {
+  }
+  EDDSResourceClass HEADLESS : PC {
+  }
+ }
+}

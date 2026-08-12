@@ -1,0 +1,7 @@
+SCR_BaseGameMode {
+ ID "56B2B479C6B96951"
+ components {
+  EC29_VONSettingsComponent "{6933A1B7C5E4E001}" {
+  }
+ }
+}
