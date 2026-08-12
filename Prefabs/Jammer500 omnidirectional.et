@@ -1,0 +1,63 @@
+GenericEntity {
+ ID "68493046939B2981"
+ components {
+  ColliderHistoryComponent "{68493046939B29BF}" {
+  }
+  EC29_JammerComponent "{68493046939B29AC}" {
+   m_vEmitterOffset 0 0.5 0
+  }
+  MeshObject "{68493046939B29A1}" {
+   Object "{04B34F783859027E}Assets/Jammersmall FBX.xob"
+  }
+  RigidBody "{68493046939B29A3}" {
+   LayerPreset "PropFireView"
+   ModelGeometry 1
+  }
+  SCR_EditableEntityComponent "{68493046939B29A2}" {
+   m_EntityType SYSTEM
+   m_UIInfo SCR_EditableEntityUIInfo "{68493046939B2A59}" {
+    Name "Jammer OmniDirectional 500 M"
+    Description "Omnidirectional Radio Jammer"
+    Icon "{FB6D26632201761E}PrefabsEditable/Auto/Compositions/Slotted/SlotFlatSmall/Jammer.edds"
+    m_Image "{FB6D26632201761E}PrefabsEditable/Auto/Compositions/Slotted/SlotFlatSmall/Jammer.edds"
+    m_aAuthoredLabels {
+     ENTITYTYPE_COMPOSITION TRAIT_EFFECT_MODULE
+    }
+    m_EntityBudgetCost {
+     SCR_EntityBudgetValue "{68493046939B2A5B}" {
+     }
+    }
+   }
+   m_Flags PLACEABLE
+  }
+  ActionsManagerComponent "{68493046939B2A5C}" {
+   ActionContexts {
+    UserActionContext "{68493046939B2A5E}" {
+     UIInfo UIInfo "{68493046939B2A50}" {
+      Name "JammerControlPanel"
+      Description "JammerControlPanel"
+     }
+     ContextName "JammerControlPanel"
+     Position PointInfo "{68493046939B2A52}" {
+      Offset 0 0.9716 -0.0967
+     }
+    }
+   }
+   additionalActions {
+    EC29_JammerToggleUserAction "{68493046939B2A57}" {
+     ParentContextList {
+      "JammerControlPanel"
+     }
+     UIInfo UIInfo "{68493046939B2A56}" {
+      Name "Toggle Jammer"
+      Description "Toggle Jammer"
+     }
+     ActionTitle "Toggle Jammer"
+    }
+   }
+  }
+  RplComponent "{68493046939B2A08}" {
+  }
+ }
+ coords 3 3.967 3.197
+}

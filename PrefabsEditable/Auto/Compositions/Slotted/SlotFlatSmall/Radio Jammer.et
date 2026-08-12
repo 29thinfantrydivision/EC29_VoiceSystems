@@ -1,0 +1,308 @@
+GenericEntity : "{8B4B8BF44162B24E}Prefabs/Compositions/Slotted/SlotFlatSmall/Antenna_S_US_01.et" {
+ ID "5282DCB5DFC8538F"
+ components {
+  SCR_EditableEntityComponent "{5EA88D643C6D1ED3}" : "{B35795373E565FE7}Prefabs/Editor/Components/SlotFlatSmall_SCR_EditableEntityComponent.ct" {
+   m_UIInfo SCR_EditableEntityUIInfo "{5298E609432D192D}" {
+    Name "Radio Jammer"
+    Icon "{3F3D80879DDD074D}UI/Textures/Editor/ContentBrowser/ContentBrowser_Trait_Radio.edds"
+    m_Image "{FB6D26632201761E}PrefabsEditable/Auto/Compositions/Slotted/SlotFlatSmall/Jammer.edds"
+    m_sFaction "US"
+    m_aAuthoredLabels {
+     ENTITYTYPE_COMPOSITION SLOT_FLAT_SMALL TRAIT_RADIO TRAIT_SERVICE SERVICE_ANTENNA TUTORIAL_ANTENNA
+    }
+    m_aAutoLabels {
+     FACTION_US
+    }
+    m_EntityBudgetCost {
+     SCR_EntityBudgetValue "{68483279AA5DDF8A}" {
+      m_BudgetType CAMPAIGN
+      m_Value 250
+     }
+    }
+    m_EntityChildrenBudgetCost {
+     SCR_EntityBudgetValue "{68483279AA5DDF84}" {
+      m_BudgetType SYSTEMS
+      m_Value 5
+     }
+     SCR_EntityBudgetValue "{68483279AA5DDF86}" {
+      m_BudgetType PROPS
+      m_Value 8
+     }
+    }
+   }
+  }
+  SCR_EditorLinkComponent "{68483279AA5DDFBB}" {
+   m_aEntries {
+    SCR_EditorLinkEntry "{68483279AA5DDFBA}" {
+     m_Prefab "{9FEBA85C09987EF6}PrefabsEditable/Auto/Compositions/Misc/CustomEntities/CompositionDecals/E_CompositionDecal_Dirt_Patch_03.et"
+     m_vPosition -0.005 0.1 2.063
+     m_vAngles 0 34.761 0
+     m_fScale 1
+    }
+    SCR_EditorLinkEntry "{68483279AA5DDFBD}" {
+     m_Prefab "{90BD7DEFA921C518}PrefabsEditable/Auto/Props/Airport/GeneratorAirfield_US_01/E_GeneratorAirfield_US_01.et"
+     m_vPosition -0.566 0 -3.254
+     m_vAngles 0 -161.536 0
+     m_fScale 1
+    }
+    SCR_EditorLinkEntry "{68483279AA5DEF23}" {
+     m_Prefab "{FDA8F11B3BD0C445}PrefabsEditable/Auto/Props/Construction/CableReel/E_CableReelWooden_01.et"
+     m_vPosition -3.229 0 4.056
+     m_vAngles 0 0 0
+     m_fScale 1
+    }
+    SCR_EditorLinkEntry "{68483279AA5DEF21}" {
+     m_Prefab "{FDA8F11B3BD0C445}PrefabsEditable/Auto/Props/Construction/CableReel/E_CableReelWooden_01.et"
+     m_vPosition -3.667 0 2.472
+     m_vAngles 0 64.577 0
+     m_fScale 1
+    }
+    SCR_EditorLinkEntry "{68483279AA5DEF20}" {
+     m_Prefab "{47E2C605FF71A05A}PrefabsEditable/Auto/Structures/Military/CamoNets/US/E_CamoNet_Medium_US.et"
+     m_vPosition 0 0 0
+     m_vAngles 0 0 0
+     m_fScale 1
+    }
+    SCR_EditorLinkEntry "{68483279AA5E0DB4}" {
+     m_Prefab "{1EC51D33C3E9E8A1}PrefabsEditable/Auto/Props/Military/Compositions/US/E_Antenna_01_US.et"
+     m_vPosition 0 0 0
+     m_vAngles 0 38.558 0
+     m_fScale 1
+    }
+    SCR_EditorLinkEntry "{68483279AA5E0DBB}" {
+     m_Prefab "{910D0810DB232ED5}PrefabsEditable/Auto/Systems/Compositions/PatrolPoint/E_PatrolPoint_LoiterPoint.et"
+     m_vPosition -3.006 0.1 1.32
+     m_vAngles 0 61.473 0
+     m_fScale 1
+    }
+    SCR_EditorLinkEntry "{68483279AA5E1947}" {
+     m_Prefab "{308E000E2051D357}PrefabsEditable/Auto/Systems/SpawnPoints/E_SpawnPosition.et"
+     m_vPosition -2.583 0.01 -2.04
+     m_vAngles 0 14.578 0
+     m_fScale 1
+    }
+    SCR_EditorLinkEntry "{68483279AA5E1946}" {
+     m_Prefab "{308E000E2051D357}PrefabsEditable/Auto/Systems/SpawnPoints/E_SpawnPosition.et"
+     m_vPosition 2.856 0.01 -0.099
+     m_vAngles 0 -36.778 0
+     m_fScale 1
+    }
+    SCR_EditorLinkEntry "{68483279AA5E195F}" {
+     m_Prefab "{801ED7BC8CEAB598}PrefabsEditable/Auto/Compositions/Misc/CustomEntities/CompositionDecals/E_CompositionDecal_Dirt_Footprints_02.et"
+     m_vPosition -5.779 0.1 -1.598
+     m_vAngles 0 -36.565 0
+     m_fScale 1
+    }
+    SCR_EditorLinkEntry "{68483279AA5E195E}" {
+     m_Prefab "{801ED7BC8CEAB598}PrefabsEditable/Auto/Compositions/Misc/CustomEntities/CompositionDecals/E_CompositionDecal_Dirt_Footprints_02.et"
+     m_vPosition -4.076 0.1 -0.987
+     m_vAngles 0 14.107 0
+     m_fScale 1
+    }
+    SCR_EditorLinkEntry "{68483279AA5E8FBD}" {
+     m_Prefab "{F0AC39FB028EE442}PrefabsEditable/Auto/Systems/Compositions/PatrolPoint/E_PatrolPoint_ObservationPoint.et"
+     m_vPosition -1.514 0.1 6.154
+     m_vAngles 0 -81.559 0
+     m_fScale 1
+    }
+    SCR_EditorLinkEntry "{68483279AA5E8FBE}" {
+     m_Prefab "{F0AC39FB028EE442}PrefabsEditable/Auto/Systems/Compositions/PatrolPoint/E_PatrolPoint_ObservationPoint.et"
+     m_vPosition 1.549 0.1 6.737
+     m_vAngles 0 -95.154 0
+     m_fScale 1
+    }
+   }
+  }
+ }
+ coords 0 0 0
+ {
+  GenericEntity {
+   ID "5D088D25EF40208B"
+   components {
+    MeshObject "{5872F0EB7FA40561}" {
+     Enabled 0
+    }
+   }
+   Flags 0x100000 0x403
+  }
+  GenericEntity {
+   ID "5D088D25EF4020B9"
+   components {
+    ClimbingDataComponent "{5EDEE534EA0A0AF0}" {
+     Enabled 0
+    }
+    MeshObject "{52F0B4B05BC0C1F4}" {
+     Enabled 0
+    }
+    RigidBody "{52F0B4B05F6D4CE2}" {
+     Enabled 0
+    }
+    Hierarchy "{58489A7BAB68DC3D}" {
+     Enabled 0
+    }
+   }
+   Flags 0x100000 0x3
+  }
+  GenericEntity {
+   ID "5D088D25EF4020D1"
+   components {
+    Hierarchy "{5866E2109746055F}" {
+     Enabled 0
+    }
+   }
+   Flags 0x100000 0x3
+   {
+    DecalEntity {
+     ID "56DF08929A14FB98"
+     Flags 0x100000 0x80003
+    }
+   }
+  }
+  GenericEntity {
+   ID "5D088D25EF4020F0"
+   components {
+    Hierarchy "{5866E2109746055F}" {
+     Enabled 0
+    }
+   }
+   Flags 0x100000 0x3
+   {
+    DecalEntity {
+     ID "56E0B29E01E2AC90"
+     Flags 0x100000 0x80003
+     coords 1.1 0 -1.617
+     scale 1
+    }
+   }
+  }
+  GenericEntity {
+   ID "5D088D25EF402104"
+   components {
+    SignalsManagerComponent "{585497CF23028ACD}" {
+     Enabled 0
+    }
+    SoundComponent "{585497CF23028AC0}" {
+     Enabled 0
+    }
+    MeshObject "{5872F0EB7FA40561}" {
+     Enabled 0
+    }
+    RigidBody "{5872F0EB7DFB5A9D}" {
+     Enabled 0
+    }
+    ActionsManagerComponent "{585497CF23028AEE}" {
+     Enabled 0
+    }
+    RplComponent "{585497CF23028AE1}" {
+     Enabled 0
+    }
+    Hierarchy "{5D647736503ABF8E}" {
+     Enabled 0
+    }
+   }
+   Flags 0x100000 0x403
+  }
+  GenericEntity {
+   ID "5D088D25EF402114"
+   components {
+    MeshObject "{5872F0EB7FA40561}" {
+     Enabled 0
+    }
+    RigidBody "{5872F0EB7DFB5A9D}" {
+     Enabled 0
+    }
+    Hierarchy "{5D64773650314B1A}" {
+     Enabled 0
+    }
+   }
+   Flags 0x100000 0x403
+  }
+  GenericEntity {
+   ID "5D088D25EF402134"
+   Flags 0x100000 0x3
+   {
+    DecalEntity {
+     ID "56DF08929A14FB98"
+     Flags 0x100000 0x80003
+    }
+   }
+  }
+  GenericEntity {
+   ID "5D371AC87254ED3A"
+   components {
+    EC29_JammerComponent "{68483279636121DE}" {
+    }
+    MeshObject "{5872F0EB7FA40561}" {
+     Object "{04B34F783859027E}Assets/Jammersmall FBX.xob"
+    }
+    SCR_AntennaServicePointComponent "{5CB8818C79A7B643}" {
+     Enabled 0
+    }
+    SCR_HorizontalAlignComponent "{55B890D2B67E0C35}" {
+     Enabled 0
+    }
+    ScriptedRadioComponent "{5CB8818C71F12C73}" {
+     Enabled 0
+    }
+   }
+   Flags 0x100000 0x403
+  }
+  GenericEntity {
+   ID "5DCAAA1816D09E42"
+   components {
+    SCR_SpawnPositionComponent "{5DCAAA19520B7416}" {
+     Enabled 0
+    }
+    Hierarchy "{5E48CE44D2AD4C53}" {
+     Enabled 0
+    }
+   }
+   Flags 0x100000 0x3
+  }
+  GenericEntity {
+   ID "5DCAAA1816D09E6E"
+   components {
+    SCR_SpawnPositionComponent "{5DCAAA19520B7416}" {
+     Enabled 0
+    }
+    Hierarchy "{5E48CE44D2AC95E5}" {
+     Enabled 0
+    }
+   }
+   Flags 0x100000 0x3
+  }
+  GenericEntity {
+   ID "5EA88D65C2A5898A"
+   components {
+    Hierarchy "{5EA88D643DB3E138}" {
+     Enabled 0
+     AutoTransform 0
+    }
+   }
+   Flags 0x100000 0x3
+  }
+  GenericEntity {
+   ID "5EA88D65C2A58996"
+   components {
+    Hierarchy "{5EA88D643D8FA61A}" {
+     Enabled 0
+     AutoTransform 0
+    }
+   }
+   Flags 0x100000 0x3
+  }
+  GenericEntity {
+   ID "5EA88D65C2A589AD"
+   components {
+    SCR_AISmartActionSentinelComponent "{5CB0DBCC796A6F1C}" {
+     Enabled 0
+    }
+    Hierarchy "{5EA88D643D9B193E}" {
+     Enabled 0
+     AutoTransform 0
+    }
+   }
+   Flags 0x100000 0x3
+  }
+ }
+}

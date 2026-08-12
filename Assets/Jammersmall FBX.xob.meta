@@ -1,0 +1,17 @@
+MetaFileClass {
+ Name "{04B34F783859027E}Assets/Jammersmall FBX.xob"
+ Configurations {
+  XOBResourceClass PC {
+  }
+  XOBResourceClass XBOX_ONE : PC {
+  }
+  XOBResourceClass XBOX_SERIES : PC {
+  }
+  XOBResourceClass PS4 : PC {
+  }
+  XOBResourceClass PS5 : PC {
+  }
+  XOBResourceClass HEADLESS : PC {
+  }
+ }
+}

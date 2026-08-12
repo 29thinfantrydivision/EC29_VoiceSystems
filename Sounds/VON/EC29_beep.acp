@@ -1,0 +1,472 @@
+AudioClass {
+ signals {
+  SignalClass "8205" {
+   id 8205
+   name "Routing Signal"
+   tl 115.468 -456.121
+   res "{4D6CC8A4D1FED38F}Sounds/VON/EC29routing.sig"
+   conns {
+    IOPConnectionClass "iop:1" {
+     port 1
+     conn {
+      ConnectionsClass connections {
+       id 26
+       links {
+        ConnectionClass "11294:65" {
+         id 11294
+         port 65
+        }
+       }
+      }
+     }
+    }
+   }
+   inputsport {
+    1
+   }
+   outputsport {
+    2 22
+   }
+   inputvalues {
+    0
+   }
+   inputvaluesmin {
+    0
+   }
+   inputvaluesmax {
+    1
+   }
+  }
+ }
+ vars {
+  VariableClass "11294" {
+   id 11294
+   name "Ear Routing"
+   version 5
+   tl -104.745 -459.659
+   varName "EC29_EarRouting"
+   varResource "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf"
+  }
+ }
+ sounds {
+  SoundClass "6153" {
+   id 6153
+   name "EC29_CLICK_OFF"
+   version 5
+   tl 539.339 -359.592
+   ins {
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "9223:65" {
+       id 9223
+       port 65
+      }
+     }
+    }
+   }
+   volume_dB -15
+  }
+  SoundClass "14345" {
+   id 14345
+   name "EC29_BEEP_HIGH"
+   version 5
+   tl 540.457 -239.969
+   ins {
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "12295:65" {
+       id 12295
+       port 65
+      }
+     }
+    }
+   }
+   volume_dB -12
+  }
+  SoundClass "16393" {
+   id 16393
+   name "EC29_BEEP_LOW"
+   version 5
+   tl 542.108 -123.633
+   ins {
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "15367:65" {
+       id 15367
+       port 65
+      }
+     }
+    }
+   }
+   volume_dB -12
+  }
+  SoundClass "17417" {
+   id 17417
+   name "EC29_GRS_START"
+   version 5
+   tl 542.699 -4.274
+   ins {
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "18439:65" {
+       id 18439
+       port 65
+      }
+     }
+    }
+   }
+   volume_dB 6
+  }
+  SoundClass "19465" {
+   id 19465
+   name "EC29_GRS_END"
+   version 5
+   tl 546.654 113.269
+   ins {
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "20487:65" {
+       id 20487
+       port 65
+      }
+     }
+    }
+   }
+   volume_dB -3
+  }
+  SoundClass "21513" {
+   id 21513
+   name "EC29_SQUELCH_TAIL"
+   version 5
+   tl 546.232 232.999
+   ins {
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "22535:65" {
+       id 22535
+       port 65
+      }
+     }
+    }
+   }
+   volume_dB -12
+  }
+ }
+ buses {
+  BusClass "9223" {
+   id 9223
+   name "Routing Bus"
+   version 7
+   tl 315.946 -359.952
+   ins {
+    ConnectionsClass "con:2" {
+     id 2
+     links {
+      ConnectionClass "8205:22" {
+       id 8205
+       port 22
+      }
+     }
+    }
+    ConnectionsClass "con:3" {
+     id 3
+     links {
+      ConnectionClass "8205:2" {
+       id 8205
+       port 2
+      }
+     }
+    }
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "3076:65" {
+       id 3076
+       port 65
+      }
+     }
+    }
+   }
+   pi {
+    1020 0
+   }
+   channels "2"
+   channelVolume 1
+  }
+  BusClass "12295" {
+   id 12295
+   name "Routing Bus"
+   version 7
+   tl 315.763 -240.676
+   ins {
+    ConnectionsClass "con:2" {
+     id 2
+     links {
+      ConnectionClass "8205:22" {
+       id 8205
+       port 22
+      }
+     }
+    }
+    ConnectionsClass "con:3" {
+     id 3
+     links {
+      ConnectionClass "8205:2" {
+       id 8205
+       port 2
+      }
+     }
+    }
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "1028:65" {
+       id 1028
+       port 65
+      }
+     }
+    }
+   }
+   pi {
+    1020 0
+   }
+   channels "2"
+   channelVolume 1
+  }
+  BusClass "15367" {
+   id 15367
+   name "Routing Bus"
+   version 7
+   tl 315.801 -123.486
+   ins {
+    ConnectionsClass "con:2" {
+     id 2
+     links {
+      ConnectionClass "8205:22" {
+       id 8205
+       port 22
+      }
+     }
+    }
+    ConnectionsClass "con:3" {
+     id 3
+     links {
+      ConnectionClass "8205:2" {
+       id 8205
+       port 2
+      }
+     }
+    }
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "2052:65" {
+       id 2052
+       port 65
+      }
+     }
+    }
+   }
+   pi {
+    1020 0
+   }
+   channels "2"
+   channelVolume 1
+  }
+  BusClass "18439" {
+   id 18439
+   name "Routing Bus"
+   version 7
+   tl 315.694 -2.067
+   ins {
+    ConnectionsClass "con:2" {
+     id 2
+     links {
+      ConnectionClass "8205:22" {
+       id 8205
+       port 22
+      }
+     }
+    }
+    ConnectionsClass "con:3" {
+     id 3
+     links {
+      ConnectionClass "8205:2" {
+       id 8205
+       port 2
+      }
+     }
+    }
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "4100:65" {
+       id 4100
+       port 65
+      }
+     }
+    }
+   }
+   pi {
+    1020 0
+   }
+   channels "2"
+   channelVolume 1
+  }
+  BusClass "20487" {
+   id 20487
+   name "Routing Bus"
+   version 7
+   tl 312.938 120.206
+   ins {
+    ConnectionsClass "con:2" {
+     id 2
+     links {
+      ConnectionClass "8205:22" {
+       id 8205
+       port 22
+      }
+     }
+    }
+    ConnectionsClass "con:3" {
+     id 3
+     links {
+      ConnectionClass "8205:2" {
+       id 8205
+       port 2
+      }
+     }
+    }
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "5124:65" {
+       id 5124
+       port 65
+      }
+     }
+    }
+   }
+   pi {
+    1020 0
+   }
+   channels "2"
+   channelVolume 1
+  }
+  BusClass "22535" {
+   id 22535
+   name "Routing Bus"
+   version 7
+   tl 312.516 237.463
+   ins {
+    ConnectionsClass "con:2" {
+     id 2
+     links {
+      ConnectionClass "8205:22" {
+       id 8205
+       port 22
+      }
+     }
+    }
+    ConnectionsClass "con:3" {
+     id 3
+     links {
+      ConnectionClass "8205:2" {
+       id 8205
+       port 2
+      }
+     }
+    }
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "23556:65" {
+       id 23556
+       port 65
+      }
+     }
+    }
+   }
+   pi {
+    1020 0
+   }
+   channels "2"
+   channelVolume 1
+  }
+ }
+ banks_local {
+  BankLocalClass "1028" {
+   id 1028
+   name "ACE_HighBeep"
+   version 7
+   tl 88.043 -247.33
+   Samples {
+    AudioBankSampleClass "beep_high.wav" {
+     Filename "{1ADFC1E8AF584F50}Sounds/ACE_Radio/beep_high.wav"
+    }
+   }
+  }
+  BankLocalClass "2052" {
+   id 2052
+   name "ACE_LowBeep"
+   version 7
+   tl 89.223 -122.351
+   Samples {
+    AudioBankSampleClass "beep_low.wav" {
+     Filename "{A08EB2587E7B515E}Sounds/ACE_Radio/beep_low.wav"
+    }
+   }
+  }
+  BankLocalClass "3076" {
+   id 3076
+   name "ACE_ClickOff"
+   version 7
+   tl 109.665 -355.743
+   Samples {
+    AudioBankSampleClass "click_off.wav" {
+     Filename "{E43AE4FF96A1BFE6}Sounds/ACE_Radio/click_off.wav"
+    }
+   }
+  }
+  BankLocalClass "4100" {
+   id 4100
+   name "GRS_Start"
+   version 7
+   tl 94.209 0.851
+   Samples {
+    AudioBankSampleClass "StartRadioTransmissionBeep.wav" {
+     Filename "{FFCC0497F888301F}Sounds/VON/GL_Sounds/StartRadioTransmissionBeep.wav"
+    }
+   }
+  }
+  BankLocalClass "5124" {
+   id 5124
+   name "GRS_End"
+   version 7
+   tl 91.525 121.032
+   Samples {
+    AudioBankSampleClass "EndRadioTransmission2.wav" {
+     Filename "{A5C6D2BF6A2C871D}Sounds/VON/GL_Sounds/EndRadioTransmission2.wav"
+    }
+   }
+  }
+  BankLocalClass "23556" {
+   id 23556
+   name "Squelch Tail"
+   version 7
+   tl 93.748 236.967
+   Samples {
+    AudioBankSampleClass Empty {
+     Filename "{A79CA9FE93FE6EAB}Sounds/EC29_Sound/squelch_tail_01.wav"
+    }
+   }
+  }
+ }
+ version 2
+}

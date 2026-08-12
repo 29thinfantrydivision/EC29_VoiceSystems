@@ -1,0 +1,256 @@
+//! Per-frequency receive-side squelch state, one channel per frequency.
+//! Fed by two sources: authoritative key-state RPCs relayed through
+//! EC29_RFPropagationNetworkComponent (instant open/close, dead keys audible)
+//! and the voice packet stream from SCR_VoNComponent (fallback for senders
+//! that never sent a key RPC, e.g. other mods or GM transmissions).
+//! A keyed channel stays open through dead air; a voice-only channel closes
+//! by silence timeout via Tick().
+class EC29_RxChannelState
+{
+    //! Sender id -> last key-start time; only senders whose key-start passed
+    //! this receiver's tuning/reachability gates are entered, so their stops
+    //! are the only ones that can release the channel.
+    ref map<int, float> m_mKeyedSenders = new map<int, float>();
+    bool m_bVoiceActive;
+    float m_fLastVoiceMs;
+    bool m_bOpen;
+    float m_fClosedAtMs;
+    float m_fRpcClosedAtMs;
+}
+
+class EC29_RadioRxSquelch
+{
+    //! Voice capture does silence detection, so the timeout must ride through
+    //! natural speech pauses; the grace keeps borderline gaps from replaying
+    //! the open beep. MAX_KEY_HOLD is a failsafe against a lost key-stop RPC.
+    protected static const float SILENCE_TIMEOUT_MS = 600;
+    protected static const float REOPEN_GRACE_MS = 500;
+    protected static const float MAX_KEY_HOLD_MS = 120000;
+    protected static const float MIN_SIGNAL_QUALITY = 0.05;
+    //! Voice frames still in flight behind the reliable key-stop RPC must not
+    //! reopen the channel (that would earn a second close beep from Tick);
+    //! kept below REOPEN_GRACE_MS so a genuine still-talking voice-only sender
+    //! resumes silently right after the window.
+    protected static const float VOICE_TAIL_DISCARD_MS = 400;
+
+    private static ref EC29_RadioRxSquelch s_Instance;
+
+    protected ref map<int, ref EC29_RxChannelState> m_mChannels = new map<int, ref EC29_RxChannelState>();
+
+    //------------------------------------------------------------------------------------------------
+    static EC29_RadioRxSquelch GetInstance()
+    {
+        if (!s_Instance)
+            s_Instance = new EC29_RadioRxSquelch();
+
+        return s_Instance;
+    }
+
+    //------------------------------------------------------------------------------------------------
+    //! Remote player key state relayed by the server. Key-start is gated by
+    //! frequency tuning and reachability so squelch mirrors what the voice
+    //! path could actually deliver; key-stop is always processed so counts
+    //! cannot wedge when the receiver moved out of range mid-transmission.
+    void OnRemoteKeyState(int senderPlayerId, int frequency, float range, bool keyed, vector senderPos)
+    {
+        PlayerController playerController = GetGame().GetPlayerController();
+        if (!playerController)
+            return;
+
+        if (playerController.GetPlayerId() == senderPlayerId)
+            return;
+
+        float nowMs = GetGame().GetWorld().GetWorldTime();
+
+        if (keyed)
+        {
+            BaseTransceiver transceiver = FindTunedTransceiver(frequency);
+            if (!transceiver)
+                return;
+
+            if (!IsReachable(frequency, range, senderPos, playerController))
+                return;
+
+            EC29_RxChannelState state = GetOrCreateState(frequency);
+            ExpireStuckKeys(state, nowMs);
+            state.m_mKeyedSenders.Set(senderPlayerId, nowMs);
+            Open(state, transceiver, nowMs);
+        }
+        else
+        {
+            EC29_RxChannelState state;
+            if (!m_mChannels.Find(frequency, state))
+                return;
+
+            // Only honor stops whose start was accepted for this receiver, so a
+            // filtered-out sender's release cannot close a channel someone else
+            // is still keying.
+            if (!state.m_mKeyedSenders.Contains(senderPlayerId))
+                return;
+
+            state.m_mKeyedSenders.Remove(senderPlayerId);
+
+            // Voice stops with the key, so close immediately instead of waiting
+            // out the silence timeout; the tail-discard window swallows voice
+            // frames that were still in flight behind this RPC.
+            if (state.m_mKeyedSenders.Count() == 0)
+            {
+                state.m_bVoiceActive = false;
+                state.m_fRpcClosedAtMs = nowMs;
+                Close(state, frequency, nowMs);
+            }
+        }
+    }
+
+    //------------------------------------------------------------------------------------------------
+    //! Voice packet on a tuned radio; the caller filters out own transmissions.
+    void OnVoicePacket(int frequency, BaseTransceiver receiver)
+    {
+        float nowMs = GetGame().GetWorld().GetWorldTime();
+
+        EC29_RxChannelState state = GetOrCreateState(frequency);
+        ExpireStuckKeys(state, nowMs);
+
+        if (nowMs - state.m_fRpcClosedAtMs < VOICE_TAIL_DISCARD_MS)
+            return;
+
+        state.m_bVoiceActive = true;
+        state.m_fLastVoiceMs = nowMs;
+        Open(state, receiver, nowMs);
+    }
+
+    //------------------------------------------------------------------------------------------------
+    //! Advance timeouts; close voice-silent channels and drop idle state.
+    //! \return true while any channel still needs ticking
+    bool Tick(float nowMs)
+    {
+        array<int> idle = {};
+        foreach (int frequency, EC29_RxChannelState state : m_mChannels)
+        {
+            ExpireStuckKeys(state, nowMs);
+
+            if (state.m_bVoiceActive && nowMs - state.m_fLastVoiceMs > SILENCE_TIMEOUT_MS)
+                state.m_bVoiceActive = false;
+
+            if (state.m_bOpen && state.m_mKeyedSenders.Count() == 0 && !state.m_bVoiceActive)
+                Close(state, frequency, nowMs);
+
+            if (!state.m_bOpen && state.m_mKeyedSenders.Count() == 0 && !state.m_bVoiceActive && nowMs - state.m_fClosedAtMs > REOPEN_GRACE_MS)
+                idle.Insert(frequency);
+        }
+
+        foreach (int frequency : idle)
+            m_mChannels.Remove(frequency);
+
+        return m_mChannels.Count() > 0;
+    }
+
+    //------------------------------------------------------------------------------------------------
+    protected void Open(EC29_RxChannelState state, BaseTransceiver transceiver, float nowMs)
+    {
+        if (state.m_bOpen)
+            return;
+
+        state.m_bOpen = true;
+
+        if (nowMs - state.m_fClosedAtMs < REOPEN_GRACE_MS)
+            return;
+
+        EC29_RadioBeepHelper.PlayRxOpen(transceiver);
+    }
+
+    //------------------------------------------------------------------------------------------------
+    protected void Close(EC29_RxChannelState state, int frequency, float nowMs)
+    {
+        if (!state.m_bOpen)
+            return;
+
+        state.m_bOpen = false;
+        state.m_fClosedAtMs = nowMs;
+
+        BaseTransceiver transceiver = FindTunedTransceiver(frequency);
+        if (transceiver)
+            EC29_RadioBeepHelper.PlayRxClose(transceiver);
+    }
+
+    //------------------------------------------------------------------------------------------------
+    protected void ExpireStuckKeys(EC29_RxChannelState state, float nowMs)
+    {
+        if (state.m_mKeyedSenders.Count() == 0)
+            return;
+
+        array<int> stale = {};
+        foreach (int senderId, float lastKeyMs : state.m_mKeyedSenders)
+        {
+            if (nowMs - lastKeyMs > MAX_KEY_HOLD_MS)
+                stale.Insert(senderId);
+        }
+
+        foreach (int senderId : stale)
+            state.m_mKeyedSenders.Remove(senderId);
+    }
+
+    //------------------------------------------------------------------------------------------------
+    protected EC29_RxChannelState GetOrCreateState(int frequency)
+    {
+        EC29_RxChannelState state;
+        if (m_mChannels.Find(frequency, state))
+            return state;
+
+        state = new EC29_RxChannelState();
+        m_mChannels.Set(frequency, state);
+        return state;
+    }
+
+    //------------------------------------------------------------------------------------------------
+    protected BaseTransceiver FindTunedTransceiver(int frequency)
+    {
+        PlayerController playerController = GetGame().GetPlayerController();
+        if (!playerController)
+            return null;
+
+        SCR_VONController vonController = SCR_VONController.Cast(playerController.FindComponent(SCR_VONController));
+        if (!vonController)
+            return null;
+
+        SCR_VONEntryRadio entry = vonController.EC29_FindRadioEntryByFrequency(frequency);
+        if (!entry)
+            return null;
+
+        BaseTransceiver transceiver = entry.GetTransceiver();
+        if (!transceiver)
+            return null;
+
+        // The engine only delivers voice to powered radios; mirror that gate so
+        // a switched-off radio never squelches.
+        BaseRadioComponent radio = transceiver.GetRadio();
+        if (!radio || !radio.IsPowered())
+            return null;
+
+        return transceiver;
+    }
+
+    //------------------------------------------------------------------------------------------------
+    protected bool IsReachable(int frequency, float range, vector senderPos, PlayerController playerController)
+    {
+        if (senderPos == vector.Zero || range <= 0)
+            return true;
+
+        IEntity myEntity = playerController.GetControlledEntity();
+        if (!myEntity)
+            return true;
+
+        vector myPos = myEntity.GetOrigin();
+        if (vector.Distance(senderPos, myPos) > range)
+            return false;
+
+        if (EC29_RFPropagationNetworkComponent.IsRFPropagationEnabled())
+        {
+            float quality = EC29_SignalManager.GetInstance().GetSignalQuality(senderPos, myPos, frequency);
+            if (quality < MIN_SIGNAL_QUALITY)
+                return false;
+        }
+
+        return true;
+    }
+}

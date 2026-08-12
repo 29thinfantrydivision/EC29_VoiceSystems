@@ -1,0 +1,65 @@
+GenericEntity {
+ ID "684832092672BA57"
+ components {
+  ColliderHistoryComponent "{684832092672BA66}" {
+  }
+  EC29_JammerComponent "{684832092672BA70}" {
+   m_fRangeConfig 2000
+   m_fConeAngleConfig 90
+   m_vEmitterOffset 0 12 3
+  }
+  MeshObject "{684832092672BA72}" {
+   Object "{D21357E0C2546DD1}Assets/jammer large.xob"
+  }
+  RigidBody "{684832092672BA0C}" {
+   LayerPreset "PropFireView"
+   ModelGeometry 1
+  }
+  SCR_EditableEntityComponent "{684832092672BA0D}" {
+   m_EntityType SYSTEM
+   m_UIInfo SCR_EditableEntityUIInfo "{684832092672BA0F}" {
+    Name "Mega Jammer (2000m)"
+    Description "Directional 2000m Jammer"
+    Icon "{0D9D6F9C1CE3014B}Prefabs/mega jammer.edds"
+    m_Image "{0D9D6F9C1CE3014B}Prefabs/mega jammer.edds"
+    m_aAuthoredLabels {
+     ENTITYTYPE_COMPOSITION TRAIT_EFFECT_MODULE
+    }
+    m_EntityBudgetCost {
+     SCR_EntityBudgetValue "{684832092672BA09}" {
+     }
+    }
+   }
+   m_Flags PLACEABLE
+  }
+  ActionsManagerComponent "{68491B29F028F4D9}" {
+   ActionContexts {
+    UserActionContext "{68491B29F42201EC}" {
+     UIInfo UIInfo "{68491B29E9082216}" {
+      Name "Power Box"
+      Description "Power Box"
+     }
+     ContextName "JammerControlPanel"
+     Position PointInfo "{68491B291B828339}" {
+      Offset -6.7011 1.3539 -2.7624
+     }
+    }
+   }
+   additionalActions {
+    EC29_JammerToggleUserAction "{6849118DA0E31404}" {
+     ParentContextList {
+      "JammerControlPanel"
+     }
+     UIInfo UIInfo "{6849118DA6438711}" {
+      Name "Toggle Jammer"
+      Description "Toggle Jammer"
+     }
+     ActionTitle "Toggle Jammer"
+    }
+   }
+  }
+  RplComponent "{684832092672BA04}" {
+  }
+ }
+ coords 3 3.967 3.197
+}

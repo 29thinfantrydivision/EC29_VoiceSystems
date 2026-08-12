@@ -1,0 +1,4 @@
+MatPBRBasic {
+ BCRMap "{E94014D30613EC02}Assets/Data/Material.006_BCR.edds"
+ NMOMap "{BEB79115C619C737}Assets/Data/Material.006_NMO.edds"
+}

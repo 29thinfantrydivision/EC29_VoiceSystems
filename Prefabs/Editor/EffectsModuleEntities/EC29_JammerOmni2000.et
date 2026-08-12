@@ -1,0 +1,30 @@
+GenericEntity {
+ ID "67340DB92266C343"
+ components {
+  EC29_JammerComponent "{67340DB92266C0B2}" {
+   m_fRangeConfig 2000
+  }
+  SCR_EditableEntityComponent "{67340DB92266C0BF}" {
+   m_EntityType SYSTEM
+   m_UIInfo SCR_EditableEntityUIInfo "{67340DB92266C0A3}" {
+    Name "Jammer Omni 2000 M"
+    Description "Omnidirectional Radio Jammer"
+    Icon "{AA07D789D7CC6707}Assets/RadarImage.edds"
+    m_Image "{AA07D789D7CC6707}Assets/RadarImage.edds"
+    m_aAuthoredLabels {
+     ENTITYTYPE_SYSTEM TRAIT_EFFECT_MODULE
+    }
+    m_EntityBudgetCost {
+     SCR_EntityBudgetValue "{67340DB92266C0A5}" {
+      m_BudgetType SYSTEMS
+      m_Value 5
+     }
+    }
+   }
+   m_Flags PLACEABLE
+  }
+  RplComponent "{67340DB92266C0A6}" {
+  }
+ }
+ coords 3 3.967 3.197
+}
