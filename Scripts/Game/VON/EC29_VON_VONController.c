@@ -57,7 +57,7 @@ modded class SCR_VONController
     {
         Print("[EC29-DBG][VONCtrl] F3 keybind FIRED (EC29_VONVoiceRangeCycle action works)", LogLevel.NORMAL);
 
-        // Coexistence: real WCS_VON also cycles on F3; firing both would double-cycle.
+        // Coexistence: a known conflicting mod also cycles voice range on F3; firing both would double-cycle.
         if (EC29_CoexistenceGuard.ShouldYieldVoiceRange())
             return;
         if (!m_VONComp)
@@ -312,7 +312,7 @@ modded class SCR_VONController
         if (!m_bEC29_RadioCheckPlayed)
             EC29_TryPlayRadioCheck();
 
-        // Coexistence: the real 506IRRU mod polls the same default keys; ours yields.
+        // Coexistence: a known conflicting VON mod polls the same default keys; ours yields.
         if (EC29_CoexistenceGuard.ShouldYieldRadio())
             return;
 

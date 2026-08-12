@@ -83,7 +83,7 @@ class EC29_Earplugs_System extends WorldSystem
 	{
 		Print("[EC29-DBG][Earplugs] F2 keybind FIRED (EC29_ToggleEarplugs action works)", LogLevel.NORMAL);
 
-		// Coexistence: real WCS_Earplugs also toggles on F2; both firing would cancel out.
+		// Coexistence: a known conflicting mod also toggles SFX volume on F2; both firing would cancel out.
 		if (EC29_CoexistenceGuard.ShouldYieldEarplugs())
 			return;
 

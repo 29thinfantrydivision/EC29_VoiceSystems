@@ -205,7 +205,7 @@ class EC29_RFPropagationNetworkComponent : SCR_BaseGameModeComponent
 	[RplRpc(RplChannel.Reliable, RplRcver.Broadcast)]
 	protected void RpcDo_EC29_KeyState(int senderPlayerId, int frequency, float range, bool keyed, vector senderPos)
 	{
-		// Coexistence: the real 506IRRU mod runs its own key-state/squelch system.
+		// Coexistence: a known conflicting VON mod runs its own key-state/squelch system.
 		if (EC29_CoexistenceGuard.ShouldYieldRadio())
 			return;
 

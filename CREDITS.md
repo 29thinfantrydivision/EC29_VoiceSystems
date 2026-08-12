@@ -2,6 +2,10 @@
 
 **Engineering:** Goldwep (29th Infantry Division)
 
+**Research:** voice range, earplug, and radio enhancement functionality
+researched from the WCS and 506th radio codebases, reimplemented and extended
+for the 29th ID with the original authors' blessing.
+
 ## Audio
 - Sound effects from http://www.freesfx.co.uk
 - Roger beep derived from "Walkie Talkie.wav" by CGEffex
