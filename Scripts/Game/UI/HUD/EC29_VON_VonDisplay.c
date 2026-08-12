@@ -19,6 +19,7 @@ modded class SCR_VonDisplay
 	//! mode changes (replicated via SCR_VoNComponent's RplProp).
 	void EC29_ForceRefreshAllTransmissions()
 	{
+		Print("[EC29-DBG][VonOverlay] Refreshing transmission labels after voice-mode change", LogLevel.NORMAL);
 		if (m_OutTransmission)
 			m_OutTransmission.m_bForceUpdate = true;
 

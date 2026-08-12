@@ -26,19 +26,31 @@ class EC29_Earplugs_System extends WorldSystem
 	//------------------------------------------------------------------------------------------------
 	override void OnInit()
 	{
+		Print("[EC29-DBG][Earplugs] System OnInit ENTER - system was instantiated (ChimeraSystemsConfig override applied)", LogLevel.NORMAL);
 		Instance = this;
 
 		EngineUserSettings = GetGame().GetEngineUserSettings();
 		GameUserSettings = GetGame().GetGameUserSettings();
 		Input = GetGame().GetInputManager();
 
+		if (!EngineUserSettings)
+			Print("[EC29-DBG][Earplugs] EngineUserSettings is NULL", LogLevel.WARNING);
+		if (!GameUserSettings)
+			Print("[EC29-DBG][Earplugs] GameUserSettings is NULL", LogLevel.WARNING);
+		if (!Input)
+			Print("[EC29-DBG][Earplugs] InputManager is NULL - keybind will NOT register", LogLevel.WARNING);
+
 		SFX_DefaultVolume = FetchDefaultSFXVolume();
 		EarplugsVolume = FetchEarplugsVolume();
+		PrintFormat("[EC29-DBG][Earplugs] Volumes resolved: defaultSFX=%1 pluggedSFX=%2", SFX_DefaultVolume, EarplugsVolume);
 
 		GetGame().OnUserSettingsChangedInvoker().Insert(OnUserSettingsChanged);
 
 		if (Input)
+		{
 			Input.AddActionListener("EC29_ToggleEarplugs", EActionTrigger.DOWN, OnKeybindPressed);
+			Print("[EC29-DBG][Earplugs] Action listener registered for 'EC29_ToggleEarplugs' (F2). If F2 does nothing and no keypress log appears, the input action did not load from chimeraInputCommon.conf", LogLevel.NORMAL);
+		}
 
 		if (GetVolume() < SFX_DefaultVolume)
 			SetVolume(SFX_DefaultVolume);
@@ -69,6 +81,7 @@ class EC29_Earplugs_System extends WorldSystem
 	//------------------------------------------------------------------------------------------------
 	void OnKeybindPressed()
 	{
+		Print("[EC29-DBG][Earplugs] F2 keybind FIRED (EC29_ToggleEarplugs action works)", LogLevel.NORMAL);
 		EngineUserSettings = GetGame().GetEngineUserSettings();
 		ToggleSFXVolume();
 	}
@@ -95,8 +108,13 @@ class EC29_Earplugs_System extends WorldSystem
 		if (earplugSettings)
 		{
 			earplugSettings.Get("EarplugsVolume", volume);
+			PrintFormat("[EC29-DBG][Earplugs] Settings module found: reduction slider=%1%%", volume);
 			volume = 1.0 - (volume * 0.01);
 			volume *= SFX_DefaultVolume;
+		}
+		else
+		{
+			Print("[EC29-DBG][Earplugs] Settings module 'EC29_EarplugSettings' NOT found - plugged volume will be 0 (full mute)", LogLevel.WARNING);
 		}
 
 		return volume;
@@ -112,6 +130,7 @@ class EC29_Earplugs_System extends WorldSystem
 		else
 			SetVolume(SFX_DefaultVolume);
 
+		PrintFormat("[EC29-DBG][Earplugs] Toggled: muted=%1 -> SFX master volume set to %2 (readback=%3)", bMuted, bMuted ? EarplugsVolume : SFX_DefaultVolume, GetVolume());
 		ThrowEvent(this.OnEarplugsToggled, bMuted);
 	}
 

@@ -137,6 +137,8 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 		super.OnPostInit(owner);
 
 		s_pInstance = this;
+		PrintFormat("[EC29-DBG][VONSettings] Component alive on game mode (GameMode_Base override applied). isServer=%1 whisper=%2m normal=%3m yell=%4m falloff=%5 yellVol=%6 minVol=%7",
+			Replication.IsServer(), m_fWhisperRange, m_fNormalRange, m_fYellRange, m_fFalloffPower, m_fYellVolume, m_fMinVolume);
 
 		if (!Replication.IsServer())
 			return;

@@ -5,6 +5,7 @@ modded class SCR_AudioSettingsSubMenu
 	{
 		super.OnTabCreate(menuRoot, buttonsLayout, index);
 
+		Print("[EC29-DBG][EarplugsMenu] Audio settings tab created - inserting earplug reduction slider", LogLevel.NORMAL);
 		SCR_SettingBindingGameplay bind = new SCR_SettingBindingGameplay("EC29_EarplugSettings", "EarplugsVolume", "Earplugs");
 		m_aSettingsBindings.Insert(bind);
 

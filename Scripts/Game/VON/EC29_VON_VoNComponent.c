@@ -8,6 +8,9 @@ modded class SCR_VoNComponent
 	protected static ref map<int, SCR_VoNComponent> s_mEC29PlayerVon = new map<int, SCR_VoNComponent>();
 	protected static ref map<int, IEntity> s_mEC29PlayerVonEntity = new map<int, IEntity>();
 
+	// Debug: last gain logged per speaker so OnReceive logging doesn't spam every voice packet.
+	protected static ref map<int, float> s_mEC29DbgLastGain = new map<int, float>();
+
 	[RplProp(onRplName: "EC29_OnVoiceRangeReplicated")]
 	protected EC29_EVoiceRange m_eEC29VoiceRange = EC29_EVoiceRange.NORMAL;
 
@@ -17,6 +20,7 @@ modded class SCR_VoNComponent
 	//! refreshes mid-transmission instead of only on the next new transmission.
 	protected void EC29_OnVoiceRangeReplicated()
 	{
+		PrintFormat("[EC29-DBG][VoN] CLIENT received replicated voice range: %1", typename.EnumToString(EC29_EVoiceRange, m_eEC29VoiceRange));
 		// Can fire from JIP initial-state replication before the local PlayerController
 		// exists; vanilla GetDisplay() dereferences GetPlayerController() unguarded.
 		if (!GetGame().GetPlayerController())
@@ -45,11 +49,15 @@ modded class SCR_VoNComponent
 	{
 		// Reject out-of-enum values from a tampered client before storing/replicating.
 		if (range < EC29_EVoiceRange.WHISPER || range > EC29_EVoiceRange.YELL)
+		{
+			PrintFormat("[EC29-DBG][VoN] SERVER rejected out-of-range voice mode value %1", range, level: LogLevel.WARNING);
 			return;
+		}
 
 		if (m_eEC29VoiceRange == range)
 			return;
 
+		PrintFormat("[EC29-DBG][VoN] SERVER accepted voice range %1 -> replicating to clients", typename.EnumToString(EC29_EVoiceRange, range));
 		m_eEC29VoiceRange = range;
 		Replication.BumpMe();
 	}
@@ -107,6 +115,8 @@ modded class SCR_VoNComponent
 
 			if (!s_bEC29VarValid)
 				PrintFormat("[EC29_VON] AudioSystem variable lookup FAILED: name='%1' config='%2' - audio modulation disabled", EC29_VAR_NAME, EC29_VAR_CONFIG, level: LogLevel.WARNING);
+			else
+				PrintFormat("[EC29-DBG][VoN] AudioSystem variable '%1' resolved OK - von.acp override + local variables conf are loaded", EC29_VAR_NAME);
 		}
 
 		if (!s_bEC29VarValid)
@@ -127,6 +137,23 @@ modded class SCR_VoNComponent
 
 			// Audio path applies the floor so the source stays alive in the engine.
 			volume = settings.ComputeListenerVolume(playerId, listener, true);
+		}
+		else
+		{
+			// One log per session is enough; settings==null means the GameMode_Base override didn't apply.
+			if (!s_mEC29DbgLastGain.Contains(-1))
+			{
+				s_mEC29DbgLastGain.Set(-1, 1.0);
+				Print("[EC29-DBG][VoN] EC29_VONSettingsComponent.GetInstance() is NULL during OnReceive - GameMode prefab override not applied; gain stays 1.0", LogLevel.WARNING);
+			}
+		}
+
+		// Throttled receive-path logging: only when this speaker's computed gain changes noticeably.
+		float lastGain;
+		if (!s_mEC29DbgLastGain.Find(playerId, lastGain) || Math.AbsFloat(lastGain - volume) > 0.02)
+		{
+			s_mEC29DbgLastGain.Set(playerId, volume);
+			PrintFormat("[EC29-DBG][VoN] OnReceive: speaker playerId=%1 computed gain=%2 (pushed to audio var '%3')", playerId, volume, EC29_VAR_NAME);
 		}
 
 		AudioSystem.SetVariableByName(EC29_VAR_NAME, volume, EC29_VAR_CONFIG);
