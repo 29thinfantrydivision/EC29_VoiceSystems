@@ -1,0 +1,10 @@
+VerticalLayoutWidgetClass {
+ {
+  ButtonWidgetClass "{684601EE00000305}" : "{0022F0B45ADBC5AC}UI/layouts/WidgetLibrary/EditBox/WLib_EditBox.layout" {
+   Name "EditBox"
+   Slot LayoutSlot "{684601EE00000306}" {
+    Padding 8 8 8 8
+   }
+  }
+ }
+}

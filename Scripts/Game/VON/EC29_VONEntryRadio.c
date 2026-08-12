@@ -19,7 +19,7 @@ modded class SCR_VONEntryRadio
         if (!m_RadioTransceiver)
             return;
 
-        EC29_RadioEarSettings settings = EC29_RadioEarSettings.GetInstance();
+        EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
         EC29_EEarRouting routing = settings.GetRouting(m_RadioTransceiver);
         EC29_EBeepType beepType = settings.GetBeepType(m_RadioTransceiver);
         int volume = settings.GetVolumePercent(m_RadioTransceiver);

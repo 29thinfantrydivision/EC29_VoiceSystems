@@ -33,7 +33,6 @@ class EC29_RadioRxSquelch
     //! resumes silently right after the window.
     protected static const float VOICE_TAIL_DISCARD_MS = 400;
 
-    private static ref EC29_RadioRxSquelch s_Instance;
 
     protected ref map<int, ref EC29_RxChannelState> m_mChannels = new map<int, ref EC29_RxChannelState>();
 
@@ -44,28 +43,8 @@ class EC29_RadioRxSquelch
     protected static const int TICK_INTERVAL_MS = 150;
     protected bool m_bTicking = false;
 
-    //! World-lifecycle guard: script statics survive mission restart / server hop,
-    //! but the CallLater ticker and world clock do not. Weak member (no ref) nulls
-    //! when its world is destroyed; a mismatch means stale channel timestamps and
-    //! a stranded m_bTicking flag, so GetInstance() rebuilds the singleton fresh.
-    protected BaseWorld m_OwnerWorld;
 
     //------------------------------------------------------------------------------------------------
-    static EC29_RadioRxSquelch GetInstance()
-    {
-        BaseWorld currentWorld = GetGame().GetWorld();
-
-        if (!s_Instance || s_Instance.m_OwnerWorld != currentWorld)
-        {
-            if (s_Instance)
-                Print("[EC29-DBG][RadioSquelch] World changed - resetting squelch singleton (stale channels + ticker flag dropped)", LogLevel.NORMAL);
-
-            s_Instance = new EC29_RadioRxSquelch();
-            s_Instance.m_OwnerWorld = currentWorld;
-        }
-
-        return s_Instance;
-    }
 
     //------------------------------------------------------------------------------------------------
     void EnsureTicking()
@@ -290,7 +269,7 @@ class EC29_RadioRxSquelch
 
         if (EC29_RFPropagationNetworkComponent.IsRFPropagationEnabled())
         {
-            float quality = EC29_SignalManager.GetInstance().GetSignalQuality(senderPos, myPos, frequency);
+            float quality = EC29_RadioState.GetInstance().GetSignalQuality(senderPos, myPos, frequency);
             if (quality < MIN_SIGNAL_QUALITY)
                 return false;
         }

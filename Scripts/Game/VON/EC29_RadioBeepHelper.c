@@ -22,7 +22,7 @@ class EC29_RadioBeepHelper
         if (!transceiver)
             return;
 
-        EC29_RadioEarSettings settings = EC29_RadioEarSettings.GetInstance();
+        EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
         EC29_EBeepType beepType = settings.GetBeepType(transceiver);
 
         string eventName;
@@ -43,7 +43,7 @@ class EC29_RadioBeepHelper
         if (!transceiver)
             return;
 
-        EC29_RadioEarSettings settings = EC29_RadioEarSettings.GetInstance();
+        EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
         EC29_EBeepType beepType = settings.GetBeepType(transceiver);
 
         string eventName;
@@ -68,7 +68,7 @@ class EC29_RadioBeepHelper
         if (!transceiver)
             return;
 
-        EC29_RadioEarSettings settings = EC29_RadioEarSettings.GetInstance();
+        EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
         EC29_EBeepType beepType = settings.GetBeepType(transceiver);
 
         string eventName;
@@ -93,7 +93,7 @@ class EC29_RadioBeepHelper
         if (!transceiver)
             return;
 
-        EC29_RadioEarSettings settings = EC29_RadioEarSettings.GetInstance();
+        EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
         EC29_EBeepType beepType = settings.GetBeepType(transceiver);
 
         string eventName;
@@ -130,7 +130,7 @@ class EC29_RadioBeepHelper
             return;
         }
 
-        EC29_RadioEarSettings settings = EC29_RadioEarSettings.GetInstance();
+        EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
         EC29_EEarRouting routing = settings.GetRouting(transceiver);
 
         AudioSystem.SetVariableByName("EC29_EarRouting", routing, EAR_ROUTING_CONFIG);

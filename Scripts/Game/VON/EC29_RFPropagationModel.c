@@ -17,16 +17,8 @@ class EC29_RFPropagationModel
     protected static const float POOR_THRESHOLD = 92.0;
     protected static const float CUTOFF_THRESHOLD = 100.0;
 
-    private static ref EC29_RFPropagationModel s_Instance;
 
     //------------------------------------------------------------------------------------------------
-    static EC29_RFPropagationModel GetInstance()
-    {
-        if (!s_Instance)
-            s_Instance = new EC29_RFPropagationModel();
-
-        return s_Instance;
-    }
 
     //------------------------------------------------------------------------------------------------
     float CalculateSignalQuality(vector txPos, vector rxPos, float frequencyKHz = 0)
@@ -344,7 +336,7 @@ class EC29_RFPropagationModel
         float worstFresnelIntrusion = 0.0;
         float worstFresnelRadius = 0.0;
 
-        EC29_RFPropagationModel model = GetInstance();
+        EC29_RFPropagationModel model = new EC29_RFPropagationModel();
 
         for (int i = 1; i < numSamples; i++)
         {

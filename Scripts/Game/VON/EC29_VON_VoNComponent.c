@@ -283,20 +283,20 @@ modded class SCR_VoNComponent
 		if (playerController && playerController.GetPlayerId() == senderPlayerId)
 			return;
 
-		EC29_RadioRxSquelch.GetInstance().OnVoicePacket(frequency, receiver);
-		EC29_RadioRxSquelch.GetInstance().EnsureTicking();
+		EC29_RadioState.GetInstance().Squelch().OnVoicePacket(frequency, receiver);
+		EC29_RadioState.GetInstance().Squelch().EnsureTicking();
 	}
 
 	protected float EC29_GetEarRoutingForTransceiver(BaseTransceiver transceiver)
 	{
-		EC29_RadioEarSettings settings = EC29_RadioEarSettings.GetInstance();
+		EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
 		EC29_EEarRouting routing = settings.GetRouting(transceiver);
 		return routing;
 	}
 
 	protected float EC29_GetChannelVolumeForTransceiver(BaseTransceiver transceiver)
 	{
-		EC29_RadioEarSettings settings = EC29_RadioEarSettings.GetInstance();
+		EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
 		float volume = settings.GetVolume(transceiver);
 		// Apply exponential curve for better volume sensitivity
 		return Math.Pow(volume, 2.5);
@@ -313,13 +313,13 @@ modded class SCR_VoNComponent
 
 		vector transmitterPos = transmitter.GetOrigin();
 
-		EC29_SignalManager signalManager = EC29_SignalManager.GetInstance();
+		EC29_RadioState signalManager = EC29_RadioState.GetInstance();
 		return signalManager.GetSignalQuality(transmitterPos, receiverPos, frequencyKHz);
 	}
 
 	protected float EC29_GetJamStrength(vector receiverPos)
 	{
-		EC29_SignalManager signalManager = EC29_SignalManager.GetInstance();
+		EC29_RadioState signalManager = EC29_RadioState.GetInstance();
 		float jammerDegradation = signalManager.GetJammerStrength(receiverPos);
 		// CAREFUL THIS IS INVERTED!!!!
 		return 1.0 - jammerDegradation;

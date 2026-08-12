@@ -34,9 +34,9 @@ class EC29_RFPropagationNetworkComponent : SCR_BaseGameModeComponent
 	protected static const int EC29_MIN_FREQUENCY_KHZ = 1000;
 	protected static const int EC29_MAX_FREQUENCY_KHZ = 1000000;
 	protected static const float EC29_MAX_RANGE_M = 50000;
-	protected static const int EC29_RELAY_RATE_MAX = 10;
-	protected static const float EC29_RELAY_RATE_WINDOW_MS = 4000;
-	protected ref map<int, ref array<float>> m_mEC29_RelayTimesByPlayer = new map<int, ref array<float>>();
+	protected static const float EC29_RELAY_BUCKET_CAPACITY = 10;
+	protected static const float EC29_RELAY_BUCKET_WINDOW_MS = 4000;
+	protected ref map<int, ref EC29_TokenBucket> m_mEC29_RelayBucketByPlayer = new map<int, ref EC29_TokenBucket>();
 
 
 	//------------------------------------------------------------------------------------------------
@@ -142,32 +142,25 @@ class EC29_RFPropagationNetworkComponent : SCR_BaseGameModeComponent
 	}
 
 	//------------------------------------------------------------------------------------------------
-	//! Server-side key-rate limiter mirroring the client-side EC29_KEY_SPAM_* lockout;
-	//! a compliant client is throttled by its own lockout first and never trips this.
+	//! Server-side key-rate limiter (token bucket per player) mirroring the
+	//! client-side bucket; a compliant client drains its own first.
 	protected bool EC29_CheckRelayRate(int playerId)
 	{
 		float nowMs = GetGame().GetWorld().GetWorldTime();
 
-		array<float> times;
-		if (!m_mEC29_RelayTimesByPlayer.Find(playerId, times))
+		EC29_TokenBucket bucket;
+		if (!m_mEC29_RelayBucketByPlayer.Find(playerId, bucket))
 		{
-			times = new array<float>();
-			m_mEC29_RelayTimesByPlayer.Set(playerId, times);
+			bucket = new EC29_TokenBucket(EC29_RELAY_BUCKET_CAPACITY, EC29_RELAY_BUCKET_WINDOW_MS);
+			m_mEC29_RelayBucketByPlayer.Set(playerId, bucket);
 		}
 
-		for (int i = times.Count() - 1; i >= 0; i--)
+		if (!bucket.TryConsume(nowMs))
 		{
-			if (nowMs - times[i] > EC29_RELAY_RATE_WINDOW_MS)
-				times.Remove(i);
-		}
-
-		if (times.Count() >= EC29_RELAY_RATE_MAX)
-		{
-			PrintFormat("[EC29-DBG][RadioNet] SERVER rate-limited key-state relay from player %1 (%2 in window)", playerId, times.Count(), level: LogLevel.WARNING);
+			PrintFormat("[EC29-DBG][RadioNet] SERVER rate-limited key-state relay from player %1", playerId, level: LogLevel.WARNING);
 			return false;
 		}
 
-		times.Insert(nowMs);
 		return true;
 	}
 
@@ -209,13 +202,13 @@ class EC29_RFPropagationNetworkComponent : SCR_BaseGameModeComponent
 		if (EC29_CoexistenceGuard.ShouldYieldRadio())
 			return;
 
-		EC29_RadioRxSquelch.GetInstance().OnRemoteKeyState(senderPlayerId, frequency, range, keyed, senderPos);
+		EC29_RadioState.GetInstance().Squelch().OnRemoteKeyState(senderPlayerId, frequency, range, keyed, senderPos);
 
 		// Dead-key channels produce no voice packets, so the voice-packet feed path
 		// may never run; keep timeouts advancing from here as well. The squelch
 		// singleton owns the ticker (single-ticker rule).
 		if (GetGame().GetPlayerController())
-			EC29_RadioRxSquelch.GetInstance().EnsureTicking();
+			EC29_RadioState.GetInstance().Squelch().EnsureTicking();
 	}
 
 	//------------------------------------------------------------------------------------------------

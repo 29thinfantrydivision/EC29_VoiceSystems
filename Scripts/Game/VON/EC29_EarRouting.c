@@ -15,7 +15,6 @@ enum EC29_EBeepType
 
 class EC29_RadioEarSettings
 {
-    private static ref EC29_RadioEarSettings s_Instance;
 
     protected ref map<BaseTransceiver, EC29_EEarRouting> m_mRoutingByTransceiver = new map<BaseTransceiver, EC29_EEarRouting>();
     protected ref map<BaseTransceiver, EC29_EBeepType> m_mBeepTypeByTransceiver = new map<BaseTransceiver, EC29_EBeepType>();
@@ -23,28 +22,6 @@ class EC29_RadioEarSettings
     protected int m_iAlternateFrequency = -1;
     protected bool m_bTransmittingOnAlternate = false;
 
-    //! World-lifecycle guard: the maps key raw BaseTransceiver pointers, which are
-    //! only meaningful within one world; statics survive mission restart / server
-    //! hop, so a stale instance would leak dead keys (and could mis-apply settings
-    //! if the engine recycles component addresses). Weak member nulls with its
-    //! world; mismatch rebuilds the singleton empty.
-    protected BaseWorld m_OwnerWorld;
-
-    static EC29_RadioEarSettings GetInstance()
-    {
-        BaseWorld currentWorld = GetGame().GetWorld();
-
-        if (!s_Instance || s_Instance.m_OwnerWorld != currentWorld)
-        {
-            if (s_Instance)
-                Print("[EC29-DBG][RadioEar] World changed - resetting ear/beep/volume settings singleton", LogLevel.NORMAL);
-
-            s_Instance = new EC29_RadioEarSettings();
-            s_Instance.m_OwnerWorld = currentWorld;
-        }
-
-        return s_Instance;
-    }
 
     EC29_EEarRouting GetRouting(BaseTransceiver transceiver)
     {

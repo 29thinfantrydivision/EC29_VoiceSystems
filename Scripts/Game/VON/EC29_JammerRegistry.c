@@ -1,15 +1,7 @@
-class EC29_JammerManager
+class EC29_JammerRegistry
 {
-    private static ref EC29_JammerManager s_Instance;
     protected ref array<EC29_JammerComponent> m_aJammers = new array<EC29_JammerComponent>();
 
-    static EC29_JammerManager GetInstance()
-    {
-        if (!s_Instance)
-            s_Instance = new EC29_JammerManager();
-
-        return s_Instance;
-    }
 
     void RegisterJammer(EC29_JammerComponent jammer)
     {
@@ -85,7 +77,7 @@ class EC29_JammerManager
     }
 
     //------------------------------------------------------------------------------------------------
-    //! Debug function - call from Workbench console: EC29_JammerManager.DebugJammers()
+    //! Debug function - call from Workbench console: EC29_JammerRegistry.DebugJammers()
     static void DebugJammers()
     {
         Print("=== EC29 JAMMER DEBUG ===", LogLevel.NORMAL);
@@ -108,7 +100,7 @@ class EC29_JammerManager
         vector playerPos = controlled.GetOrigin();
         Print(string.Format("[Jammer Debug] Player position: %1", playerPos), LogLevel.NORMAL);
 
-        EC29_JammerManager manager = GetInstance();
+        EC29_JammerRegistry manager = EC29_RadioState.GetInstance().Jammers();
         int totalJammers = manager.m_aJammers.Count();
         Print(string.Format("[Jammer Debug] Total registered jammers: %1", totalJammers), LogLevel.NORMAL);
 

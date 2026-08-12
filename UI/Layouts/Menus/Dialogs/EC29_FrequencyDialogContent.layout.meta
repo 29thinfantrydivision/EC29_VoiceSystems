@@ -1,5 +1,5 @@
 MetaFileClass {
- Name "{618CC2BF24440A1C}UI/layouts/EC29_FrequencyInput.layout"
+ Name "{684601EE00000304}UI/Layouts/Menus/Dialogs/EC29_FrequencyDialogContent.layout"
  Configurations {
   LayoutResourceClass PC {
   }

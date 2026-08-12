@@ -86,7 +86,7 @@ modded class SCR_VonDisplay
 		// logic owns this widget - our WHITE reset would erase its indicator.
 		if (!IsReceiving && radioTransceiver && !EC29_CoexistenceGuard.ShouldYieldRadio() && data && data.m_Widgets && data.m_Widgets.m_wFrequency)
 		{
-			EC29_RadioEarSettings earSettings = EC29_RadioEarSettings.GetInstance();
+			EC29_RadioEarSettings earSettings = EC29_RadioState.GetInstance().EarSettings();
 			if (earSettings.IsTransmittingOnAlternate())
 				data.m_Widgets.m_wFrequency.SetColor(Color.FromInt(Color.CYAN));
 			else

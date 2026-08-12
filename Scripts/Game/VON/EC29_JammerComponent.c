@@ -41,7 +41,7 @@ class EC29_JammerComponent : ScriptComponent
 			Replication.BumpMe();
 		}
 
-		EC29_JammerManager.GetInstance().RegisterJammer(this);
+		EC29_RadioState.GetInstance().Jammers().RegisterJammer(this);
 
 		#ifdef WORKBENCH
 		SetEventMask(owner, EntityEvent.FRAME);
@@ -124,7 +124,7 @@ class EC29_JammerComponent : ScriptComponent
 
 	override void OnDelete(IEntity owner)
 	{
-		EC29_JammerManager.GetInstance().UnregisterJammer(this);
+		EC29_RadioState.GetInstance().Jammers().UnregisterJammer(this);
 		super.OnDelete(owner);
 	}
 
