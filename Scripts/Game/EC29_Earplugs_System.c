@@ -125,12 +125,13 @@ class EC29_Earplugs_System extends WorldSystem
 	{
 		bMuted = !bMuted;
 
+		float targetVolume = SFX_DefaultVolume;
 		if (bMuted)
-			SetVolume(EarplugsVolume);
-		else
-			SetVolume(SFX_DefaultVolume);
+			targetVolume = EarplugsVolume;
 
-		PrintFormat("[EC29-DBG][Earplugs] Toggled: muted=%1 -> SFX master volume set to %2 (readback=%3)", bMuted, bMuted ? EarplugsVolume : SFX_DefaultVolume, GetVolume());
+		SetVolume(targetVolume);
+
+		PrintFormat("[EC29-DBG][Earplugs] Toggled: muted=%1 -> SFX master volume set to %2 (readback=%3)", bMuted, targetVolume, GetVolume());
 		ThrowEvent(this.OnEarplugsToggled, bMuted);
 	}
 
