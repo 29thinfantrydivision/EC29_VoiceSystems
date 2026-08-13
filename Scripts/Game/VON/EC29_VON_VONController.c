@@ -324,10 +324,6 @@ modded class SCR_VONController
             if (inputMgr && inputMgr.GetActionTriggered("EC29_VONBeepTypeAction"))
                 OnBeepTypeToggle();
 
-            float volumeValue = inputMgr.GetActionValue("EC29_VolumeAction");
-            if (volumeValue != 0)
-                OnVolumeAdjust(volumeValue);
-
             if (inputMgr.GetActionTriggered("EC29_VolumeUp"))
                 OnVolumeAdjust(1);
 
