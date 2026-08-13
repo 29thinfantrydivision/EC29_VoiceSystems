@@ -4,7 +4,6 @@ modded class SCR_VONController
     const string EC29_SOUND_LOCAL_OFF = "{AFA775D58D24308A}Sounds/VON/EC29_FX/RadioLocalOff.wav";
     const string EC29_SOUND_LOCAL_ON = "{E21F58D501028C63}Sounds/VON/EC29_FX/RadioLocalOn.wav";
     const string EC29_SOUND_ERROR = "{7065D8DD8ADFA3DE}Sounds/EC29_Sound/errorbeep.wav";
-    const string EC29_SOUND_ROGER = "{CD44EABA985BFDF1}Sounds/EC29_Sound/rogerbeep.wav";
 
     //! Key-up rate limit: a token bucket sized for normal PTT traffic; an empty
     //! bucket refuses transmission and answers with the deny tone - like a
@@ -32,21 +31,7 @@ modded class SCR_VONController
         if (m_InputManager)
         {
             m_InputManager.AddActionListener(EC29_ACTION_VOICE_RANGE_CYCLE, EActionTrigger.DOWN, EC29_ActionVoiceRangeCycle);
-
-            // Radio actions are event-driven, not polled: PTT gets press+release
-            // triggers, everything else fires on press. The menu-scoped handlers
-            // guard on the radial menu being open; their context is activated
-            // per-frame in Update() (contexts require per-frame activation).
-            m_InputManager.AddActionListener("EC29_AlternateChannel", EActionTrigger.DOWN, EC29_OnAlternatePTTDown);
-            m_InputManager.AddActionListener("EC29_AlternateChannel", EActionTrigger.UP, EC29_OnAlternatePTTUp);
-            m_InputManager.AddActionListener("EC29_VONRoutingAction", EActionTrigger.DOWN, EC29_OnRoutingAction);
-            m_InputManager.AddActionListener("EC29_SetFrequencyAction", EActionTrigger.DOWN, EC29_OnFrequencyAction);
-            m_InputManager.AddActionListener("EC29_VONBeepTypeAction", EActionTrigger.DOWN, EC29_OnBeepTypeAction);
-            m_InputManager.AddActionListener("EC29_VolumeUp", EActionTrigger.DOWN, EC29_OnVolumeUpAction);
-            m_InputManager.AddActionListener("EC29_VolumeDown", EActionTrigger.DOWN, EC29_OnVolumeDownAction);
-            m_InputManager.AddActionListener("EC29_AlternateChannelAction", EActionTrigger.DOWN, EC29_OnAlternateDesignateAction);
-
-            Print("[EC29-DBG][VONCtrl] Voice + radio action listeners registered. If a key does nothing and no keypress log appears, the input action did not load from chimeraInputCommon.conf", LogLevel.NORMAL);
+            Print("[EC29-DBG][VONCtrl] Listener registered for 'EC29_VONVoiceRangeCycle' (F3). Radio actions are frame-polled (original bind behavior).", LogLevel.NORMAL);
         }
         else
         {
@@ -58,17 +43,7 @@ modded class SCR_VONController
     override protected void Cleanup()
     {
         if (m_InputManager)
-        {
             m_InputManager.RemoveActionListener(EC29_ACTION_VOICE_RANGE_CYCLE, EActionTrigger.DOWN, EC29_ActionVoiceRangeCycle);
-            m_InputManager.RemoveActionListener("EC29_AlternateChannel", EActionTrigger.DOWN, EC29_OnAlternatePTTDown);
-            m_InputManager.RemoveActionListener("EC29_AlternateChannel", EActionTrigger.UP, EC29_OnAlternatePTTUp);
-            m_InputManager.RemoveActionListener("EC29_VONRoutingAction", EActionTrigger.DOWN, EC29_OnRoutingAction);
-            m_InputManager.RemoveActionListener("EC29_SetFrequencyAction", EActionTrigger.DOWN, EC29_OnFrequencyAction);
-            m_InputManager.RemoveActionListener("EC29_VONBeepTypeAction", EActionTrigger.DOWN, EC29_OnBeepTypeAction);
-            m_InputManager.RemoveActionListener("EC29_VolumeUp", EActionTrigger.DOWN, EC29_OnVolumeUpAction);
-            m_InputManager.RemoveActionListener("EC29_VolumeDown", EActionTrigger.DOWN, EC29_OnVolumeDownAction);
-            m_InputManager.RemoveActionListener("EC29_AlternateChannelAction", EActionTrigger.DOWN, EC29_OnAlternateDesignateAction);
-        }
 
         super.Cleanup();
     }
@@ -199,8 +174,8 @@ modded class SCR_VONController
             return;
         }
 
-        AudioSystem.PlaySound(EC29_SOUND_ROGER);
-
+        // Spawn-in confirmation is chat-only; the audible roger beep on every
+        // spawn was noise (removed by request).
         if (chatComponent)
             chatComponent.ShowMessage("***EC29 VOICE SYSTEMS INITIALIZED***");
     }
@@ -323,95 +298,45 @@ modded class SCR_VONController
         if (EC29_CoexistenceGuard.ShouldYieldRadio())
             return;
 
-        // Event-driven input: all radio actions fire through listeners registered
-        // in Init(). The only per-frame work left is (a) keeping the menu action
-        // context active while the radial menu is open - Enfusion contexts must
-        // be re-activated every frame - and (b) sampling the analog volume wheel,
-        // which is a relative axis with no edge to listen for.
-        if (EC29_IsRadioMenuOpen())
+        // Original bind behavior: radio actions are frame-polled exactly as the
+        // absorbed implementation did - PTT by action value, menu actions only
+        // while the radial menu is open. Polling keeps these keys inert in every
+        // other input situation, which is what keeps them conflict-free against
+        // vanilla uses of the same physical keys.
+        InputManager inputMgr = GetGame().GetInputManager();
+        if (inputMgr)
         {
-            InputManager inputMgr = GetGame().GetInputManager();
-            if (inputMgr)
-            {
-                inputMgr.ActivateContext("EC29_RadioMenuContext");
-
-                float volumeValue = inputMgr.GetActionValue("EC29_VolumeAction");
-                if (volumeValue != 0)
-                    OnVolumeAdjust(volumeValue);
-            }
+            float altValue = inputMgr.GetActionValue("EC29_AlternateChannel");
+            if (altValue > 0 && !m_bAlternatePTTActive)
+                OnAlternatePTTStart();
+            else if (altValue <= 0 && m_bAlternatePTTActive)
+                OnAlternatePTTEnd();
         }
-    }
 
-    //------------------------------------------------------------------------------------------------
-    protected bool EC29_IsRadioMenuOpen()
-    {
-        return m_VONMenu && m_VONMenu.GetRadialMenu() && m_VONMenu.GetRadialMenu().IsOpened();
-    }
+        if (m_VONMenu && m_VONMenu.GetRadialMenu() && m_VONMenu.GetRadialMenu().IsOpened())
+        {
+            if (inputMgr && inputMgr.GetActionTriggered("EC29_VONRoutingAction"))
+                OnEarRoutingToggle();
 
-    //------------------------------------------------------------------------------------------------
-    //! Listener wrappers. PTT is press/release; menu actions gate on the radial
-    //! menu being open and on the coexistence guard (a conflicting radio mod
-    //! owns these keys when co-loaded).
-    protected void EC29_OnAlternatePTTDown(float value, EActionTrigger reason)
-    {
-        if (EC29_CoexistenceGuard.ShouldYieldRadio() || m_bAlternatePTTActive)
-            return;
+            if (inputMgr && inputMgr.GetActionTriggered("EC29_SetFrequencyAction"))
+                OnSetFrequencyPressed();
 
-        OnAlternatePTTStart();
-    }
+            if (inputMgr && inputMgr.GetActionTriggered("EC29_VONBeepTypeAction"))
+                OnBeepTypeToggle();
 
-    protected void EC29_OnAlternatePTTUp(float value, EActionTrigger reason)
-    {
-        if (m_bAlternatePTTActive)
-            OnAlternatePTTEnd();
-    }
+            float volumeValue = inputMgr.GetActionValue("EC29_VolumeAction");
+            if (volumeValue != 0)
+                OnVolumeAdjust(volumeValue);
 
-    protected void EC29_OnRoutingAction(float value, EActionTrigger reason)
-    {
-        if (EC29_CoexistenceGuard.ShouldYieldRadio() || !EC29_IsRadioMenuOpen())
-            return;
+            if (inputMgr.GetActionTriggered("EC29_VolumeUp"))
+                OnVolumeAdjust(1);
 
-        OnEarRoutingToggle();
-    }
+            if (inputMgr.GetActionTriggered("EC29_VolumeDown"))
+                OnVolumeAdjust(-1);
 
-    protected void EC29_OnFrequencyAction(float value, EActionTrigger reason)
-    {
-        if (EC29_CoexistenceGuard.ShouldYieldRadio() || !EC29_IsRadioMenuOpen())
-            return;
-
-        OnSetFrequencyPressed();
-    }
-
-    protected void EC29_OnBeepTypeAction(float value, EActionTrigger reason)
-    {
-        if (EC29_CoexistenceGuard.ShouldYieldRadio() || !EC29_IsRadioMenuOpen())
-            return;
-
-        OnBeepTypeToggle();
-    }
-
-    protected void EC29_OnVolumeUpAction(float value, EActionTrigger reason)
-    {
-        if (EC29_CoexistenceGuard.ShouldYieldRadio() || !EC29_IsRadioMenuOpen())
-            return;
-
-        OnVolumeAdjust(1);
-    }
-
-    protected void EC29_OnVolumeDownAction(float value, EActionTrigger reason)
-    {
-        if (EC29_CoexistenceGuard.ShouldYieldRadio() || !EC29_IsRadioMenuOpen())
-            return;
-
-        OnVolumeAdjust(-1);
-    }
-
-    protected void EC29_OnAlternateDesignateAction(float value, EActionTrigger reason)
-    {
-        if (EC29_CoexistenceGuard.ShouldYieldRadio() || !EC29_IsRadioMenuOpen())
-            return;
-
-        OnAlternateChannelToggle();
+            if (inputMgr && inputMgr.GetActionTriggered("EC29_AlternateChannelAction"))
+                OnAlternateChannelToggle();
+        }
     }
 
     protected void OnEarRoutingToggle()
