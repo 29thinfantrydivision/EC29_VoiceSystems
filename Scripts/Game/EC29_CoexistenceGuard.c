@@ -98,7 +98,7 @@ class EC29_CoexistenceGuard
 
 		if (s_bYieldRadio || s_bYieldVoiceRange || s_bYieldEarplugs)
 			PrintFormat("[EC29-DBG][Coexist] Conflicting voice mod(s) co-loaded (radioYield=%1 vonRangeYield=%2 earplugsYield=%3) - matching EC29 features suppressed", s_bYieldRadio, s_bYieldVoiceRange, s_bYieldEarplugs, level: LogLevel.WARNING);
-		else
+		else if (EC29_Debug.VERBOSE)
 			Print("[EC29-DBG][Coexist] No conflicting voice mods co-loaded - all EC29 features active");
 	}
 }

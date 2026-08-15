@@ -22,7 +22,8 @@ class EC29_RFPropagationSettings
             if (!s_Instance)
             {
                 s_Instance = new EC29_RFPropagationSettings();
-                Print("[EC29-DBG][RadioNet] CLIENT RF settings instance created with defaults (no profile JSON IO on clients)");
+                if (EC29_Debug.VERBOSE)
+                    Print("[EC29-DBG][RadioNet] CLIENT RF settings instance created with defaults (no profile JSON IO on clients)");
             }
 
             return s_Instance;

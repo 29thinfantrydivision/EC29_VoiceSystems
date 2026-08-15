@@ -26,7 +26,8 @@ class EC29_Earplugs_System extends WorldSystem
 	//------------------------------------------------------------------------------------------------
 	override void OnInit()
 	{
-		Print("[EC29-DBG][Earplugs] System OnInit ENTER - system was instantiated (ChimeraSystemsConfig override applied)", LogLevel.NORMAL);
+		if (EC29_Debug.VERBOSE)
+			Print("[EC29-DBG][Earplugs] System OnInit ENTER - system was instantiated (ChimeraSystemsConfig override applied)", LogLevel.NORMAL);
 		Instance = this;
 
 		EngineUserSettings = GetGame().GetEngineUserSettings();
@@ -42,14 +43,16 @@ class EC29_Earplugs_System extends WorldSystem
 
 		SFX_DefaultVolume = FetchDefaultSFXVolume();
 		EarplugsVolume = FetchEarplugsVolume();
-		PrintFormat("[EC29-DBG][Earplugs] Volumes resolved: defaultSFX=%1 pluggedSFX=%2", SFX_DefaultVolume, EarplugsVolume);
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][Earplugs] Volumes resolved: defaultSFX=%1 pluggedSFX=%2", SFX_DefaultVolume, EarplugsVolume);
 
 		GetGame().OnUserSettingsChangedInvoker().Insert(OnUserSettingsChanged);
 
 		if (Input)
 		{
 			Input.AddActionListener("EC29_ToggleEarplugs", EActionTrigger.DOWN, OnKeybindPressed);
-			Print("[EC29-DBG][Earplugs] Action listener registered for 'EC29_ToggleEarplugs' (F2). If F2 does nothing and no keypress log appears, the input action did not load from chimeraInputCommon.conf", LogLevel.NORMAL);
+			if (EC29_Debug.VERBOSE)
+				Print("[EC29-DBG][Earplugs] Action listener registered for 'EC29_ToggleEarplugs' (F2). If F2 does nothing and no keypress log appears, the input action did not load from chimeraInputCommon.conf", LogLevel.NORMAL);
 		}
 
 		if (GetVolume() < SFX_DefaultVolume)
@@ -81,7 +84,8 @@ class EC29_Earplugs_System extends WorldSystem
 	//------------------------------------------------------------------------------------------------
 	void OnKeybindPressed()
 	{
-		Print("[EC29-DBG][Earplugs] F2 keybind FIRED (EC29_ToggleEarplugs action works)", LogLevel.NORMAL);
+		if (EC29_Debug.VERBOSE)
+			Print("[EC29-DBG][Earplugs] F2 keybind FIRED (EC29_ToggleEarplugs action works)", LogLevel.NORMAL);
 
 		// Coexistence: a known conflicting mod also toggles SFX volume on F2; both firing would cancel out.
 		if (EC29_CoexistenceGuard.ShouldYieldEarplugs())
@@ -113,7 +117,8 @@ class EC29_Earplugs_System extends WorldSystem
 		if (earplugSettings)
 		{
 			earplugSettings.Get("EarplugsVolume", volume);
-			PrintFormat("[EC29-DBG][Earplugs] Settings module found: reduction slider=%1%%", volume);
+			if (EC29_Debug.VERBOSE)
+				PrintFormat("[EC29-DBG][Earplugs] Settings module found: reduction slider=%1%%", volume);
 			volume = 1.0 - (volume * 0.01);
 			volume *= SFX_DefaultVolume;
 		}
@@ -136,7 +141,8 @@ class EC29_Earplugs_System extends WorldSystem
 
 		SetVolume(targetVolume);
 
-		PrintFormat("[EC29-DBG][Earplugs] Toggled: muted=%1 -> SFX master volume set to %2 (readback=%3)", bMuted, targetVolume, GetVolume());
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][Earplugs] Toggled: muted=%1 -> SFX master volume set to %2 (readback=%3)", bMuted, targetVolume, GetVolume());
 		ThrowEvent(this.OnEarplugsToggled, bMuted);
 	}
 

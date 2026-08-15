@@ -17,6 +17,14 @@ class EC29_RFPropagationModel
     protected static const float POOR_THRESHOLD = 92.0;
     protected static const float CUTOFF_THRESHOLD = 100.0;
 
+    //! Scratch buffers for CalculateTerrainDiffractionLoss. The model is a
+    //! long-lived member of EC29_RadioState and the method runs on the
+    //! per-packet hot path - reusing these avoids three array allocations per
+    //! call. Not reentrant, which is fine: script runs single-threaded.
+    protected ref array<float> m_aScratchPeakHeights = new array<float>();
+    protected ref array<float> m_aScratchPeakD1 = new array<float>();
+    protected ref array<float> m_aScratchPeakD2 = new array<float>();
+
 
     //------------------------------------------------------------------------------------------------
 
@@ -78,9 +86,12 @@ class EC29_RFPropagationModel
         float dirX = dx / horizontalDist;
         float dirZ = dz / horizontalDist;
 
-        ref array<float> peakHeights = new array<float>();
-        ref array<float> peakD1 = new array<float>();
-        ref array<float> peakD2 = new array<float>();
+        array<float> peakHeights = m_aScratchPeakHeights;
+        array<float> peakD1 = m_aScratchPeakD1;
+        array<float> peakD2 = m_aScratchPeakD2;
+        peakHeights.Clear();
+        peakD1.Clear();
+        peakD2.Clear();
 
         float worstFresnelIntrusion = 0.0;
         float worstFresnelRadius = 0.0;

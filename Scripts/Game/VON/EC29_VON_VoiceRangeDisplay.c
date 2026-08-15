@@ -53,7 +53,8 @@ class EC29_VoiceRangeDisplay : SCR_InfoDisplay
 			return;
 		}
 
-		PrintFormat("[EC29-DBG][VoiceHUD] Voice-range display active (DefaultPlayerController override applied). imageset=%1", m_sImageSet);
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][VoiceHUD] Voice-range display active (DefaultPlayerController override applied). imageset=%1", m_sImageSet);
 
 		// Position the icon explicitly via FrameSlot - matches the pattern in SCR_CharacterControllerComponent.
 		// Anchor point at parent's bottom-left (0, 1), then size + position from there.
@@ -108,7 +109,8 @@ class EC29_VoiceRangeDisplay : SCR_InfoDisplay
 
 		if (changed)
 		{
-			PrintFormat("[EC29-DBG][VoiceHUD] Mode changed -> icon '%1'", EC29_GetSpriteForRange(range));
+			if (EC29_Debug.VERBOSE)
+				PrintFormat("[EC29-DBG][VoiceHUD] Mode changed -> icon '%1'", EC29_GetSpriteForRange(range));
 			m_wIcon.LoadImageFromSet(0, m_sImageSet, EC29_GetSpriteForRange(range));
 			m_iLastRange = range;
 

@@ -18,9 +18,11 @@ class EC29_RadioBeepHelper
 
     static void PlayTxStart(BaseTransceiver transceiver)
     {
-        Print("[EC29-DBG][RadioBeep] TX start beep requested");
         if (!transceiver)
             return;
+
+        if (EC29_Debug.VERBOSE)
+            Print("[EC29-DBG][RadioBeep] TX start beep requested");
 
         EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
         EC29_EBeepType beepType = settings.GetBeepType(transceiver);
@@ -39,9 +41,11 @@ class EC29_RadioBeepHelper
 
     static void PlayTxEnd(BaseTransceiver transceiver)
     {
-        Print("[EC29-DBG][RadioBeep] TX end beep requested");
         if (!transceiver)
             return;
+
+        if (EC29_Debug.VERBOSE)
+            Print("[EC29-DBG][RadioBeep] TX end beep requested");
 
         EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
         EC29_EBeepType beepType = settings.GetBeepType(transceiver);
@@ -124,9 +128,12 @@ class EC29_RadioBeepHelper
 
     protected static void PlayRouted(string eventName, BaseTransceiver transceiver)
     {
+        // Beeps default OFF, so this is the common exit - it must stay silent
+        // or the default config logs a line per squelch event.
         if (!EC29_AreBeepsEnabled())
         {
-            Print("[EC29-DBG][RadioBeep] Beep suppressed - RadioBeepsEnabled setting is off");
+            if (EC29_Debug.VERBOSE)
+                Print("[EC29-DBG][RadioBeep] Beep suppressed - RadioBeepsEnabled setting is off");
             return;
         }
 

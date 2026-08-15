@@ -33,7 +33,7 @@ modded class SCR_VoNComponent
 		if (s_EC29OwnerWorld == currentWorld)
 			return;
 
-		if (s_EC29OwnerWorld)
+		if (s_EC29OwnerWorld && EC29_Debug.VERBOSE)
 			Print("[EC29-DBG][VoN] World changed - clearing static player/VoN caches and re-arming audio-var probes", LogLevel.NORMAL);
 
 		s_EC29OwnerWorld = currentWorld;
@@ -53,7 +53,8 @@ modded class SCR_VoNComponent
 	//! refreshes mid-transmission instead of only on the next new transmission.
 	protected void EC29_OnVoiceRangeReplicated()
 	{
-		PrintFormat("[EC29-DBG][VoN] CLIENT received replicated voice range: %1", typename.EnumToString(EC29_EVoiceRange, m_eEC29VoiceRange));
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][VoN] CLIENT received replicated voice range: %1", typename.EnumToString(EC29_EVoiceRange, m_eEC29VoiceRange));
 		// Can fire from JIP initial-state replication before the local PlayerController
 		// exists; vanilla GetDisplay() dereferences GetPlayerController() unguarded.
 		if (!GetGame().GetPlayerController())
@@ -90,7 +91,8 @@ modded class SCR_VoNComponent
 		if (m_eEC29VoiceRange == range)
 			return;
 
-		PrintFormat("[EC29-DBG][VoN] SERVER accepted voice range %1 -> replicating to clients", typename.EnumToString(EC29_EVoiceRange, range));
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][VoN] SERVER accepted voice range %1 -> replicating to clients", typename.EnumToString(EC29_EVoiceRange, range));
 		m_eEC29VoiceRange = range;
 		Replication.BumpMe();
 	}
@@ -173,7 +175,7 @@ modded class SCR_VoNComponent
 
 			if (!s_bEC29VarValid)
 				PrintFormat("[EC29_VON] AudioSystem variable lookup FAILED: name='%1' config='%2' - audio modulation disabled", EC29_VAR_NAME, EC29_VAR_CONFIG, level: LogLevel.WARNING);
-			else
+			else if (EC29_Debug.VERBOSE)
 				PrintFormat("[EC29-DBG][VoN] AudioSystem variable '%1' resolved OK - von.acp override + local variables conf are loaded", EC29_VAR_NAME);
 		}
 
@@ -203,12 +205,17 @@ modded class SCR_VoNComponent
 			}
 		}
 
-		// Throttled receive-path logging: only when this speaker's computed gain changes noticeably.
-		float lastGain;
-		if (!s_mEC29DbgLastGain.Find(playerId, lastGain) || Math.AbsFloat(lastGain - volume) > 0.02)
+		// Throttled receive-path logging: only when this speaker's computed gain
+		// changes noticeably. The throttle map only exists to feed this log, so
+		// the whole block sits behind the debug gate.
+		if (EC29_Debug.VERBOSE)
 		{
-			s_mEC29DbgLastGain.Set(playerId, volume);
-			PrintFormat("[EC29-DBG][VoN] OnReceive: speaker playerId=%1 computed gain=%2 (pushed to audio var '%3')", playerId, volume, EC29_VAR_NAME);
+			float lastGain;
+			if (!s_mEC29DbgLastGain.Find(playerId, lastGain) || Math.AbsFloat(lastGain - volume) > 0.02)
+			{
+				s_mEC29DbgLastGain.Set(playerId, volume);
+				PrintFormat("[EC29-DBG][VoN] OnReceive: speaker playerId=%1 computed gain=%2 (pushed to audio var '%3')", playerId, volume, EC29_VAR_NAME);
+			}
 		}
 
 		AudioSystem.SetVariableByName(EC29_VAR_NAME, volume, EC29_VAR_CONFIG);
@@ -232,8 +239,9 @@ modded class SCR_VoNComponent
 			s_bEC29ChannelVolumeValid = (AudioSystem.GetVariableIDByName("EC29_ChannelVolume", EC29_EAR_ROUTING_CONFIG) != -1);
 			EC29_RFPropagationSettings.GetInstance();
 
-			PrintFormat("[EC29-DBG][Radio] audio var probe: earRouting=%1 signalQuality=%2 jamStrength=%3 channelVolume=%4",
-				s_bEC29_EEarRoutingValid, s_bEC29SignalQualityValid, s_bEC29JamStrengthValid, s_bEC29ChannelVolumeValid);
+			if (EC29_Debug.VERBOSE)
+				PrintFormat("[EC29-DBG][Radio] audio var probe: earRouting=%1 signalQuality=%2 jamStrength=%3 channelVolume=%4",
+					s_bEC29_EEarRoutingValid, s_bEC29SignalQualityValid, s_bEC29JamStrengthValid, s_bEC29ChannelVolumeValid);
 		}
 
 		if (s_bEC29_EEarRoutingValid)
@@ -313,8 +321,10 @@ modded class SCR_VoNComponent
 
 		vector transmitterPos = transmitter.GetOrigin();
 
+		// Cached per sender (short TTL): this runs per voice packet and the
+		// uncached model raymarches up to 200 terrain samples per call.
 		EC29_RadioState signalManager = EC29_RadioState.GetInstance();
-		return signalManager.GetSignalQuality(transmitterPos, receiverPos, frequencyKHz);
+		return signalManager.GetSignalQualityCached(senderId, transmitterPos, receiverPos, frequencyKHz);
 	}
 
 	protected float EC29_GetJamStrength(vector receiverPos)

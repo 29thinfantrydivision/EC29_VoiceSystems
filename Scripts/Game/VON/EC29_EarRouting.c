@@ -44,7 +44,8 @@ class EC29_RadioEarSettings
 
     EC29_EEarRouting CycleRouting(BaseTransceiver transceiver)
     {
-        Print("[EC29-DBG][RadioEar] CycleRouting pressed");
+        if (EC29_Debug.VERBOSE)
+            Print("[EC29-DBG][RadioEar] CycleRouting pressed");
         if (!transceiver)
             return EC29_EEarRouting.CENTER;
 
@@ -106,7 +107,8 @@ class EC29_RadioEarSettings
 
     EC29_EBeepType CycleBeepType(BaseTransceiver transceiver)
     {
-        Print("[EC29-DBG][RadioEar] CycleBeepType pressed");
+        if (EC29_Debug.VERBOSE)
+            Print("[EC29-DBG][RadioEar] CycleBeepType pressed");
         if (!transceiver)
             return EC29_EBeepType.HIGH;
 
@@ -175,7 +177,8 @@ class EC29_RadioEarSettings
 
     float AdjustVolume(BaseTransceiver transceiver, float delta)
     {
-        PrintFormat("[EC29-DBG][RadioEar] AdjustVolume delta=%1", delta);
+        if (EC29_Debug.VERBOSE)
+            PrintFormat("[EC29-DBG][RadioEar] AdjustVolume delta=%1", delta);
         float current = GetVolume(transceiver);
         float newVolume = Math.Clamp(current + delta, 0.0, 1.0);
         SetVolume(transceiver, newVolume);
@@ -218,7 +221,8 @@ class EC29_RadioEarSettings
 
     bool ToggleAlternate(BaseTransceiver transceiver)
     {
-        Print("[EC29-DBG][RadioEar] ToggleAlternate pressed");
+        if (EC29_Debug.VERBOSE)
+            Print("[EC29-DBG][RadioEar] ToggleAlternate pressed");
         if (!transceiver)
             return false;
 

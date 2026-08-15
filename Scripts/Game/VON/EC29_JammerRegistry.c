@@ -5,14 +5,16 @@ class EC29_JammerRegistry
 
     void RegisterJammer(EC29_JammerComponent jammer)
     {
-        PrintFormat("[EC29-DBG][Jammer] Registered jammer (total=%1)", m_aJammers.Count() + 1);
+        if (EC29_Debug.VERBOSE)
+            PrintFormat("[EC29-DBG][Jammer] Registered jammer (total=%1)", m_aJammers.Count() + 1);
         if (!m_aJammers.Contains(jammer))
             m_aJammers.Insert(jammer);
     }
 
     void UnregisterJammer(EC29_JammerComponent jammer)
     {
-        PrintFormat("[EC29-DBG][Jammer] Unregistered jammer (total before remove=%1)", m_aJammers.Count());
+        if (EC29_Debug.VERBOSE)
+            PrintFormat("[EC29-DBG][Jammer] Unregistered jammer (total before remove=%1)", m_aJammers.Count());
         m_aJammers.RemoveItem(jammer);
     }
 

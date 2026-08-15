@@ -133,29 +133,25 @@ class EC29_JammerComponent : ScriptComponent
 		return m_bActive;
 	}
 
+	//! Authority-only by design. The single caller (EC29_JammerToggleUserAction)
+	//! already early-outs on non-authority, so a client->server request path
+	//! would be unreachable from our own code - it existed only as an
+	//! unvalidated attack surface and was removed. If client-initiated toggling
+	//! is ever needed, add a server-validated RPC (permission + rate checks),
+	//! not a blind setter.
 	void SetJammerActive(bool active)
 	{
-		if (Replication.IsServer() || !Replication.IsRunning())
-		{
-			m_bActive = active;
-			Replication.BumpMe();
-		}
-		else
-		{
-			Rpc(RpcAsk_SetJammerActive, active);
-		}
-	}
+		if (Replication.IsRunning() && !Replication.IsServer())
+			return;
 
-	[RplRpc(RplChannel.Reliable, RplRcver.Server)]
-	protected void RpcAsk_SetJammerActive(bool active)
-	{
 		m_bActive = active;
 		Replication.BumpMe();
 	}
 
 	protected void OnActiveChanged()
 	{
-		PrintFormat("[EC29-DBG][Jammer] Active state replicated: %1 (range=%2 cone=%3)", m_bActive, m_fRange, m_fConeAngle);
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][Jammer] Active state replicated: %1 (range=%2 cone=%3)", m_bActive, m_fRange, m_fConeAngle);
 	}
 
 	float GetRange()

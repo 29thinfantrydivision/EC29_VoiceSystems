@@ -14,7 +14,8 @@ class EC29_FrequencyDialog : SCR_EditboxDialogUi
 	//! Open the dialog for one transceiver; returns null if the preset fails to load.
 	static EC29_FrequencyDialog OpenFor(notnull BaseTransceiver transceiver, SCR_VONEntryRadio radioEntry)
 	{
-		Print("[EC29-DBG][RadioFreq] Frequency dialog OPEN");
+		if (EC29_Debug.VERBOSE)
+			Print("[EC29-DBG][RadioFreq] Frequency dialog OPEN");
 
 		EC29_FrequencyDialog dialog = new EC29_FrequencyDialog();
 		dialog.m_Transceiver = transceiver;
@@ -61,7 +62,8 @@ class EC29_FrequencyDialog : SCR_EditboxDialogUi
 	//! Parse MHz input, clamp to the transceiver band, snap to channel resolution.
 	protected void EC29_ApplyFrequency(string input)
 	{
-		PrintFormat("[EC29-DBG][RadioFreq] Frequency dialog CONFIRM: raw='%1'", input);
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][RadioFreq] Frequency dialog CONFIRM: raw='%1'", input);
 
 		float inputMHz = input.ToFloat();
 		if (inputMHz <= 0)
@@ -75,7 +77,8 @@ class EC29_FrequencyDialog : SCR_EditboxDialogUi
 			freqKHz = (freqKHz / resolution) * resolution;
 
 		m_Transceiver.SetFrequency(freqKHz);
-		PrintFormat("[EC29-DBG][RadioFreq] Frequency set to %1 kHz", freqKHz);
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][RadioFreq] Frequency set to %1 kHz", freqKHz);
 
 		if (m_RadioEntry)
 		{
