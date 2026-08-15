@@ -1,0 +1,17 @@
+MetaFileClass {
+ Name "{CD44EABA985BFDF1}Sounds/EC29_Sound/rogerbeep.wav"
+ Configurations {
+  WAVResourceClass PC {
+  }
+  WAVResourceClass XBOX_ONE : PC {
+  }
+  WAVResourceClass XBOX_SERIES : PC {
+  }
+  WAVResourceClass PS4 : PC {
+  }
+  WAVResourceClass PS5 : PC {
+  }
+  WAVResourceClass HEADLESS : PC {
+  }
+ }
+}

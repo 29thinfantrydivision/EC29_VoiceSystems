@@ -1,0 +1,17 @@
+MetaFileClass {
+ Name "{A17AE8D502C50EAD}Assets/Data/_3__BCR.edds"
+ Configurations {
+  EDDSResourceClass PC {
+  }
+  EDDSResourceClass XBOX_ONE : PC {
+  }
+  EDDSResourceClass XBOX_SERIES : PC {
+  }
+  EDDSResourceClass PS4 : PC {
+  }
+  EDDSResourceClass PS5 : PC {
+  }
+  EDDSResourceClass HEADLESS : PC {
+  }
+ }
+}

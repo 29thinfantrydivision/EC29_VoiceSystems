@@ -1,0 +1,17 @@
+MetaFileClass {
+ Name "{684601EE00000304}UI/Layouts/Menus/Dialogs/EC29_FrequencyDialogContent.layout"
+ Configurations {
+  LayoutResourceClass PC {
+  }
+  LayoutResourceClass XBOX_ONE : PC {
+  }
+  LayoutResourceClass XBOX_SERIES : PC {
+  }
+  LayoutResourceClass PS4 : PC {
+  }
+  LayoutResourceClass PS5 : PC {
+  }
+  LayoutResourceClass HEADLESS : PC {
+  }
+ }
+}

@@ -3,6 +3,17 @@ modded class SCR_VoNComponent
 	static const string EC29_VAR_NAME   = "EC29_VonRange";
 	static const string EC29_VAR_CONFIG = "{33A27275C95E0302}Sounds/VON/EC29_LocalVariables_VON.conf";
 
+	// Radio path: ear routing / signal quality / jamming / per-channel volume
+	// audio variables. Boundary rule: EC29_VonRange gain applies to DIRECT speech
+	// falloff, the radio variables apply to the RADIO path - the two sets never
+	// touch the same audio variable.
+	protected static const string EC29_EAR_ROUTING_CONFIG = "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf";
+	protected static bool s_bEC29RadioVarsChecked;
+	protected static bool s_bEC29_EEarRoutingValid;
+	protected static bool s_bEC29SignalQualityValid;
+	protected static bool s_bEC29JamStrengthValid;
+	protected static bool s_bEC29ChannelVolumeValid;
+
 	protected static bool s_bEC29VarValid;
 	protected static bool s_bEC29VarChecked;
 	protected static ref map<int, SCR_VoNComponent> s_mEC29PlayerVon = new map<int, SCR_VoNComponent>();
@@ -10,6 +21,28 @@ modded class SCR_VoNComponent
 
 	// Debug: last gain logged per speaker so OnReceive logging doesn't spam every voice packet.
 	protected static ref map<int, float> s_mEC29DbgLastGain = new map<int, float>();
+
+	// World-lifecycle guard for the static caches above: playerIds and component
+	// pointers are world-scoped, statics are not. Weak member nulls with its world;
+	// a mismatch clears the caches and re-arms the one-shot audio-variable probes.
+	protected static BaseWorld s_EC29OwnerWorld;
+
+	protected static void EC29_CheckWorldReset()
+	{
+		BaseWorld currentWorld = GetGame().GetWorld();
+		if (s_EC29OwnerWorld == currentWorld)
+			return;
+
+		if (s_EC29OwnerWorld)
+			Print("[EC29-DBG][VoN] World changed - clearing static player/VoN caches and re-arming audio-var probes", LogLevel.NORMAL);
+
+		s_EC29OwnerWorld = currentWorld;
+		s_mEC29PlayerVon.Clear();
+		s_mEC29PlayerVonEntity.Clear();
+		s_mEC29DbgLastGain.Clear();
+		s_bEC29VarChecked = false;
+		s_bEC29RadioVarsChecked = false;
+	}
 
 	[RplProp(onRplName: "EC29_OnVoiceRangeReplicated")]
 	protected EC29_EVoiceRange m_eEC29VoiceRange = EC29_EVoiceRange.NORMAL;
@@ -107,6 +140,31 @@ modded class SCR_VoNComponent
 	//------------------------------------------------------------------------------------------------
 	override protected event void OnReceive(int playerId, bool isSenderEditor, BaseTransceiver receiver, int frequency, float quality)
 	{
+		EC29_CheckWorldReset();
+
+		// Packet-type gate keeps the two systems from stomping each other's global
+		// audio variables: direct packets (receiver == null) own EC29_VonRange,
+		// radio packets own the ear-routing/quality/jam/volume set. Without the
+		// gate, a far-away radio speaker drags the direct-falloff gain to the
+		// floor mid-conversation, and a nearby direct speaker resets ear routing
+		// to CENTER mid-radio-stream.
+		if (!receiver)
+		{
+			EC29_ApplyRangeGain(playerId);
+		}
+		else
+		{
+			EC29_ApplyRadioAudioVars(playerId, receiver, frequency);
+			EC29_TrackIncomingTransmission(receiver, frequency, playerId);
+		}
+
+		super.OnReceive(playerId, isSenderEditor, receiver, frequency, quality);
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Direct-speech falloff gain (whisper/normal/yell). Writes EC29_VonRange only.
+	protected void EC29_ApplyRangeGain(int playerId)
+	{
 		// One-time AudioSystem variable lookup so we can early-out cleanly when the conf isn't loaded.
 		if (!s_bEC29VarChecked)
 		{
@@ -120,10 +178,7 @@ modded class SCR_VoNComponent
 		}
 
 		if (!s_bEC29VarValid)
-		{
-			super.OnReceive(playerId, isSenderEditor, receiver, frequency, quality);
 			return;
-		}
 
 		float volume = 1.0;
 
@@ -157,7 +212,116 @@ modded class SCR_VoNComponent
 		}
 
 		AudioSystem.SetVariableByName(EC29_VAR_NAME, volume, EC29_VAR_CONFIG);
+	}
 
-		super.OnReceive(playerId, isSenderEditor, receiver, frequency, quality);
+	//------------------------------------------------------------------------------------------------
+	//! Radio-path audio variables: ear routing, RF signal
+	//! quality, jammer strength, per-channel volume. All are global external variables
+	//! consumed by the merged von.acp graph; they must be refreshed per incoming packet.
+	protected void EC29_ApplyRadioAudioVars(int playerId, BaseTransceiver receiver, int frequency)
+	{
+		if (EC29_CoexistenceGuard.ShouldYieldRadio())
+			return;
+
+		if (!s_bEC29RadioVarsChecked)
+		{
+			s_bEC29RadioVarsChecked = true;
+			s_bEC29_EEarRoutingValid    = (AudioSystem.GetVariableIDByName("EC29_EarRouting", EC29_EAR_ROUTING_CONFIG) != -1);
+			s_bEC29SignalQualityValid = (AudioSystem.GetVariableIDByName("EC29_SignalQuality", EC29_EAR_ROUTING_CONFIG) != -1);
+			s_bEC29JamStrengthValid   = (AudioSystem.GetVariableIDByName("EC29_JamStrength", EC29_EAR_ROUTING_CONFIG) != -1);
+			s_bEC29ChannelVolumeValid = (AudioSystem.GetVariableIDByName("EC29_ChannelVolume", EC29_EAR_ROUTING_CONFIG) != -1);
+			EC29_RFPropagationSettings.GetInstance();
+
+			PrintFormat("[EC29-DBG][Radio] audio var probe: earRouting=%1 signalQuality=%2 jamStrength=%3 channelVolume=%4",
+				s_bEC29_EEarRoutingValid, s_bEC29SignalQualityValid, s_bEC29JamStrengthValid, s_bEC29ChannelVolumeValid);
+		}
+
+		if (s_bEC29_EEarRoutingValid)
+		{
+			float earRouting = EC29_GetEarRoutingForTransceiver(receiver);
+			AudioSystem.SetVariableByName("EC29_EarRouting", earRouting, EC29_EAR_ROUTING_CONFIG);
+		}
+
+		vector receiverPos = vector.Zero;
+		PlayerController playerController = GetGame().GetPlayerController();
+		if (playerController)
+		{
+			IEntity receiverEntity = playerController.GetControlledEntity();
+			if (receiverEntity)
+				receiverPos = receiverEntity.GetOrigin();
+		}
+
+		if (s_bEC29SignalQualityValid)
+		{
+			float signalQuality = EC29_GetSignalQuality(playerId, frequency, receiverPos);
+			AudioSystem.SetVariableByName("EC29_SignalQuality", signalQuality, EC29_EAR_ROUTING_CONFIG);
+		}
+
+		if (s_bEC29JamStrengthValid)
+		{
+			float jamStrength = EC29_GetJamStrength(receiverPos);
+			AudioSystem.SetVariableByName("EC29_JamStrength", jamStrength, EC29_EAR_ROUTING_CONFIG);
+		}
+
+		if (s_bEC29ChannelVolumeValid)
+		{
+			float channelVolume = EC29_GetChannelVolumeForTransceiver(receiver);
+			AudioSystem.SetVariableByName("EC29_ChannelVolume", channelVolume, EC29_EAR_ROUTING_CONFIG);
+		}
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Voice packets feed EC29_RadioRxSquelch as the fallback squelch trigger (key-state
+	//! RPCs are the primary). The squelch singleton owns its own 150ms ticker; both this
+	//! path and the key-state RPC path just ensure it is running (single-ticker rule).
+	protected void EC29_TrackIncomingTransmission(BaseTransceiver receiver, int frequency, int senderPlayerId)
+	{
+		if (EC29_CoexistenceGuard.ShouldYieldRadio())
+			return;
+
+		PlayerController playerController = GetGame().GetPlayerController();
+		if (playerController && playerController.GetPlayerId() == senderPlayerId)
+			return;
+
+		EC29_RadioState.GetInstance().Squelch().OnVoicePacket(frequency, receiver);
+		EC29_RadioState.GetInstance().Squelch().EnsureTicking();
+	}
+
+	protected float EC29_GetEarRoutingForTransceiver(BaseTransceiver transceiver)
+	{
+		EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
+		EC29_EEarRouting routing = settings.GetRouting(transceiver);
+		return routing;
+	}
+
+	protected float EC29_GetChannelVolumeForTransceiver(BaseTransceiver transceiver)
+	{
+		EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
+		float volume = settings.GetVolume(transceiver);
+		// Apply exponential curve for better volume sensitivity
+		return Math.Pow(volume, 2.5);
+	}
+
+	protected float EC29_GetSignalQuality(int senderId, int frequencyKHz, vector receiverPos)
+	{
+		if (!EC29_RFPropagationNetworkComponent.IsRFPropagationEnabled())
+			return 1.0;
+
+		IEntity transmitter = GetGame().GetPlayerManager().GetPlayerControlledEntity(senderId);
+		if (!transmitter)
+			return 1.0;
+
+		vector transmitterPos = transmitter.GetOrigin();
+
+		EC29_RadioState signalManager = EC29_RadioState.GetInstance();
+		return signalManager.GetSignalQuality(transmitterPos, receiverPos, frequencyKHz);
+	}
+
+	protected float EC29_GetJamStrength(vector receiverPos)
+	{
+		EC29_RadioState signalManager = EC29_RadioState.GetInstance();
+		float jammerDegradation = signalManager.GetJammerStrength(receiverPos);
+		// CAREFUL THIS IS INVERTED!!!!
+		return 1.0 - jammerDegradation;
 	}
 }

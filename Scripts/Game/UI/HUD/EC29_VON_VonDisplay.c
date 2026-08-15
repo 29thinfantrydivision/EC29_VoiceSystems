@@ -79,6 +79,20 @@ modded class SCR_VonDisplay
 		if (!result)
 			return false;
 
+		// Radio overlay: outgoing entries show CYAN frequency while the alternate
+		// channel is keyed, WHITE otherwise (the reset un-cyans after alt-PTT release).
+		// EC29 never colors m_wFrequency, so this owns that widget exclusively.
+		// Coexistence: when a known conflicting VON mod is co-loaded its display
+		// logic owns this widget - our WHITE reset would erase its indicator.
+		if (!IsReceiving && radioTransceiver && !EC29_CoexistenceGuard.ShouldYieldRadio() && data && data.m_Widgets && data.m_Widgets.m_wFrequency)
+		{
+			EC29_RadioEarSettings earSettings = EC29_RadioState.GetInstance().EarSettings();
+			if (earSettings.IsTransmittingOnAlternate())
+				data.m_Widgets.m_wFrequency.SetColor(Color.FromInt(Color.CYAN));
+			else
+				data.m_Widgets.m_wFrequency.SetColor(Color.FromInt(Color.WHITE));
+		}
+
 		if (!data || data.m_bIsAdditional)
 			return result;
 

@@ -1,0 +1,17 @@
+MetaFileClass {
+ Name "{FB843F6E573DC457}Language/EC29_earplugs_localization.it_it.conf"
+ Configurations {
+  CONFResourceClass PC {
+  }
+  CONFResourceClass XBOX_ONE : PC {
+  }
+  CONFResourceClass XBOX_SERIES : PC {
+  }
+  CONFResourceClass PS4 : PC {
+  }
+  CONFResourceClass PS5 : PC {
+  }
+  CONFResourceClass HEADLESS : PC {
+  }
+ }
+}
