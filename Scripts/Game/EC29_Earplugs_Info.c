@@ -7,7 +7,8 @@ class EC29_Earplugs_Info extends SCR_InfoDisplay
 	{
 		super.OnStartDraw(owner);
 
-		Print("[EC29-DBG][EarplugsInfo] HUD display OnStartDraw (Character_Base override applied, character HUD active)", LogLevel.NORMAL);
+		if (EC29_Debug.VERBOSE)
+			Print("[EC29-DBG][EarplugsInfo] HUD display OnStartDraw (Character_Base override applied, character HUD active)", LogLevel.NORMAL);
 
 		if (!EC29_Earplugs_System.Instance)
 		{
@@ -35,7 +36,8 @@ class EC29_Earplugs_Info extends SCR_InfoDisplay
 	[ReceiverAttribute()]
 	void SetVisibility(bool state)
 	{
-		PrintFormat("[EC29-DBG][EarplugsInfo] Icon visibility -> %1", state);
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][EarplugsInfo] Icon visibility -> %1", state);
 		if (!Image)
 			return;
 

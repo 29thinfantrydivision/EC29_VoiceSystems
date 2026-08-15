@@ -108,10 +108,16 @@ class EC29_RFPropagationNetworkComponent : SCR_BaseGameModeComponent
 
 		range = Math.Clamp(range, 0, EC29_MAX_RANGE_M);
 
-		if (!EC29_CheckRelayRate(senderPlayerId))
+		// Only key-STARTS consume rate-limit tokens. A stop is self-limiting
+		// (it only matters against a start that already paid a token), and
+		// dropping one would wedge every receiver's squelch open until the
+		// 120s MAX_KEY_HOLD failsafe - including the disconnect path below,
+		// which routes through this same function.
+		if (keyed && !EC29_CheckRelayRate(senderPlayerId))
 			return;
 
-		PrintFormat("[EC29-DBG][RadioNet] SERVER relay key-state: player=%1 freq=%2 range=%3 keyed=%4", senderPlayerId, frequency, range, keyed);
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][RadioNet] SERVER relay key-state: player=%1 freq=%2 range=%3 keyed=%4", senderPlayerId, frequency, range, keyed);
 
 		if (keyed)
 		{
@@ -224,5 +230,9 @@ class EC29_RFPropagationNetworkComponent : SCR_BaseGameModeComponent
 		int frequency;
 		if (m_mEC29_KeyedFreqByPlayer.Find(playerId, frequency))
 			EC29_RelayKeyState(playerId, frequency, 0.0, false);
+
+		// Server lives across many joins/leaves; per-player scratch state must
+		// leave with the player or the maps grow for the process lifetime.
+		m_mEC29_RelayBucketByPlayer.Remove(playerId);
 	}
 }

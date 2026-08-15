@@ -5,14 +5,16 @@ modded class SCR_AudioSettingsSubMenu
 	{
 		super.OnTabCreate(menuRoot, buttonsLayout, index);
 
-		Print("[EC29-DBG][EarplugsMenu] Audio settings tab created - inserting earplug reduction slider", LogLevel.NORMAL);
+		if (EC29_Debug.VERBOSE)
+			Print("[EC29-DBG][EarplugsMenu] Audio settings tab created - inserting earplug reduction slider", LogLevel.NORMAL);
 		SCR_SettingBindingGameplay bind = new SCR_SettingBindingGameplay("EC29_EarplugSettings", "EarplugsVolume", "Earplugs");
 		m_aSettingsBindings.Insert(bind);
 
 		bind.LoadEntry(m_wScroll, false, true);
 		bind.GetEntryChangedInvoker().Insert(OnMenuItemChanged);
 
-		Print("[EC29-DBG][RadioMenu] Inserting radio beeps checkbox (default off)", LogLevel.NORMAL);
+		if (EC29_Debug.VERBOSE)
+			Print("[EC29-DBG][RadioMenu] Inserting radio beeps checkbox (default off)", LogLevel.NORMAL);
 		SCR_SettingBindingGameplay beepBind = new SCR_SettingBindingGameplay("EC29_RadioSettings", "RadioBeepsEnabled", "RadioBeeps");
 		m_aSettingsBindings.Insert(beepBind);
 

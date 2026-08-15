@@ -31,7 +31,8 @@ modded class SCR_VONController
         if (m_InputManager)
         {
             m_InputManager.AddActionListener(EC29_ACTION_VOICE_RANGE_CYCLE, EActionTrigger.DOWN, EC29_ActionVoiceRangeCycle);
-            Print("[EC29-DBG][VONCtrl] Listener registered for 'EC29_VONVoiceRangeCycle' (F3). Radio actions are frame-polled (original bind behavior).", LogLevel.NORMAL);
+            if (EC29_Debug.VERBOSE)
+                Print("[EC29-DBG][VONCtrl] Listener registered for 'EC29_VONVoiceRangeCycle' (F3). Radio actions are frame-polled (original bind behavior).", LogLevel.NORMAL);
         }
         else
         {
@@ -51,7 +52,8 @@ modded class SCR_VONController
     //------------------------------------------------------------------------------------------------
     protected void EC29_ActionVoiceRangeCycle(float value, EActionTrigger reason = EActionTrigger.UP)
     {
-        Print("[EC29-DBG][VONCtrl] F3 keybind FIRED (EC29_VONVoiceRangeCycle action works)", LogLevel.NORMAL);
+        if (EC29_Debug.VERBOSE)
+            Print("[EC29-DBG][VONCtrl] F3 keybind FIRED (EC29_VONVoiceRangeCycle action works)", LogLevel.NORMAL);
 
         // Coexistence: a known conflicting mod also cycles voice range on F3; firing both would double-cycle.
         if (EC29_CoexistenceGuard.ShouldYieldVoiceRange())
@@ -72,7 +74,8 @@ modded class SCR_VONController
             default:                      next = EC29_EVoiceRange.NORMAL;  break;
         }
 
-        PrintFormat("[EC29-DBG][VONCtrl] Requesting voice range change: %1 -> %2", typename.EnumToString(EC29_EVoiceRange, current), typename.EnumToString(EC29_EVoiceRange, next));
+        if (EC29_Debug.VERBOSE)
+            PrintFormat("[EC29-DBG][VONCtrl] Requesting voice range change: %1 -> %2", typename.EnumToString(EC29_EVoiceRange, current), typename.EnumToString(EC29_EVoiceRange, next));
         m_VONComp.EC29_RequestSetVoiceRange(next);
 
         // Refresh the VoN overlay label immediately for the local outgoing transmission.
@@ -133,7 +136,8 @@ modded class SCR_VONController
         if (m_EC29_KeyBucket.TryConsume(nowMs))
             return false;
 
-        Print("[EC29-DBG][RadioKey] Key-up denied - rate bucket empty", LogLevel.NORMAL);
+        if (EC29_Debug.VERBOSE)
+            Print("[EC29-DBG][RadioKey] Key-up denied - rate bucket empty", LogLevel.NORMAL);
         return true;
     }
 
@@ -303,25 +307,27 @@ modded class SCR_VONController
         // while the radial menu is open. Polling keeps these keys inert in every
         // other input situation, which is what keeps them conflict-free against
         // vanilla uses of the same physical keys.
-        InputManager inputMgr = GetGame().GetInputManager();
-        if (inputMgr)
-        {
-            float altValue = inputMgr.GetActionValue("EC29_AlternateChannel");
-            if (altValue > 0 && !m_bAlternatePTTActive)
-                OnAlternatePTTStart();
-            else if (altValue <= 0 && m_bAlternatePTTActive)
-                OnAlternatePTTEnd();
-        }
+        // Uses the member vanilla Init already resolved instead of re-fetching
+        // the manager from the game every frame.
+        InputManager inputMgr = m_InputManager;
+        if (!inputMgr)
+            return;
+
+        float altValue = inputMgr.GetActionValue("EC29_AlternateChannel");
+        if (altValue > 0 && !m_bAlternatePTTActive)
+            OnAlternatePTTStart();
+        else if (altValue <= 0 && m_bAlternatePTTActive)
+            OnAlternatePTTEnd();
 
         if (m_VONMenu && m_VONMenu.GetRadialMenu() && m_VONMenu.GetRadialMenu().IsOpened())
         {
-            if (inputMgr && inputMgr.GetActionTriggered("EC29_VONRoutingAction"))
+            if (inputMgr.GetActionTriggered("EC29_VONRoutingAction"))
                 OnEarRoutingToggle();
 
-            if (inputMgr && inputMgr.GetActionTriggered("EC29_SetFrequencyAction"))
+            if (inputMgr.GetActionTriggered("EC29_SetFrequencyAction"))
                 OnSetFrequencyPressed();
 
-            if (inputMgr && inputMgr.GetActionTriggered("EC29_VONBeepTypeAction"))
+            if (inputMgr.GetActionTriggered("EC29_VONBeepTypeAction"))
                 OnBeepTypeToggle();
 
             if (inputMgr.GetActionTriggered("EC29_VolumeUp"))
@@ -330,7 +336,7 @@ modded class SCR_VONController
             if (inputMgr.GetActionTriggered("EC29_VolumeDown"))
                 OnVolumeAdjust(-1);
 
-            if (inputMgr && inputMgr.GetActionTriggered("EC29_AlternateChannelAction"))
+            if (inputMgr.GetActionTriggered("EC29_AlternateChannelAction"))
                 OnAlternateChannelToggle();
         }
     }
@@ -451,7 +457,8 @@ modded class SCR_VONController
 
         m_bAlternatePTTActive = true;
         settings.SetTransmittingOnAlternate(true);
-        PrintFormat("[EC29-DBG][RadioAlt] Alternate PTT START on freq %1 (primary entry saved)", altFrequency);
+        if (EC29_Debug.VERBOSE)
+            PrintFormat("[EC29-DBG][RadioAlt] Alternate PTT START on freq %1 (primary entry saved)", altFrequency);
 
         m_SavedPrimaryEntry = m_ActiveEntry;
         m_ActiveEntry = altEntry;
@@ -466,7 +473,8 @@ modded class SCR_VONController
         EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
         settings.SetTransmittingOnAlternate(false);
         m_bAlternatePTTActive = false;
-        Print("[EC29-DBG][RadioAlt] Alternate PTT END (primary entry restored)");
+        if (EC29_Debug.VERBOSE)
+            Print("[EC29-DBG][RadioAlt] Alternate PTT END (primary entry restored)");
 
         DeactivateVON(EVONTransmitType.CHANNEL);
 

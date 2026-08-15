@@ -89,7 +89,7 @@ class EC29_RadioRxSquelch
             if (!transceiver)
                 return;
 
-            if (!IsReachable(frequency, range, senderPos, playerController))
+            if (!IsReachable(senderPlayerId, frequency, range, senderPos, playerController))
                 return;
 
             EC29_RxChannelState state = GetOrCreateState(frequency);
@@ -169,9 +169,13 @@ class EC29_RadioRxSquelch
     //------------------------------------------------------------------------------------------------
     protected void Open(EC29_RxChannelState state, BaseTransceiver transceiver, float nowMs)
     {
-        PrintFormat("[EC29-DBG][RadioSquelch] Channel OPEN (squelch beep) t=%1", nowMs);
+        // Guard BEFORE logging: this runs per voice packet, logging belongs to
+        // the state transition only.
         if (state.m_bOpen)
             return;
+
+        if (EC29_Debug.VERBOSE)
+            PrintFormat("[EC29-DBG][RadioSquelch] Channel OPEN (squelch beep) t=%1", nowMs);
 
         state.m_bOpen = true;
 
@@ -184,9 +188,11 @@ class EC29_RadioRxSquelch
     //------------------------------------------------------------------------------------------------
     protected void Close(EC29_RxChannelState state, int frequency, float nowMs)
     {
-        PrintFormat("[EC29-DBG][RadioSquelch] Channel CLOSE freq=%1 t=%2", frequency, nowMs);
         if (!state.m_bOpen)
             return;
+
+        if (EC29_Debug.VERBOSE)
+            PrintFormat("[EC29-DBG][RadioSquelch] Channel CLOSE freq=%1 t=%2", frequency, nowMs);
 
         state.m_bOpen = false;
         state.m_fClosedAtMs = nowMs;
@@ -254,7 +260,7 @@ class EC29_RadioRxSquelch
     }
 
     //------------------------------------------------------------------------------------------------
-    protected bool IsReachable(int frequency, float range, vector senderPos, PlayerController playerController)
+    protected bool IsReachable(int senderPlayerId, int frequency, float range, vector senderPos, PlayerController playerController)
     {
         if (senderPos == vector.Zero || range <= 0)
             return true;
@@ -269,7 +275,9 @@ class EC29_RadioRxSquelch
 
         if (EC29_RFPropagationNetworkComponent.IsRFPropagationEnabled())
         {
-            float quality = EC29_RadioState.GetInstance().GetSignalQuality(senderPos, myPos, frequency);
+            // Cached per sender: shares the TTL entry with the voice-packet
+            // path so a key-start followed by voice costs one raymarch, not two.
+            float quality = EC29_RadioState.GetInstance().GetSignalQualityCached(senderPlayerId, senderPos, myPos, frequency);
             if (quality < MIN_SIGNAL_QUALITY)
                 return false;
         }
