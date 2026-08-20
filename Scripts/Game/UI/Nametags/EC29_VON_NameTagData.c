@@ -20,7 +20,11 @@ modded class SCR_NameTagData
 	{
 		// Only gate direct VoN. Radio always shows the icon regardless of distance.
 		if (!receiver && EC29_ShouldGateNameTagVON(playerId))
+		{
+			if (EC29_Debug.VERBOSE)
+				PrintFormat("[EC29-DBG][NameTag] VON icon suppressed for player %1 (out of audible range)", playerId);
 			return;
+		}
 
 		super.OnReceivedVON(playerId, receiver, frequency, quality);
 	}

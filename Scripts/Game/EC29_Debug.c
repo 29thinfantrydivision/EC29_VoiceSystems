@@ -7,7 +7,11 @@
 //! resource load) stay UNGATED on purpose - those must reach every RPT.
 //!
 //! Flip to true when chasing a bug; the entire original debug chain returns.
+//!
+//! Currently TRUE for the integration weekend: every RPT captures the full
+//! trace chain so field reports come back with usable logs. Flip back to
+//! false for the wide release build.
 class EC29_Debug
 {
-	static const bool VERBOSE = false;
+	static const bool VERBOSE = true;
 }
