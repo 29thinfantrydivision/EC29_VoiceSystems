@@ -57,6 +57,10 @@ class EC29_JammerToggleUserAction : ScriptedUserAction
 			return;
 
 		bool newState = !m_JammerComponent.IsJammerActive();
+
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][Jammer] Toggle user action performed on authority, new state=%1", newState);
+
 		m_JammerComponent.SetJammerActive(newState);
 	}
 }
