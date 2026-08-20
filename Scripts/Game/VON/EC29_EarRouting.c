@@ -23,15 +23,62 @@ class EC29_RadioEarSettings
     protected bool m_bTransmittingOnAlternate = false;
 
 
+    //! Issue #7: squad net defaults to the left ear, platoon net to the right.
+    //! A radio the player has not routed manually resolves to a default by
+    //! device class on first query; the K-menu cycle still overrides per radio.
     EC29_EEarRouting GetRouting(BaseTransceiver transceiver)
     {
         if (!transceiver)
             return EC29_EEarRouting.CENTER;
 
-        if (!m_mRoutingByTransceiver.Contains(transceiver))
+        EC29_EEarRouting routing;
+        if (m_mRoutingByTransceiver.Find(transceiver, routing))
+            return routing;
+
+        return ApplyDefaultRouting(transceiver);
+    }
+
+    //! Classifies the device behind a transceiver and stores its default
+    //! routing: personal handheld (EGadgetType.RADIO - squad net) -> LEFT,
+    //! manpack (EGadgetType.RADIO_BACKPACK - platoon net) -> RIGHT, anything
+    //! without a radio gadget (vehicle sets, editor transceivers) -> CENTER.
+    //! The result is memoized in the routing map so the per-packet hot path
+    //! stays a single map lookup. A transceiver whose owning entity cannot be
+    //! resolved yet returns CENTER WITHOUT memoizing, so classification
+    //! retries on the next query instead of freezing a wrong default.
+    protected EC29_EEarRouting ApplyDefaultRouting(BaseTransceiver transceiver)
+    {
+        BaseRadioComponent radio = transceiver.GetRadio();
+        if (!radio)
             return EC29_EEarRouting.CENTER;
 
-        return m_mRoutingByTransceiver.Get(transceiver);
+        IEntity radioEntity = radio.GetOwner();
+        if (!radioEntity)
+            return EC29_EEarRouting.CENTER;
+
+        SCR_RadioComponent gadget = SCR_RadioComponent.Cast(radioEntity.FindComponent(SCR_RadioComponent));
+        EC29_EEarRouting routing = EC29_EEarRouting.CENTER;
+        if (gadget)
+        {
+            EGadgetType gadgetType = gadget.GetType();
+            if (gadgetType == EGadgetType.RADIO)
+                routing = EC29_EEarRouting.LEFT;
+            else if (gadgetType == EGadgetType.RADIO_BACKPACK)
+                routing = EC29_EEarRouting.RIGHT;
+        }
+
+        m_mRoutingByTransceiver.Set(transceiver, routing);
+
+        if (EC29_Debug.VERBOSE)
+        {
+            bool hasGadget = false;
+            if (gadget)
+                hasGadget = true;
+            PrintFormat("[EC29-DBG][RadioEar] Default routing %1 applied to transceiver at %2 kHz (gadget=%3)",
+                GetRoutingDisplayText(routing), transceiver.GetFrequency(), hasGadget);
+        }
+
+        return routing;
     }
 
     void SetRouting(BaseTransceiver transceiver, EC29_EEarRouting routing)
