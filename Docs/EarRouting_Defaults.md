@@ -47,6 +47,17 @@ retries on the next call, so a wrong default is never frozen in.
 No audio-graph changes: the routing enum value (CENTER=0, RIGHT=1, LEFT=2) feeds the
 `EC29_EarRouting` audio variable exactly as before; only the unset-entry default moved.
 
+## Known limitation: simultaneous two-net traffic
+
+Ear routing rides a single global audio variable (`EC29_EarRouting`), rewritten per
+incoming packet — last writer wins for all currently-playing radio audio. When squad and
+platoon transmit at the same time, routing (and per-channel volume) can flicker between
+ears at packet rate. This is a pre-existing engine-level limitation inherited from the
+source codebase and already affected anyone who set divergent routing manually — which,
+per issue #7, is most of the unit. The defaults make that configuration universal rather
+than introducing it. Accepted as-is; the VERBOSE build logs the per-packet writes if it
+ever needs chasing.
+
 ## Debug logging
 
 `EC29_Debug.VERBOSE` is **ON** in this build (integration weekend — every RPT captures
