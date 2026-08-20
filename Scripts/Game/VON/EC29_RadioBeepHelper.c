@@ -112,6 +112,31 @@ class EC29_RadioBeepHelper
         PlayRouted(eventName, transceiver);
     }
 
+    //! Plays the current style's key-up sound for this radio, BYPASSING the
+    //! master switch. Only for deliberate user actions (cycling the style with
+    //! K in the radial menu) - it is the audible feedback that the cycle did
+    //! something, and it doubles as a speaker test for the beep audio path.
+    //! Style OFF previews as silence, which is the correct feedback for OFF.
+    static void PlayPreview(BaseTransceiver transceiver)
+    {
+        if (!transceiver)
+            return;
+
+        EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
+        EC29_EBeepType beepType = settings.GetBeepType(transceiver);
+
+        string eventName;
+        switch (beepType)
+        {
+            case EC29_EBeepType.HIGH: eventName = EVENT_BEEP_HIGH; break;
+            case EC29_EBeepType.LOW: eventName = EVENT_BEEP_LOW; break;
+            case EC29_EBeepType.CLASSIC: eventName = EVENT_CLASSIC_START; break;
+            default: return;
+        }
+
+        PlayEventRouted(eventName, transceiver);
+    }
+
     //! Master switch, persisted in game settings (Audio tab, 29th ID section).
     //! Default OFF - beeps are opt-in. The per-radio beep type (K in the radial
     //! menu) still selects the style once enabled.
@@ -119,12 +144,24 @@ class EC29_RadioBeepHelper
     {
         BaseContainer radioSettings = GetGame().GetGameUserSettings().GetModule("EC29_RadioSettings");
         if (!radioSettings)
+        {
+            // Not VERBOSE-gated on purpose: if the settings module fails to
+            // register, the Audio-tab checkbox is inert and beeps are stuck
+            // off with no other symptom. Warn once per game run.
+            if (!s_bModuleMissingWarned)
+            {
+                s_bModuleMissingWarned = true;
+                Print("[EC29] EC29_RadioSettings module not found in game user settings - radio beeps forced OFF and the Audio-tab checkbox will not work", LogLevel.WARNING);
+            }
             return false;
+        }
 
         bool enabled;
         radioSettings.Get("RadioBeepsEnabled", enabled);
         return enabled;
     }
+
+    protected static bool s_bModuleMissingWarned;
 
     protected static void PlayRouted(string eventName, BaseTransceiver transceiver)
     {
@@ -137,6 +174,11 @@ class EC29_RadioBeepHelper
             return;
         }
 
+        PlayEventRouted(eventName, transceiver);
+    }
+
+    protected static void PlayEventRouted(string eventName, BaseTransceiver transceiver)
+    {
         EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
         EC29_EEarRouting routing = settings.GetRouting(transceiver);
 
