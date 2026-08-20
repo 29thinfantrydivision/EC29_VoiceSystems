@@ -20,6 +20,16 @@ modded class SCR_AudioSettingsSubMenu
 
 		beepBind.LoadEntry(m_wScroll, false, true);
 		beepBind.GetEntryChangedInvoker().Insert(OnMenuItemChanged);
+
+		// Not VERBOSE-gated: if either settings module failed to register, its
+		// widget renders but never reads or writes the setting (the binding
+		// ctor needs GetModule to succeed; vanilla LoadEntry then warns
+		// "Settings item not found" and bails). Make that state unmissable in
+		// the log the moment the Audio tab is opened.
+		if (!GetGame().GetGameUserSettings().GetModule("EC29_RadioSettings"))
+			Print("[EC29] Audio tab: EC29_RadioSettings module missing - Radio Beeps checkbox is inert", LogLevel.WARNING);
+		if (!GetGame().GetGameUserSettings().GetModule("EC29_EarplugSettings"))
+			Print("[EC29] Audio tab: EC29_EarplugSettings module missing - Earplugs slider is inert", LogLevel.WARNING);
 	}
 }
 

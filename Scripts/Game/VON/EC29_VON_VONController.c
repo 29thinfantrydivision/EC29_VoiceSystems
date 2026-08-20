@@ -376,7 +376,20 @@ modded class SCR_VONController
             return;
 
         EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
-        settings.CycleBeepType(transceiver);
+        EC29_EBeepType next = settings.CycleBeepType(transceiver);
+
+        // Fail-safe feedback: the style change must be self-evident even with
+        // the master switch off, or "K does nothing" reports come back. The
+        // preview bypasses the master switch (deliberate user action); the
+        // popup names the state the cycle landed on and points at the master
+        // switch when it is the reason beeps stay silent.
+        EC29_RadioBeepHelper.PlayPreview(transceiver);
+
+        string styleText = settings.GetBeepTypeDisplayText(next);
+        string masterHint = "";
+        if (!EC29_RadioBeepHelper.EC29_AreBeepsEnabled())
+            masterHint = "Radio beeps are OFF - enable them in Settings > Audio > 29th ID";
+        SCR_PopUpNotification.GetInstance().PopupMsg("Radio beep style: " + styleText, 4, masterHint);
 
         radialMenu.UpdateEntries();
     }
