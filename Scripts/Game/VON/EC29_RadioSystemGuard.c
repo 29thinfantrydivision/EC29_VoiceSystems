@@ -9,12 +9,17 @@
 //!
 //! 2. An already-powered radio can miss receiver registration with the native
 //!    radio system around the time its VON entry registers: it transmits but never
-//!    receives, and a manual off/on repairs it. The receiver guard below verifies
-//!    each radio against the native transceiver registry
-//!    (RadioManagerEntity.GetTransceiversInRange returns only power-ON
-//!    transceivers, so a powered radio absent from the query is unregistered) and
-//!    only then reproduces the off/on transition. A healthy radio is never
-//!    touched, so the guard becomes a no-op the day BI fixes the engine side.
+//!    receives, and a manual off/on repairs it. The receiver guard below reproduces
+//!    that off/on transition once per radio shortly after its VON entry registers -
+//!    the pattern every community 1.8 fix mod converged on.
+//!
+//! The registry-verification variant shipped in v1.0.3 ("cycle only radios provably
+//! missing from the native registry") is gone deliberately: on a client whose world
+//! loaded without a RadioManagerEntity, ChimeraWorld.GetRadioManager() still
+//! returns non-null, and calling GetTransceiversInRange on that handle is a native
+//! access violation - a guaranteed client CTD on exactly the GM worlds this file
+//! exists to repair (2026-08-21 field crashes). No runtime signal distinguishes a
+//! usable manager from that degraded handle, so the guard must never query it.
 //!
 //! Both defects are native-code regressions: the 1.7.0.54 -> 1.8.0.10 script diff
 //! (BohemiaInteractive/Arma-Reforger-Script-Diff) contains no functional change in
@@ -70,25 +75,19 @@ modded class SCR_BaseGameMode
 }
 
 //------------------------------------------------------------------------------------------------
-//! Client and server: verify each radio against the native transceiver registry
-//! shortly after its VON entry registers; power-cycle only radios proven missing.
+//! Client and server: power-cycle each radio once shortly after its VON entry
+//! registers, reproducing the manual off/on that repairs the 1.8 receiver defect.
 //! Owned by EC29_RadioState (world-scoped - state discards with the world).
 class EC29_RadioReceiverGuard
 {
-    //! Native radio setup continues after AddEntry; earlier checks get overwritten
+    //! Native radio setup continues after AddEntry; earlier cycles get overwritten
     //! (community-established timing - shorter delays lose the repair).
     protected static const int STABILIZATION_DELAY_MS = 3000;
     //! Separate call-queue turn so the native side actually unregisters the receiver.
     protected static const int POWER_OFF_MS = 150;
-    protected static const int VERIFY_DELAY_MS = 1000;
-    protected static const int RETRY_DELAY_MS = 2000;
-    protected static const int MAX_REPAIR_ATTEMPTS = 2;
-    protected static const float REGISTRY_QUERY_RANGE_M = 100.0;
 
-    //! Dedupe: multiple VON entries share one physical radio; check each radio once.
+    //! Dedupe: multiple VON entries share one physical radio; cycle each radio once.
     protected ref array<BaseRadioComponent> m_aScheduledRadios = {};
-    protected ref map<BaseRadioComponent, int> m_mRepairAttempts = new map<BaseRadioComponent, int>();
-    protected bool m_bWarnedNoManager;
 
     //------------------------------------------------------------------------------------------------
     void OnRadioEntryAdded(notnull BaseTransceiver transceiver)
@@ -101,7 +100,7 @@ class EC29_RadioReceiverGuard
             return;
 
         m_aScheduledRadios.Insert(radio);
-        GetGame().GetCallqueue().CallLater(CheckAndRepair, STABILIZATION_DELAY_MS, false, radio);
+        GetGame().GetCallqueue().CallLater(CycleRadio, STABILIZATION_DELAY_MS, false, radio);
     }
 
     //------------------------------------------------------------------------------------------------
@@ -118,64 +117,14 @@ class EC29_RadioReceiverGuard
     }
 
     //------------------------------------------------------------------------------------------------
-    //! True when every transceiver of this powered radio appears in the native
-    //! registry. Returns true (= take no action) when the registry cannot be
-    //! queried: cycling power cannot help a world with no RadioManagerEntity.
-    protected bool IsRegistered(BaseRadioComponent radio)
-    {
-        ChimeraWorld world = ChimeraWorld.CastFrom(GetGame().GetWorld());
-        if (!world)
-            return true;
-
-        RadioManagerEntity radioManager = world.GetRadioManager();
-        if (!radioManager)
-        {
-            if (!m_bWarnedNoManager)
-            {
-                m_bWarnedNoManager = true;
-                Print("[EC29-DBG][RadioGuard] No RadioManagerEntity in world - receiver check impossible, radio VON dead regardless (server-side ensure missing?)", LogLevel.WARNING);
-            }
-            return true;
-        }
-
-        array<BaseTransceiver> nativeRegistry = {};
-        radioManager.GetTransceiversInRange(radio.GetOwner().GetOrigin(), REGISTRY_QUERY_RANGE_M, nativeRegistry);
-
-        int tsvCount = radio.TransceiversCount();
-        for (int i = 0; i < tsvCount; i++)
-        {
-            BaseTransceiver tsv = radio.GetTransceiver(i);
-            if (tsv && nativeRegistry.Find(tsv) == -1)
-                return false;
-        }
-
-        return true;
-    }
-
-    //------------------------------------------------------------------------------------------------
-    protected void CheckAndRepair(BaseRadioComponent radio)
+    protected void CycleRadio(BaseRadioComponent radio)
     {
         // A radio the player deliberately powered off is left alone.
         if (!IsRadioAlive(radio) || !radio.IsPowered())
             return;
 
-        if (IsRegistered(radio))
-        {
-            if (EC29_Debug.VERBOSE)
-                Print("[EC29-DBG][RadioGuard] Radio receiver verified in native registry - no action", LogLevel.NORMAL);
-            return;
-        }
-
-        int attempts;
-        m_mRepairAttempts.Find(radio, attempts);
-        if (attempts >= MAX_REPAIR_ATTEMPTS)
-        {
-            Print("[EC29-DBG][RadioGuard] Radio receiver still unregistered after repair attempts - giving up on this radio (manual off/on may recover it)", LogLevel.ERROR);
-            return;
-        }
-        m_mRepairAttempts.Set(radio, attempts + 1);
-
-        Print(string.Format("[EC29-DBG][RadioGuard] Powered radio absent from native transceiver registry (1.8 receiver-registration defect) - power-cycling to re-register (attempt %1/%2)", attempts + 1, MAX_REPAIR_ATTEMPTS), LogLevel.WARNING);
+        if (EC29_Debug.VERBOSE)
+            Print("[EC29-DBG][RadioGuard] Power-cycling radio to re-register its receiver (1.8 registration defect)", LogLevel.NORMAL);
 
         radio.SetPower(false);
         GetGame().GetCallqueue().CallLater(RestorePower, POWER_OFF_MS, false, radio);
@@ -188,22 +137,5 @@ class EC29_RadioReceiverGuard
             return;
 
         radio.SetPower(true);
-        GetGame().GetCallqueue().CallLater(VerifyRepair, VERIFY_DELAY_MS, false, radio);
-    }
-
-    //------------------------------------------------------------------------------------------------
-    protected void VerifyRepair(BaseRadioComponent radio)
-    {
-        // Player powered it off during the verify window - their call stands.
-        if (!IsRadioAlive(radio) || !radio.IsPowered())
-            return;
-
-        if (IsRegistered(radio))
-        {
-            Print("[EC29-DBG][RadioGuard] Radio receiver re-registered after power cycle", LogLevel.WARNING);
-            return;
-        }
-
-        GetGame().GetCallqueue().CallLater(CheckAndRepair, RETRY_DELAY_MS, false, radio);
     }
 }
