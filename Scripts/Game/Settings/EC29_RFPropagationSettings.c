@@ -57,7 +57,12 @@ class EC29_RFPropagationSettings
         SCR_JsonLoadContext loadContext = new SCR_JsonLoadContext();
         if (!loadContext.LoadFromFile(JSON_CONFIG_PATH))
         {
-            CreateDefaultJSON();
+            // A present-but-unparseable file is an admin's hand-edited config;
+            // writing defaults over it would destroy their settings.
+            if (FileIO.FileExist(JSON_CONFIG_PATH))
+                Print("[EC29 RFPropagation] ERROR: config exists but failed to parse - fix or delete it; using defaults this run", LogLevel.ERROR);
+            else
+                CreateDefaultJSON();
             return false;
         }
 

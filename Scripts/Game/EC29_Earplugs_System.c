@@ -99,6 +99,9 @@ class EC29_Earplugs_System extends WorldSystem
 	float FetchDefaultSFXVolume()
 	{
 		float volume = AudioSystem.GetMasterVolume(AudioSystem.SFX);
+		if (!EngineUserSettings)
+			return volume;
+
 		BaseContainer audioSettings = EngineUserSettings.GetModule("AudioSettings");
 		if (audioSettings)
 		{
@@ -113,7 +116,9 @@ class EC29_Earplugs_System extends WorldSystem
 	float FetchEarplugsVolume()
 	{
 		float volume;
-		BaseContainer earplugSettings = GameUserSettings.GetModule("EC29_EarplugSettings");
+		BaseContainer earplugSettings;
+		if (GameUserSettings)
+			earplugSettings = GameUserSettings.GetModule("EC29_EarplugSettings");
 		if (earplugSettings)
 		{
 			earplugSettings.Get("EarplugsVolume", volume);

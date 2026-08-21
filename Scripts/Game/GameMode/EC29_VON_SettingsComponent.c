@@ -101,7 +101,10 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 		// NORMAL: skip the distance math entirely - vanilla spatial falloff handles it.
 		if (mode != EC29_EVoiceRange.NORMAL)
 		{
-			IEntity sender = GetGame().GetPlayerManager().GetPlayerControlledEntity(senderPlayerId);
+			IEntity sender;
+			PlayerManager playerManager = GetGame().GetPlayerManager();
+			if (playerManager)
+				sender = playerManager.GetPlayerControlledEntity(senderPlayerId);
 			if (sender)
 			{
 				float distSq = vector.DistanceSqXZ(sender.GetOrigin(), listener.GetOrigin());

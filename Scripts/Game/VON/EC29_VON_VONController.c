@@ -150,7 +150,11 @@ modded class SCR_VONController
     //! Consumes one key-up token; an empty bucket means the lockout is engaged.
     protected bool EC29_IsKeySpamLocked()
     {
-        float nowMs = GetGame().GetWorld().GetWorldTime();
+        BaseWorld world = GetGame().GetWorld();
+        if (!world)
+            return false;
+
+        float nowMs = world.GetWorldTime();
 
         if (m_EC29_KeyBucket.TryConsume(nowMs))
             return false;

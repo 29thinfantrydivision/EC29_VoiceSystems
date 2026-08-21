@@ -59,7 +59,16 @@ class EC29_RadioRxSquelch
     //------------------------------------------------------------------------------------------------
     protected void EC29_TickLoop()
     {
-        float nowMs = GetGame().GetWorld().GetWorldTime();
+        // The self-rescheduling ticker can fire into world teardown; stop
+        // cleanly so the stale instance drops out of the call queue.
+        BaseWorld world = GetGame().GetWorld();
+        if (!world)
+        {
+            m_bTicking = false;
+            return;
+        }
+
+        float nowMs = world.GetWorldTime();
 
         if (Tick(nowMs))
             GetGame().GetCallqueue().CallLater(EC29_TickLoop, TICK_INTERVAL_MS, false);

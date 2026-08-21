@@ -5,6 +5,12 @@ modded class SCR_AudioSettingsSubMenu
 	{
 		super.OnTabCreate(menuRoot, buttonsLayout, index);
 
+		if (!m_wScroll)
+		{
+			Print("[EC29] Audio tab: settings scroll widget missing - EC29 entries skipped", LogLevel.WARNING);
+			return;
+		}
+
 		if (EC29_Debug.VERBOSE)
 			Print("[EC29-DBG][EarplugsMenu] Audio settings tab created - inserting earplug reduction slider", LogLevel.NORMAL);
 		SCR_SettingBindingGameplay bind = new SCR_SettingBindingGameplay("EC29_EarplugSettings", "EarplugsVolume", "Earplugs");
@@ -26,9 +32,10 @@ modded class SCR_AudioSettingsSubMenu
 		// ctor needs GetModule to succeed; vanilla LoadEntry then warns
 		// "Settings item not found" and bails). Make that state unmissable in
 		// the log the moment the Audio tab is opened.
-		if (!GetGame().GetGameUserSettings().GetModule("EC29_RadioSettings"))
+		UserSettings userSettings = GetGame().GetGameUserSettings();
+		if (!userSettings || !userSettings.GetModule("EC29_RadioSettings"))
 			Print("[EC29] Audio tab: EC29_RadioSettings module missing - Radio Beeps checkbox is inert", LogLevel.WARNING);
-		if (!GetGame().GetGameUserSettings().GetModule("EC29_EarplugSettings"))
+		if (!userSettings || !userSettings.GetModule("EC29_EarplugSettings"))
 			Print("[EC29] Audio tab: EC29_EarplugSettings module missing - Earplugs slider is inert", LogLevel.WARNING);
 	}
 }

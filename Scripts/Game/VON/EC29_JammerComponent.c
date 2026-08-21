@@ -181,6 +181,10 @@ class EC29_JammerComponent : ScriptComponent
 
 	vector GetForwardVector()
 	{
-		return GetOwner().GetTransformAxis(2);
+		IEntity owner = GetOwner();
+		if (!owner)
+			return vector.Forward;
+
+		return owner.GetTransformAxis(2);
 	}
 }
