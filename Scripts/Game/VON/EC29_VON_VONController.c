@@ -41,6 +41,25 @@ modded class SCR_VONController
     }
 
     //------------------------------------------------------------------------------------------------
+    //! Every radio VON entry passes through here on client and server; hand the
+    //! radio to the receiver guard (1.8 receiver-registration repair - see
+    //! EC29_RadioSystemGuard.c).
+    override void AddEntry(SCR_VONEntry entry)
+    {
+        super.AddEntry(entry);
+
+        SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(entry);
+        if (!radioEntry)
+            return;
+
+        BaseTransceiver transceiver = radioEntry.GetTransceiver();
+        if (!transceiver)
+            return;
+
+        EC29_RadioState.GetInstance().ReceiverGuard().OnRadioEntryAdded(transceiver);
+    }
+
+    //------------------------------------------------------------------------------------------------
     override protected void Cleanup()
     {
         if (m_InputManager)
