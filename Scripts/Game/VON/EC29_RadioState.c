@@ -25,6 +25,7 @@ class EC29_RadioState
 	protected ref EC29_RadioRxSquelch m_Squelch;
 	protected ref EC29_JammerRegistry m_Jammers;
 	protected ref EC29_RFPropagationModel m_Propagation;
+	protected ref EC29_RadioReceiverGuard m_ReceiverGuard;
 
 	//! The propagation model raymarches up to 200 terrain samples per query and
 	//! the query sits on the per-voice-packet hot path, so results are cached
@@ -60,6 +61,13 @@ class EC29_RadioState
 		m_Squelch = new EC29_RadioRxSquelch();
 		m_Jammers = new EC29_JammerRegistry();
 		m_Propagation = new EC29_RFPropagationModel();
+		m_ReceiverGuard = new EC29_RadioReceiverGuard();
+	}
+
+	//------------------------------------------------------------------------------------------------
+	EC29_RadioReceiverGuard ReceiverGuard()
+	{
+		return m_ReceiverGuard;
 	}
 
 	//------------------------------------------------------------------------------------------------
