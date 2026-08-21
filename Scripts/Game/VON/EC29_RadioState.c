@@ -104,7 +104,12 @@ class EC29_RadioState
 	//! instead of per packet. A frequency change bypasses the cache.
 	float GetSignalQualityCached(int senderPlayerId, vector transmitterPos, vector receiverPos, float frequencyKHz = 0)
 	{
-		float nowMs = GetGame().GetWorld().GetWorldTime();
+		// No world clock means no usable cache; fall through to a direct compute.
+		BaseWorld world = GetGame().GetWorld();
+		if (!world)
+			return GetSignalQuality(transmitterPos, receiverPos, frequencyKHz);
+
+		float nowMs = world.GetWorldTime();
 
 		EC29_SignalQualityCacheEntry entry;
 		if (m_mSignalQualityBySender.Find(senderPlayerId, entry))

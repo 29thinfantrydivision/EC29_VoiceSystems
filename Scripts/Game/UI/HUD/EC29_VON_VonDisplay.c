@@ -46,9 +46,12 @@ modded class SCR_VonDisplay
 		{
 			if (ShouldHideDirectIncoming_C(playerId) || EC29_ShouldHideOutOfRange(playerId))
 			{
-				TransmissionData existing = m_aTransmissionMap.Get(playerId);
-				if (existing)
-					existing.HideTransmission();
+				if (m_aTransmissionMap)
+				{
+					TransmissionData existing = m_aTransmissionMap.Get(playerId);
+					if (existing)
+						existing.HideTransmission();
+				}
 
 				return;
 			}

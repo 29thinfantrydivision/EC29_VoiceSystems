@@ -16,6 +16,12 @@ class EC29_Earplugs_Info extends SCR_InfoDisplay
 			return;
 		}
 
+		if (!m_wRoot)
+		{
+			Print("[EC29-DBG][EarplugsInfo] Root widget missing - EarplugsOverlay.layout failed to load; icon disabled", LogLevel.WARNING);
+			return;
+		}
+
 		EC29_Earplugs_System.ConnectEvent(EC29_Earplugs_System.Instance.OnEarplugsToggled, this.SetVisibility);
 
 		Image = ImageWidget.Cast(m_wRoot.FindAnyWidget("Image0"));

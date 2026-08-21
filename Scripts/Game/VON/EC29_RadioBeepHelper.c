@@ -142,7 +142,10 @@ class EC29_RadioBeepHelper
     //! menu) still selects the style once enabled.
     static bool EC29_AreBeepsEnabled()
     {
-        BaseContainer radioSettings = GetGame().GetGameUserSettings().GetModule("EC29_RadioSettings");
+        BaseContainer radioSettings;
+        UserSettings userSettings = GetGame().GetGameUserSettings();
+        if (userSettings)
+            radioSettings = userSettings.GetModule("EC29_RadioSettings");
         if (!radioSettings)
         {
             // Not VERBOSE-gated on purpose: if the settings module fails to

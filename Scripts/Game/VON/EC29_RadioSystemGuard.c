@@ -96,6 +96,14 @@ class EC29_RadioReceiverGuard
         if (!radio || radio.IsEditorRadio() || !radio.IsPowered())
             return;
 
+        // Deleted radios null their handles; sweep them so the dedupe list
+        // cannot grow for the world lifetime.
+        for (int i = m_aScheduledRadios.Count() - 1; i >= 0; i--)
+        {
+            if (!m_aScheduledRadios[i])
+                m_aScheduledRadios.Remove(i);
+        }
+
         if (m_aScheduledRadios.Contains(radio))
             return;
 

@@ -177,9 +177,15 @@ class EC29_RFPropagationNetworkComponent : SCR_BaseGameModeComponent
 		if (!m_mEC29_PendingStops.Find(playerId, pending))
 			return;
 
+		// The debounced flush can fire into world teardown, where no clock exists
+		// and there is no one left to notify.
+		BaseWorld world = GetGame().GetWorld();
+		if (!world)
+			return;
+
 		// A newer stop queued during our delay has its own flush call coming;
 		// the 50ms margin absorbs CallLater frame jitter on our own entry.
-		float nowMs = GetGame().GetWorld().GetWorldTime();
+		float nowMs = world.GetWorldTime();
 		if (nowMs - pending.m_fQueuedAtMs < EC29_KEY_STOP_DEBOUNCE_MS - 50)
 			return;
 
@@ -192,7 +198,10 @@ class EC29_RFPropagationNetworkComponent : SCR_BaseGameModeComponent
 	protected void EC29_BroadcastKeyState(int senderPlayerId, int frequency, float range, bool keyed)
 	{
 		vector senderPos = vector.Zero;
-		IEntity senderEntity = GetGame().GetPlayerManager().GetPlayerControlledEntity(senderPlayerId);
+		PlayerManager playerManager = GetGame().GetPlayerManager();
+		IEntity senderEntity;
+		if (playerManager)
+			senderEntity = playerManager.GetPlayerControlledEntity(senderPlayerId);
 		if (senderEntity)
 			senderPos = senderEntity.GetOrigin();
 
