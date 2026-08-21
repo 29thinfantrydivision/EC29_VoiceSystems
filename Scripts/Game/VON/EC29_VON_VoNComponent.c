@@ -44,8 +44,11 @@ modded class SCR_VoNComponent
 		s_bEC29RadioVarsChecked = false;
 	}
 
+	//! Spawn default is WHISPER (issue #11): noise discipline out of the gate, F3
+	//! cycles up when needed. The HUD seed in EC29_VON_VoiceRangeDisplay.c must
+	//! match this initializer or the icon lies until the first F3 press.
 	[RplProp(onRplName: "EC29_OnVoiceRangeReplicated")]
-	protected EC29_EVoiceRange m_eEC29VoiceRange = EC29_EVoiceRange.NORMAL;
+	protected EC29_EVoiceRange m_eEC29VoiceRange = EC29_EVoiceRange.WHISPER;
 
 	//------------------------------------------------------------------------------------------------
 	//! RplProp callback - fires on all clients when m_eEC29VoiceRange changes.

@@ -64,11 +64,12 @@ class EC29_VoiceRangeDisplay : SCR_InfoDisplay
 		FrameSlot.SetSize(m_wIcon, m_iIconSize, m_iIconSize);
 		FrameSlot.SetPos(m_wIcon, m_iMarginLeft, -m_iMarginBottom);
 
-		// Initial display: NORMAL. Imagesets reload on each mode change rather than
-		// pre-register multiple slots - vanilla code (SCR_GroupFlagImageComponent etc.)
-		// uniformly uses LoadImageFromSet with idx 0.
-		m_wIcon.LoadImageFromSet(0, m_sImageSet, m_sSpriteNormal);
-		m_iLastRange = (int)EC29_EVoiceRange.NORMAL;
+		// Initial display: WHISPER - must match the m_eEC29VoiceRange initializer in
+		// EC29_VON_VoNComponent.c (spawn default, issue #11). Imagesets reload on each
+		// mode change rather than pre-register multiple slots - vanilla code
+		// (SCR_GroupFlagImageComponent etc.) uniformly uses LoadImageFromSet with idx 0.
+		m_wIcon.LoadImageFromSet(0, m_sImageSet, m_sSpriteWhisper);
+		m_iLastRange = (int)EC29_EVoiceRange.WHISPER;
 
 		// Start hidden if we're auto-fading; visible if duration is 0 (permanent mode).
 		if (m_iVisibleDurationMs > 0)
