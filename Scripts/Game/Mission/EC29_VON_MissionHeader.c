@@ -13,6 +13,7 @@ class EC29_VON_Settings : ScriptAndConfig
 	{
 		m_fWhisperRange  = 3.0;
 		m_fNormalRange   = 15.0;
+		m_fNormalFalloffEnd = 20.0;
 		m_fYellRange     = 50.0;
 		m_fFalloffPower  = 4.0;
 		m_fWhisperVolume = 1.0;
@@ -33,8 +34,11 @@ class EC29_VON_Settings : ScriptAndConfig
 	[Attribute(defvalue: "3.0", uiwidget: UIWidgets.EditBox, desc: "Whisper characteristic range in meters. Beyond this distance, volume falls off as (R/dist)^FalloffPower.", params: "0 inf 0.5", category: "EC29_VON")]
 	float m_fWhisperRange;
 
-	[Attribute(defvalue: "15.0", uiwidget: UIWidgets.EditBox, desc: "Normal characteristic range in meters. Inside this range NORMAL skips the distance math and uses vanilla spatial falloff only.", params: "0 inf 0.5", category: "EC29_VON")]
+	[Attribute(defvalue: "15.0", uiwidget: UIWidgets.EditBox, desc: "Normal voice range in meters: full volume inside this distance, then a straight-line fade to silence at NormalFalloffEnd.", params: "0 inf 0.5", category: "EC29_VON")]
 	float m_fNormalRange;
+
+	[Attribute(defvalue: "20.0", uiwidget: UIWidgets.EditBox, desc: "Distance in meters at which NORMAL voice is fully silent. Must exceed NormalRange; the fade runs linearly between the two. Set equal to NormalRange for a hard cutoff.", params: "0 inf 0.5", category: "EC29_VON")]
+	float m_fNormalFalloffEnd;
 
 	[Attribute(defvalue: "50.0", uiwidget: UIWidgets.EditBox, desc: "Yell characteristic range in meters. Beyond this distance, volume falls off but base volume is high so it still carries.", params: "0 inf 0.5", category: "EC29_VON")]
 	float m_fYellRange;
