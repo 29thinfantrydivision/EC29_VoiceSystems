@@ -136,6 +136,14 @@ modded class SCR_VONController
                 return;
             }
 
+            // 1.8 can wedge the player's voice capture so every radio transmit
+            // is silently dead until it clears - per-player, survives switching
+            // radios (community-documented; the Exilados fix mod carries the
+            // same guard). Clearing before keying makes a wedged state
+            // self-heal on the next PTT press.
+            if (m_VONComp)
+                m_VONComp.SetCapture(false);
+
             BaseTransceiver transceiver = radioEntry.GetTransceiver();
             if (transceiver)
             {

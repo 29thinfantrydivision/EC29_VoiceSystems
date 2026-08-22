@@ -22,6 +22,14 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 	[RplProp()] protected bool m_bGateNameTagVonByRange        = true;
 	[RplProp()] protected bool m_bShowVoiceModeInOverlay       = true;
 
+	//! Server flips this once the RadioManagerEntity provably exists (found or
+	//! spawned). Replication delivers it to every client - including late
+	//! joiners via JIP initial state - so no client ever needs to poll the
+	//! native manager getter, which returns a non-null degraded handle on
+	//! manager-less worlds (the 2026-08-21 client CTD class).
+	[RplProp(onRplName: "EC29_OnRadioSystemReady")]
+	protected bool m_bEC29_RadioSystemReady;
+
 	protected static EC29_VONSettingsComponent s_pInstance;
 
 	//------------------------------------------------------------------------------------------------
@@ -80,6 +88,32 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 	bool GetHideRoleInVonOverlay()         { return m_bHideRoleInVonOverlay; }
 	bool GetGateNameTagVonByRange()        { return m_bGateNameTagVonByRange; }
 	bool GetShowVoiceModeInOverlay()       { return m_bShowVoiceModeInOverlay; }
+
+	//------------------------------------------------------------------------------------------------
+	//! Server-side: mark the radio system usable and notify all machines.
+	//! The RplProp callback does not fire on the authority for its own write,
+	//! so the local guard is notified directly.
+	void EC29_MarkRadioSystemReady()
+	{
+		if (!Replication.IsServer() || m_bEC29_RadioSystemReady)
+			return;
+
+		m_bEC29_RadioSystemReady = true;
+		Replication.BumpMe();
+		EC29_OnRadioSystemReady();
+	}
+
+	//------------------------------------------------------------------------------------------------
+	protected void EC29_OnRadioSystemReady()
+	{
+		if (!m_bEC29_RadioSystemReady)
+			return;
+
+		if (EC29_Debug.VERBOSE)
+			Print("[EC29-DBG][VONSettings] Radio system ready flag received - handing to receiver guard", LogLevel.NORMAL);
+
+		EC29_RadioState.GetInstance().ReceiverGuard().OnRadioSystemReady();
+	}
 
 	//------------------------------------------------------------------------------------------------
 	//! Single source of truth for "what volume does this listener hear from this speaker
