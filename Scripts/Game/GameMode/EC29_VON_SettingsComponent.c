@@ -6,6 +6,7 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 {
 	[RplProp()] protected float m_fWhisperRange  = 3.0;
 	[RplProp()] protected float m_fNormalRange   = 15.0;
+	[RplProp()] protected float m_fNormalFalloffEnd = 20.0;
 	[RplProp()] protected float m_fYellRange     = 50.0;
 	[RplProp()] protected float m_fFalloffPower  = 4.0;
 	[RplProp()] protected float m_fWhisperVolume = 1.0;
@@ -54,6 +55,12 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 	}
 
 	//------------------------------------------------------------------------------------------------
+	float GetNormalFalloffEnd()
+	{
+		return m_fNormalFalloffEnd;
+	}
+
+	//------------------------------------------------------------------------------------------------
 	float GetFalloffPower()
 	{
 		return m_fFalloffPower;
@@ -98,23 +105,32 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 		EC29_EVoiceRange mode = senderVon.EC29_GetVoiceRange();
 		float volume = GetVolumeForMode(mode);
 
-		// NORMAL: skip the distance math entirely - vanilla spatial falloff handles it.
-		if (mode != EC29_EVoiceRange.NORMAL)
+		IEntity sender;
+		PlayerManager playerManager = GetGame().GetPlayerManager();
+		if (playerManager)
+			sender = playerManager.GetPlayerControlledEntity(senderPlayerId);
+		if (sender)
 		{
-			IEntity sender;
-			PlayerManager playerManager = GetGame().GetPlayerManager();
-			if (playerManager)
-				sender = playerManager.GetPlayerControlledEntity(senderPlayerId);
-			if (sender)
-			{
-				float distSq = vector.DistanceSqXZ(sender.GetOrigin(), listener.GetOrigin());
-				float maxRange = GetRangeForMode(mode);
+			float distSq = vector.DistanceSqXZ(sender.GetOrigin(), listener.GetOrigin());
+			float maxRange = GetRangeForMode(mode);
 
-				if (distSq > maxRange * maxRange)
+			if (distSq > maxRange * maxRange)
+			{
+				float dist = Math.Sqrt(distSq);
+				if (mode == EC29_EVoiceRange.NORMAL)
 				{
-					float dist = Math.Sqrt(distSq);
-					float falloff = Math.Pow(maxRange / dist, m_fFalloffPower);
-					volume *= falloff;
+					// NORMAL: full volume inside range, straight-line fade to silence
+					// at the cutoff. Whisper and yell keep the inverse-power tail so a
+					// shout still carries past its range.
+					float fadeBand = m_fNormalFalloffEnd - maxRange;
+					if (fadeBand <= 0 || dist >= m_fNormalFalloffEnd)
+						volume = 0;
+					else
+						volume *= 1.0 - (dist - maxRange) / fadeBand;
+				}
+				else
+				{
+					volume *= Math.Pow(maxRange / dist, m_fFalloffPower);
 				}
 			}
 		}
@@ -141,8 +157,8 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 
 		s_pInstance = this;
 		if (EC29_Debug.VERBOSE)
-			PrintFormat("[EC29-DBG][VONSettings] Component alive on game mode (GameMode_Base override applied). isServer=%1 whisper=%2m normal=%3m yell=%4m falloff=%5 yellVol=%6 minVol=%7",
-				Replication.IsServer(), m_fWhisperRange, m_fNormalRange, m_fYellRange, m_fFalloffPower, m_fYellVolume, m_fMinVolume);
+			PrintFormat("[EC29-DBG][VONSettings] Component alive on game mode (GameMode_Base override applied). isServer=%1 whisper=%2m normal=%3m (silent at %4m) yell=%5m falloff=%6 yellVol=%7 minVol=%8",
+				Replication.IsServer(), m_fWhisperRange, m_fNormalRange, m_fNormalFalloffEnd, m_fYellRange, m_fFalloffPower, m_fYellVolume, m_fMinVolume);
 
 		if (!Replication.IsServer())
 			return;
@@ -157,6 +173,7 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 		EC29_VON_Settings src = header.m_EC29_VON_Settings;
 		m_fWhisperRange  = src.m_fWhisperRange;
 		m_fNormalRange   = src.m_fNormalRange;
+		m_fNormalFalloffEnd = src.m_fNormalFalloffEnd;
 		m_fYellRange     = src.m_fYellRange;
 		m_fFalloffPower  = src.m_fFalloffPower;
 		m_fWhisperVolume = src.m_fWhisperVolume;
