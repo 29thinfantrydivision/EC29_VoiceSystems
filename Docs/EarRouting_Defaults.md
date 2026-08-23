@@ -5,11 +5,17 @@ already runs this split by hand; new members now get it without setup.
 
 ## Behavior
 
-| Device | Gadget type | Net | Default routing |
-|---|---|---|---|
-| Personal handheld (ANPRC68, R-148) | `EGadgetType.RADIO` | Squad | LEFT |
-| Manpack (ANPRC77, R-107M) | `EGadgetType.RADIO_BACKPACK` | Platoon | RIGHT |
-| Vehicle sets, editor transceivers | (no radio gadget) | — | CENTER (both ears) |
+| Device | Rule | Default routing |
+|---|---|---|
+| Personal radio with 2+ channels (1.8 dual-channel) | by channel | CH1 (squad) LEFT, CH2+ (platoon) RIGHT |
+| Single-channel handheld (`EGadgetType.RADIO`) | by device | LEFT |
+| Single-channel manpack (`EGadgetType.RADIO_BACKPACK`) | by device | RIGHT |
+| Vehicle sets, editor transceivers (no radio gadget) | — | CENTER (both ears) |
+
+1.8 put both nets on one dual-channel radio, where the original device-class rule
+routed every channel to the same ear (both LEFT on a handheld). Personal radios with
+multiple transceivers therefore route **by channel index**; the device rule remains
+for single-channel radios.
 
 - The default applies **per transceiver** the first time anything asks for its routing
   (incoming voice packet, TX/RX beep, or the radial-menu label).

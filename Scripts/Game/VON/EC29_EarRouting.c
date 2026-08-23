@@ -38,10 +38,14 @@ class EC29_RadioEarSettings
         return ApplyDefaultRouting(transceiver);
     }
 
-    //! Classifies the device behind a transceiver and stores its default
-    //! routing: personal handheld (EGadgetType.RADIO - squad net) -> LEFT,
-    //! manpack (EGadgetType.RADIO_BACKPACK - platoon net) -> RIGHT, anything
-    //! without a radio gadget (vehicle sets, editor transceivers) -> CENTER.
+    //! Stores a transceiver's default routing. Personal radios with multiple
+    //! channels route by channel - CH1 (squad net) -> LEFT, every later
+    //! channel (platoon net) -> RIGHT - because 1.8 dual-channel radios carry
+    //! both nets on one device, where a device-class rule would put every
+    //! channel in the same ear. Single-channel personal radios keep the
+    //! device rule: handheld (EGadgetType.RADIO) -> LEFT, manpack
+    //! (EGadgetType.RADIO_BACKPACK) -> RIGHT. Anything without a radio gadget
+    //! (vehicle sets, editor transceivers) -> CENTER.
     //! The result is memoized in the routing map so the per-packet hot path
     //! stays a single map lookup. A transceiver whose owning entity cannot be
     //! resolved yet returns CENTER WITHOUT memoizing, so classification
@@ -60,11 +64,20 @@ class EC29_RadioEarSettings
         EC29_EEarRouting routing = EC29_EEarRouting.CENTER;
         if (gadget)
         {
-            EGadgetType gadgetType = gadget.GetType();
-            if (gadgetType == EGadgetType.RADIO)
-                routing = EC29_EEarRouting.LEFT;
-            else if (gadgetType == EGadgetType.RADIO_BACKPACK)
+            if (radio.TransceiversCount() >= 2)
+            {
                 routing = EC29_EEarRouting.RIGHT;
+                if (radio.GetTransceiver(0) == transceiver)
+                    routing = EC29_EEarRouting.LEFT;
+            }
+            else
+            {
+                EGadgetType gadgetType = gadget.GetType();
+                if (gadgetType == EGadgetType.RADIO)
+                    routing = EC29_EEarRouting.LEFT;
+                else if (gadgetType == EGadgetType.RADIO_BACKPACK)
+                    routing = EC29_EEarRouting.RIGHT;
+            }
         }
 
         m_mRoutingByTransceiver.Set(transceiver, routing);
