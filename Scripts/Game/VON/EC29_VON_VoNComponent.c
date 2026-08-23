@@ -22,6 +22,16 @@ modded class SCR_VoNComponent
 	// Debug: last gain logged per speaker so OnReceive logging doesn't spam every voice packet.
 	protected static ref map<int, float> s_mEC29DbgLastGain = new map<int, float>();
 
+	// One global gain variable serves every concurrently playing direct stream
+	// (last-writer-wins). The loudest recently-active stream owns it: while a
+	// nearby speaker is talking, a far speaker's near-floor writes - including
+	// the proximity component every radio transmission produces - are held
+	// back instead of chopping the nearby voice to silence. The hold window
+	// bounds how long a stale louder value can linger once its speaker stops.
+	protected static float s_fEC29ActiveGain;
+	protected static float s_fEC29ActiveGainSetMs;
+	protected static const int EC29_GAIN_HOLD_MS = 400;
+
 	// World-lifecycle guard for the static caches above: playerIds and component
 	// pointers are world-scoped, statics are not. Weak member nulls with its world;
 	// a mismatch clears the caches and re-arms the one-shot audio-variable probes.
@@ -42,6 +52,8 @@ modded class SCR_VoNComponent
 		s_mEC29DbgLastGain.Clear();
 		s_bEC29VarChecked = false;
 		s_bEC29RadioVarsChecked = false;
+		s_fEC29ActiveGain = 0;
+		s_fEC29ActiveGainSetMs = 0;
 	}
 
 	//! Spawn default is WHISPER (issue #11): noise discipline out of the gate, F3
@@ -155,7 +167,14 @@ modded class SCR_VoNComponent
 		// to CENTER mid-radio-stream.
 		if (!receiver)
 		{
-			EC29_ApplyRangeGain(playerId);
+			// Editor and spectate senders (GM camera, spectator systems, deploy
+			// screen) emit direct packets with no meaningful sender position.
+			// The display layer already special-cases them; the gain path must
+			// too, or their packets seize the shared falloff variable (org-mod
+			// audit: Fort Meade hands every player the full GM editor, and both
+			// spectate mods open editor VON for dead players).
+			if (!isSenderEditor)
+				EC29_ApplyRangeGain(playerId);
 		}
 		else
 		{
@@ -190,6 +209,14 @@ modded class SCR_VoNComponent
 		EC29_VONSettingsComponent settings = EC29_VONSettingsComponent.GetInstance();
 		if (settings)
 		{
+			// A speaker with no resolvable controlled entity (dead player on the
+			// deploy screen, spectator mid-teardown) has no position to compute
+			// falloff from; ComputeListenerVolume would return the full default,
+			// and writing that seizes the shared variable at packet rate. Leave
+			// the variable to the speakers that do resolve.
+			if (!EC29_GetVoNForPlayer(playerId))
+				return;
+
 			PlayerController localPc = GetGame().GetPlayerController();
 			IEntity listener;
 			if (localPc)
@@ -206,6 +233,23 @@ modded class SCR_VoNComponent
 				s_mEC29DbgLastGain.Set(-1, 1.0);
 				Print("[EC29-DBG][VoN] EC29_VONSettingsComponent.GetInstance() is NULL during OnReceive - GameMode prefab override not applied; gain stays 1.0", LogLevel.WARNING);
 			}
+		}
+
+		// A quieter write only goes through once the current louder value has
+		// gone stale (its speaker stopped or their packets paused); until then
+		// this packet's gain is suppressed. Equal or louder always wins and
+		// refreshes the hold, so a nearby speaker keeps ownership while talking
+		// and a speaker walking away steps their own gain down at worst
+		// EC29_GAIN_HOLD_MS late.
+		BaseWorld world = GetGame().GetWorld();
+		if (world)
+		{
+			float nowMs = world.GetWorldTime();
+			if (volume < s_fEC29ActiveGain && (nowMs - s_fEC29ActiveGainSetMs) <= EC29_GAIN_HOLD_MS)
+				return;
+
+			s_fEC29ActiveGain = volume;
+			s_fEC29ActiveGainSetMs = nowMs;
 		}
 
 		// Throttled receive-path logging: only when this speaker's computed gain
