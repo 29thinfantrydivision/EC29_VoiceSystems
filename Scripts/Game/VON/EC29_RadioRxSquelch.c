@@ -136,6 +136,12 @@ class EC29_RadioRxSquelch
     //! Voice packet on a tuned radio; the caller filters out own transmissions.
     void OnVoicePacket(int frequency, BaseTransceiver receiver)
     {
+        // No squelch on a muted receiver (the engine still delivers packets to
+        // muted transceivers - the spectator mod's radio-OFF toggle is a mute),
+        // and none on another system's net (their mod curates that audio).
+        if (receiver && (receiver.IsMuted() || EC29_CoexistenceGuard.EC29_IsSpecialNet(receiver)))
+            return;
+
         float nowMs = GetGame().GetWorld().GetWorldTime();
 
         EC29_RxChannelState state = GetOrCreateState(frequency);
@@ -260,9 +266,10 @@ class EC29_RadioRxSquelch
             return null;
 
         // The engine only delivers voice to powered radios; mirror that gate so
-        // a switched-off radio never squelches.
+        // a switched-off radio never squelches. Muted mirrors the same idea -
+        // the player (or a spectator system's OFF toggle) asked for silence.
         BaseRadioComponent radio = transceiver.GetRadio();
-        if (!radio || !radio.IsPowered())
+        if (!radio || !radio.IsPowered() || transceiver.IsMuted())
             return null;
 
         return transceiver;
