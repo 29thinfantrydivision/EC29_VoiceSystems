@@ -123,10 +123,23 @@ class EC29_RadioReceiverGuard
     protected static const int STABILIZATION_DELAY_MS = 3000;
     //! Separate call-queue turn so the native side actually unregisters the receiver.
     protected static const int POWER_OFF_MS = 150;
+    //! An owner that is transiently invalid at restore time (inventory transfer
+    //! or spawn streaming landing inside the off-window) gets retried instead
+    //! of abandoned - abandoning leaves a radio this guard switched off stuck
+    //! OFF with no trace: deaf RX plus key-ups silently rerouting to direct
+    //! speech (2026-08-24 field case, dead RX all session).
+    protected static const int RESTORE_RETRY_MS = 500;
+    protected static const int RESTORE_MAX_ATTEMPTS = 4;
+    //! Receive-health telemetry: a powered, tuned radio that has gone this long
+    //! without a single voice packet is either on a quiet net or holding a dead
+    //! receiver. The log line is the field signature this class was missing -
+    //! Chan's 2026-08-24 dead-RX session produced zero EC29 lines.
+    protected static const int RX_HEARTBEAT_INTERVAL_MS = 300000;
 
     //! Dedupe: multiple VON entries share one physical radio; cycle each radio once.
     protected ref array<BaseRadioComponent> m_aScheduledRadios = {};
     protected bool m_bRadioSystemReadySeen;
+    protected bool m_bHeartbeatRunning;
 
     //------------------------------------------------------------------------------------------------
     //! Server confirmed the RadioManagerEntity exists (replicated ready flag).
@@ -180,6 +193,77 @@ class EC29_RadioReceiverGuard
 
         m_aScheduledRadios.Insert(radio);
         GetGame().GetCallqueue().CallLater(CycleRadio, STABILIZATION_DELAY_MS, false, radio);
+
+        EC29_EnsureHeartbeat();
+    }
+
+    //------------------------------------------------------------------------------------------------
+    //! Client-only receive-health watchdog. The dedicated server has no local
+    //! receive path (OnVoicePacket never fires there), so it has nothing to
+    //! measure and must not tick.
+    protected void EC29_EnsureHeartbeat()
+    {
+        if (m_bHeartbeatRunning)
+            return;
+
+        if (!GetGame().GetPlayerController())
+            return;
+
+        m_bHeartbeatRunning = true;
+        GetGame().GetCallqueue().CallLater(EC29_HeartbeatTick, RX_HEARTBEAT_INTERVAL_MS, false);
+    }
+
+    //------------------------------------------------------------------------------------------------
+    protected void EC29_HeartbeatTick()
+    {
+        BaseWorld world = GetGame().GetWorld();
+        if (!world)
+        {
+            m_bHeartbeatRunning = false;
+            return;
+        }
+
+        // A world change rebuilds EC29_RadioState with a fresh guard; a stale
+        // instance's queued tick must not adopt the new world's radios.
+        if (EC29_RadioState.GetInstance().ReceiverGuard() != this)
+        {
+            m_bHeartbeatRunning = false;
+            return;
+        }
+
+        float nowMs = world.GetWorldTime();
+        EC29_RadioRxSquelch squelch = EC29_RadioState.GetInstance().Squelch();
+        squelch.EC29_SweepDeadRadioRxRecords();
+
+        foreach (BaseRadioComponent radio : m_aScheduledRadios)
+        {
+            if (!IsRadioAlive(radio) || !radio.IsPowered() || radio.IsEditorRadio())
+                continue;
+
+            if (radio.TransceiversCount() == 0)
+                continue;
+
+            BaseTransceiver transceiver = radio.GetTransceiver(0);
+            if (!transceiver || transceiver.GetFrequency() <= 0)
+                continue;
+
+            // Another system's net stays their business (and its traffic
+            // pattern is not ours to judge).
+            if (EC29_CoexistenceGuard.EC29_IsSpecialNet(transceiver))
+                continue;
+
+            float lastRxMs = squelch.EC29_GetLastRadioRxMs(radio);
+            if (lastRxMs >= 0 && nowMs - lastRxMs < RX_HEARTBEAT_INTERVAL_MS)
+                continue;
+
+            string lastSeen = "never this session";
+            if (lastRxMs >= 0)
+                lastSeen = string.Format("%1 ms ago", nowMs - lastRxMs);
+
+            PrintFormat("[EC29-DBG][RadioGuard] RX heartbeat: powered radio on %1 kHz has received no voice packets (last: %2). A quiet net is normal - but if others WERE transmitting on this net, this radio's receiver is dead (native registration loss)", transceiver.GetFrequency(), lastSeen, level: LogLevel.WARNING);
+        }
+
+        GetGame().GetCallqueue().CallLater(EC29_HeartbeatTick, RX_HEARTBEAT_INTERVAL_MS, false);
     }
 
     //------------------------------------------------------------------------------------------------
@@ -202,6 +286,18 @@ class EC29_RadioReceiverGuard
         if (!IsRadioAlive(radio) || !radio.IsPowered())
             return;
 
+        // A radio that has already delivered voice packets has a provably
+        // registered receiver - the defect this cycle repairs cannot be
+        // present, and the 150 ms off-window is pure risk (2026-08-24 field
+        // case: a fresh spawn's radio received fine at t+0s, was cycled at
+        // t+3s, and never received again).
+        if (EC29_RadioState.GetInstance().Squelch().EC29_GetLastRadioRxMs(radio) >= 0)
+        {
+            if (EC29_Debug.VERBOSE)
+                Print("[EC29-DBG][RadioGuard] Radio already receiving - receiver provably registered, skipping repair cycle", LogLevel.NORMAL);
+            return;
+        }
+
         if (EC29_Debug.VERBOSE)
         {
             int freq = -1;
@@ -221,10 +317,37 @@ class EC29_RadioReceiverGuard
     //------------------------------------------------------------------------------------------------
     protected void RestorePower(BaseRadioComponent radio)
     {
-        if (!IsRadioAlive(radio))
+        RestorePowerAttempt(radio, 1);
+    }
+
+    //------------------------------------------------------------------------------------------------
+    protected void RestorePowerAttempt(BaseRadioComponent radio, int attempt)
+    {
+        // Deleted radios null their handles - nothing is left powered off.
+        if (!radio)
             return;
 
+        // Transiently invalid owner (inventory transfer / spawn streaming
+        // landing inside the off-window): retry, never abandon silently -
+        // see RESTORE_RETRY_MS comment for the field case this closes.
+        if (!IsRadioAlive(radio))
+        {
+            if (attempt >= RESTORE_MAX_ATTEMPTS)
+            {
+                Print("[EC29-DBG][RadioGuard] Radio owner never returned during power restore - a radio this guard switched off may be stuck OFF (deaf RX, key-ups fall back to direct speech)", LogLevel.WARNING);
+                return;
+            }
+
+            GetGame().GetCallqueue().CallLater(RestorePowerAttempt, RESTORE_RETRY_MS, false, radio, attempt + 1);
+            return;
+        }
+
         radio.SetPower(true);
+
+        if (!radio.IsPowered())
+            Print("[EC29-DBG][RadioGuard] SetPower(true) did not stick after the repair cycle - radio remains OFF", LogLevel.WARNING);
+        else if (EC29_Debug.VERBOSE)
+            PrintFormat("[EC29-DBG][RadioGuard] Repair cycle complete (restore attempt %1) - radio back ON", attempt);
 
         // Entry usability snapshots the power state at entry init or menu
         // refresh; one taken during the 150 ms off-window silently reroutes

@@ -36,6 +36,14 @@ class EC29_RadioRxSquelch
 
     protected ref map<int, ref EC29_RxChannelState> m_mChannels = new map<int, ref EC29_RxChannelState>();
 
+    //! Receiver-registration evidence: last world-time a voice packet arrived
+    //! per local radio. Recorded BEFORE the mute/special-net gates below,
+    //! because packet arrival proves the native receiver is registered no
+    //! matter what policy does with the audio. The receiver guard reads this
+    //! to skip repair cycles on provably-working radios and to flag radios
+    //! that never receive (2026-08-24 field case: dead RX all session).
+    protected ref map<BaseRadioComponent, float> m_mLastRxMsByRadio = new map<BaseRadioComponent, float>();
+
     //! Single-ticker rule: this singleton owns its own 150ms Tick loop. Both feed
     //! paths (voice packets via SCR_VoNComponent, key-state RPCs via
     //! EC29_RFPropagationNetworkComponent) call EnsureTicking() instead of running
@@ -136,13 +144,20 @@ class EC29_RadioRxSquelch
     //! Voice packet on a tuned radio; the caller filters out own transmissions.
     void OnVoicePacket(int frequency, BaseTransceiver receiver)
     {
+        float nowMs = GetGame().GetWorld().GetWorldTime();
+
+        if (receiver)
+        {
+            BaseRadioComponent rxRadio = receiver.GetRadio();
+            if (rxRadio)
+                m_mLastRxMsByRadio.Set(rxRadio, nowMs);
+        }
+
         // No squelch on a muted receiver (the engine still delivers packets to
         // muted transceivers - the spectator mod's radio-OFF toggle is a mute),
         // and none on another system's net (their mod curates that audio).
         if (receiver && (receiver.IsMuted() || EC29_CoexistenceGuard.EC29_IsSpecialNet(receiver)))
             return;
-
-        float nowMs = GetGame().GetWorld().GetWorldTime();
 
         EC29_RxChannelState state = GetOrCreateState(frequency);
         ExpireStuckKeys(state, nowMs);
@@ -153,6 +168,46 @@ class EC29_RadioRxSquelch
         state.m_bVoiceActive = true;
         state.m_fLastVoiceMs = nowMs;
         Open(state, receiver, nowMs);
+    }
+
+    //------------------------------------------------------------------------------------------------
+    //! Last world-time any voice packet arrived on this radio, -1 if never.
+    float EC29_GetLastRadioRxMs(BaseRadioComponent radio)
+    {
+        float lastMs;
+        if (radio && m_mLastRxMsByRadio.Find(radio, lastMs))
+            return lastMs;
+
+        return -1;
+    }
+
+    //------------------------------------------------------------------------------------------------
+    //! Drop records whose radio was deleted (handles null) so the map cannot
+    //! grow for the world lifetime. Rebuilds instead of removing in place -
+    //! several deleted radios all read back as the same null key.
+    void EC29_SweepDeadRadioRxRecords()
+    {
+        bool hasDead = false;
+        foreach (BaseRadioComponent radio, float lastMs : m_mLastRxMsByRadio)
+        {
+            if (!radio)
+            {
+                hasDead = true;
+                break;
+            }
+        }
+
+        if (!hasDead)
+            return;
+
+        map<BaseRadioComponent, float> live = new map<BaseRadioComponent, float>();
+        foreach (BaseRadioComponent radio, float lastMs : m_mLastRxMsByRadio)
+        {
+            if (radio)
+                live.Set(radio, lastMs);
+        }
+
+        m_mLastRxMsByRadio = live;
     }
 
     //------------------------------------------------------------------------------------------------
