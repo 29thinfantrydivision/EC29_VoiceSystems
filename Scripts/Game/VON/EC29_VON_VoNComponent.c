@@ -353,10 +353,15 @@ modded class SCR_VoNComponent
 			}
 		}
 
+		// Special nets (spectator ghost radios) are engineered to be clean:
+		// running terrain propagation or jammer degradation on them fights the
+		// owning mod's audio design, so they get neutral values.
+		bool specialNet = EC29_CoexistenceGuard.EC29_IsSpecialNet(receiver);
+
 		if (s_bEC29SignalQualityValid)
 		{
 			float signalQuality = 1.0;
-			if (hasReceiverPos)
+			if (hasReceiverPos && !specialNet)
 				signalQuality = EC29_GetSignalQuality(playerId, frequency, receiverPos);
 			AudioSystem.SetVariableByName("EC29_SignalQuality", signalQuality, EC29_EAR_ROUTING_CONFIG);
 		}
@@ -364,7 +369,7 @@ modded class SCR_VoNComponent
 		if (s_bEC29JamStrengthValid)
 		{
 			float jamStrength = 1.0;
-			if (hasReceiverPos)
+			if (hasReceiverPos && !specialNet)
 				jamStrength = EC29_GetJamStrength(receiverPos);
 			AudioSystem.SetVariableByName("EC29_JamStrength", jamStrength, EC29_EAR_ROUTING_CONFIG);
 		}

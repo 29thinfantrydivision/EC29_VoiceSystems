@@ -15,6 +15,11 @@
 //! defined by the radio's own range, not by direct VoN distance rules.
 modded class SCR_NameTagData
 {
+	//! Debug print throttle: this fires per voice PACKET (dozens/second during
+	//! speech), so log only on the suppressed<->shown transition per speaker -
+	//! field logs showed the unthrottled print at 2,273 lines/minute.
+	protected static ref map<int, bool> s_mEC29DbgSuppressed = new map<int, bool>();
+
 	//------------------------------------------------------------------------------------------------
 	override protected void OnReceivedVON(int playerId, BaseTransceiver receiver, int frequency, float quality)
 	{
@@ -22,9 +27,19 @@ modded class SCR_NameTagData
 		if (!receiver && EC29_ShouldGateNameTagVON(playerId))
 		{
 			if (EC29_Debug.VERBOSE)
-				PrintFormat("[EC29-DBG][NameTag] VON icon suppressed for player %1 (out of audible range)", playerId);
+			{
+				bool wasSuppressed;
+				if (!s_mEC29DbgSuppressed.Find(playerId, wasSuppressed) || !wasSuppressed)
+				{
+					s_mEC29DbgSuppressed.Set(playerId, true);
+					PrintFormat("[EC29-DBG][NameTag] VON icon suppressed for player %1 (out of audible range)", playerId);
+				}
+			}
 			return;
 		}
+
+		if (EC29_Debug.VERBOSE)
+			s_mEC29DbgSuppressed.Set(playerId, false);
 
 		super.OnReceivedVON(playerId, receiver, frequency, quality);
 	}

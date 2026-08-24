@@ -504,6 +504,11 @@ modded class SCR_VONController
         if (!transceiver)
             return;
 
+        // Never retune another system's net (spectator ghost radio) - a changed
+        // frequency breaks that system until the entity is rebuilt.
+        if (EC29_CoexistenceGuard.EC29_IsSpecialNet(transceiver))
+            return;
+
         EC29_FrequencyDialog.OpenFor(transceiver, radioEntry);
     }
 
@@ -547,6 +552,12 @@ modded class SCR_VONController
         if (!transceiver)
             return;
 
+        // The alternate-PTT poll bypasses other mods' action-level transmit
+        // blocks, so marking a special net as alternate would hand spectators
+        // a transmit route their own mod deliberately removed.
+        if (EC29_CoexistenceGuard.EC29_IsSpecialNet(transceiver))
+            return;
+
         EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
         settings.ToggleAlternate(transceiver);
         radialMenu.UpdateEntries();
@@ -562,6 +573,10 @@ modded class SCR_VONController
 
         SCR_VONEntryRadio altEntry = FindEntryByFrequency(altFrequency);
         if (!altEntry)
+            return;
+
+        // Belt-and-braces with the toggle-side gate: never key a special net.
+        if (EC29_CoexistenceGuard.EC29_IsSpecialNet(altEntry.GetTransceiver()))
             return;
 
         m_bAlternatePTTActive = true;

@@ -150,6 +150,12 @@ class EC29_RadioReceiverGuard
     //------------------------------------------------------------------------------------------------
     void OnRadioEntryAdded(notnull BaseTransceiver transceiver)
     {
+        // Another system's net (spectator ghost radio): a silent 150 ms power
+        // cycle would drop their reception and re-key state - their mod owns
+        // that radio's lifecycle (observed in the field: a 29000 kHz cycle).
+        if (EC29_CoexistenceGuard.EC29_IsSpecialNet(transceiver))
+            return;
+
         BaseRadioComponent radio = transceiver.GetRadio();
         if (!radio || radio.IsEditorRadio() || !radio.IsPowered())
             return;
