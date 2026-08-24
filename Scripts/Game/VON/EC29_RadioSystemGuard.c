@@ -212,5 +212,17 @@ class EC29_RadioReceiverGuard
             return;
 
         radio.SetPower(true);
+
+        // Entry usability snapshots the power state at entry init or menu
+        // refresh; one taken during the 150 ms off-window silently reroutes
+        // this radio's key-ups to direct speech until the next refresh
+        // (2026-08-23 field case: dead TX, working RX). Re-sync now.
+        PlayerController pc = GetGame().GetPlayerController();
+        if (pc)
+        {
+            SCR_VONController vonController = SCR_VONController.Cast(pc.FindComponent(SCR_VONController));
+            if (vonController)
+                vonController.EC29_ResyncRadioEntries(radio);
+        }
     }
 }

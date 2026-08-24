@@ -123,6 +123,41 @@ modded class SCR_VONController
         EC29_RadioBeepHelper.PlayTxEnd(transceiver);
     }
 
+    //! Vanilla's transmit gate silently reroutes to direct speech when the
+    //! active entry is flagged unusable. Entry usability is a snapshot of the
+    //! radio's power state taken at entry init or menu refresh - a refresh
+    //! landing inside the receiver guard's 150 ms power-off window latches the
+    //! entry unusable while the radio itself is powered and receiving: dead TX,
+    //! working RX, no feedback (2026-08-23 field case). Re-sync the flag from
+    //! the actual power state at the moment of use, so a stale snapshot can
+    //! never eat a key-up.
+    override protected void SetVONBroadcast(bool activate, EVONTransmitType transmitType = EVONTransmitType.CHANNEL)
+    {
+        if (activate && m_ActiveEntry && !m_ActiveEntry.IsUsable() && !EC29_CoexistenceGuard.ShouldYieldRadio())
+        {
+            SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(m_ActiveEntry);
+            if (radioEntry)
+            {
+                BaseTransceiver transceiver = radioEntry.GetTransceiver();
+                if (transceiver)
+                {
+                    BaseRadioComponent radio = transceiver.GetRadio();
+                    if (radio && radio.IsPowered())
+                    {
+                        radioEntry.SetUsable(true);
+                        PrintFormat("[EC29-DBG][RadioTX] Active entry (freq %1 kHz) was flagged unusable while its radio is powered - re-synced so this key-up transmits (stale usability snapshot)", transceiver.GetFrequency(), level: LogLevel.WARNING);
+                    }
+                    else if (EC29_Debug.VERBOSE)
+                    {
+                        PrintFormat("[EC29-DBG][RadioTX] Key-up falling back to direct speech: active entry (freq %1 kHz) unusable and radio is unpowered", transceiver.GetFrequency());
+                    }
+                }
+            }
+        }
+
+        super.SetVONBroadcast(activate, transmitType);
+    }
+
     override void SetActiveTransmit(notnull SCR_VONEntry entry)
     {
         SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(entry);
@@ -274,6 +309,37 @@ modded class SCR_VONController
     SCR_VONEntryRadio EC29_FindRadioEntryByFrequency(int frequency)
     {
         return FindEntryByFrequency(frequency);
+    }
+
+    //! Re-sync usability for every entry of one physical radio from its actual
+    //! power state. The receiver guard calls this after restoring power, so an
+    //! entry that snapshotted "unpowered" during the 150 ms cycle window does
+    //! not stay dead until the next menu refresh.
+    void EC29_ResyncRadioEntries(BaseRadioComponent radio)
+    {
+        if (!radio)
+            return;
+
+        array<ref SCR_VONEntry> entries = {};
+        GetVONEntries(entries);
+
+        foreach (SCR_VONEntry entry : entries)
+        {
+            SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(entry);
+            if (!radioEntry)
+                continue;
+
+            BaseTransceiver transceiver = radioEntry.GetTransceiver();
+            if (!transceiver || transceiver.GetRadio() != radio)
+                continue;
+
+            if (radioEntry.IsUsable() != radio.IsPowered())
+            {
+                radioEntry.SetUsable(radio.IsPowered());
+                if (EC29_Debug.VERBOSE)
+                    PrintFormat("[EC29-DBG][RadioTX] Entry usability re-synced after power cycle (freq %1 kHz, usable=%2)", transceiver.GetFrequency(), radio.IsPowered());
+            }
+        }
     }
 
     override protected void ActionVONProximityToggle(float value, EActionTrigger reason = EActionTrigger.UP)

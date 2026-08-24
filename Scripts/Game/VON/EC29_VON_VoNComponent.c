@@ -159,6 +159,17 @@ modded class SCR_VoNComponent
 	{
 		EC29_CheckWorldReset();
 
+		// Audio variables are a playback concept: a machine with no local
+		// player controller (dedicated server, JIP window) has nothing to
+		// modulate, and the radio path's terrain raymarch is real CPU there -
+		// with no local listener the receiver position degraded to world
+		// origin, so every far speaker walked the model across the map per
+		// packet. Super is skipped too: vanilla's OnReceive is display-only
+		// and its GetDisplay() dereferences GetPlayerController() unguarded,
+		// which is a VM exception per packet in exactly this state.
+		if (!GetGame().GetPlayerController())
+			return;
+
 		// Packet-type gate keeps the two systems from stomping each other's global
 		// audio variables: direct packets (receiver == null) own EC29_VonRange,
 		// radio packets own the ear-routing/quality/jam/volume set. Without the
@@ -168,12 +179,14 @@ modded class SCR_VoNComponent
 		if (!receiver)
 		{
 			// Editor and spectate senders (GM camera, spectator systems, deploy
-			// screen) emit direct packets with no meaningful sender position.
-			// The display layer already special-cases them; the gain path must
-			// too, or their packets seize the shared falloff variable (org-mod
-			// audit: Fort Meade hands every player the full GM editor, and both
-			// spectate mods open editor VON for dead players).
-			if (!isSenderEditor)
+			// screen) have no meaningful position, so they get plain full gain
+			// instead of the falloff math - written steadily, because a playing
+			// editor stream is still modulated by the shared variable, and
+			// leaving it to other speakers' envelope writes pumps the GM's
+			// voice up and down (field: "GM voices fluttering").
+			if (isSenderEditor)
+				EC29_ApplyEditorGain();
+			else
 				EC29_ApplyRangeGain(playerId);
 		}
 		else
@@ -189,19 +202,7 @@ modded class SCR_VoNComponent
 	//! Direct-speech falloff gain (whisper/normal/yell). Writes EC29_VonRange only.
 	protected void EC29_ApplyRangeGain(int playerId)
 	{
-		// One-time AudioSystem variable lookup so we can early-out cleanly when the conf isn't loaded.
-		if (!s_bEC29VarChecked)
-		{
-			s_bEC29VarChecked = true;
-			s_bEC29VarValid = (AudioSystem.GetVariableIDByName(EC29_VAR_NAME, EC29_VAR_CONFIG) != -1);
-
-			if (!s_bEC29VarValid)
-				PrintFormat("[EC29_VON] AudioSystem variable lookup FAILED: name='%1' config='%2' - audio modulation disabled", EC29_VAR_NAME, EC29_VAR_CONFIG, level: LogLevel.WARNING);
-			else if (EC29_Debug.VERBOSE)
-				PrintFormat("[EC29-DBG][VoN] AudioSystem variable '%1' resolved OK - von.acp override + local variables conf are loaded", EC29_VAR_NAME);
-		}
-
-		if (!s_bEC29VarValid)
+		if (!EC29_EnsureRangeVar())
 			return;
 
 		float volume = 1.0;
@@ -235,23 +236,6 @@ modded class SCR_VoNComponent
 			}
 		}
 
-		// A quieter write only goes through once the current louder value has
-		// gone stale (its speaker stopped or their packets paused); until then
-		// this packet's gain is suppressed. Equal or louder always wins and
-		// refreshes the hold, so a nearby speaker keeps ownership while talking
-		// and a speaker walking away steps their own gain down at worst
-		// EC29_GAIN_HOLD_MS late.
-		BaseWorld world = GetGame().GetWorld();
-		if (world)
-		{
-			float nowMs = world.GetWorldTime();
-			if (volume < s_fEC29ActiveGain && (nowMs - s_fEC29ActiveGainSetMs) <= EC29_GAIN_HOLD_MS)
-				return;
-
-			s_fEC29ActiveGain = volume;
-			s_fEC29ActiveGainSetMs = nowMs;
-		}
-
 		// Throttled receive-path logging: only when this speaker's computed gain
 		// changes noticeably. The throttle map only exists to feed this log, so
 		// the whole block sits behind the debug gate.
@@ -261,8 +245,61 @@ modded class SCR_VoNComponent
 			if (!s_mEC29DbgLastGain.Find(playerId, lastGain) || Math.AbsFloat(lastGain - volume) > 0.02)
 			{
 				s_mEC29DbgLastGain.Set(playerId, volume);
-				PrintFormat("[EC29-DBG][VoN] OnReceive: speaker playerId=%1 computed gain=%2 (pushed to audio var '%3')", playerId, volume, EC29_VAR_NAME);
+				PrintFormat("[EC29-DBG][VoN] OnReceive: speaker playerId=%1 computed gain=%2 for audio var '%3'", playerId, volume, EC29_VAR_NAME);
 			}
+		}
+
+		EC29_WriteRangeGainHeld(volume);
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! One-time AudioSystem variable lookup so callers can early-out cleanly
+	//! when the conf isn't loaded.
+	protected bool EC29_EnsureRangeVar()
+	{
+		if (!s_bEC29VarChecked)
+		{
+			s_bEC29VarChecked = true;
+			s_bEC29VarValid = (AudioSystem.GetVariableIDByName(EC29_VAR_NAME, EC29_VAR_CONFIG) != -1);
+
+			if (!s_bEC29VarValid)
+				PrintFormat("[EC29_VON] AudioSystem variable lookup FAILED: name='%1' config='%2' - audio modulation disabled", EC29_VAR_NAME, EC29_VAR_CONFIG, level: LogLevel.WARNING);
+			else if (EC29_Debug.VERBOSE)
+				PrintFormat("[EC29-DBG][VoN] AudioSystem variable '%1' resolved OK - von.acp override + local variables conf are loaded", EC29_VAR_NAME);
+		}
+
+		return s_bEC29VarValid;
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Editor/spectate speech: plain full gain, written steadily for the
+	//! stream's duration so concurrent envelope writes cannot pump it.
+	protected void EC29_ApplyEditorGain()
+	{
+		if (!EC29_EnsureRangeVar())
+			return;
+
+		EC29_WriteRangeGainHeld(1.0);
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Loudest-recently-active-stream ownership of the shared gain variable.
+	//! A quieter write only goes through once the current louder value has
+	//! gone stale (its speaker stopped or their packets paused); equal or
+	//! louder always wins and refreshes the hold, so a nearby speaker keeps
+	//! ownership while talking and a speaker walking away steps their own
+	//! gain down at worst EC29_GAIN_HOLD_MS late.
+	protected void EC29_WriteRangeGainHeld(float volume)
+	{
+		BaseWorld world = GetGame().GetWorld();
+		if (world)
+		{
+			float nowMs = world.GetWorldTime();
+			if (volume < s_fEC29ActiveGain && (nowMs - s_fEC29ActiveGainSetMs) <= EC29_GAIN_HOLD_MS)
+				return;
+
+			s_fEC29ActiveGain = volume;
+			s_fEC29ActiveGainSetMs = nowMs;
 		}
 
 		AudioSystem.SetVariableByName(EC29_VAR_NAME, volume, EC29_VAR_CONFIG);
@@ -297,24 +334,38 @@ modded class SCR_VoNComponent
 			AudioSystem.SetVariableByName("EC29_EarRouting", earRouting, EC29_EAR_ROUTING_CONFIG);
 		}
 
+		// Both position-based variables need a real listener position; with no
+		// controlled entity (dead, deploy screen) the old vector.Zero fallback
+		// raymarched from every speaker to world origin per packet. They are
+		// written NEUTRAL rather than skipped, or a listener who died inside a
+		// jammer would keep jammed static on radio audio for as long as they
+		// stay dead (the variables are global and nothing else refreshes them).
 		vector receiverPos = vector.Zero;
+		bool hasReceiverPos = false;
 		PlayerController playerController = GetGame().GetPlayerController();
 		if (playerController)
 		{
 			IEntity receiverEntity = playerController.GetControlledEntity();
 			if (receiverEntity)
+			{
 				receiverPos = receiverEntity.GetOrigin();
+				hasReceiverPos = true;
+			}
 		}
 
 		if (s_bEC29SignalQualityValid)
 		{
-			float signalQuality = EC29_GetSignalQuality(playerId, frequency, receiverPos);
+			float signalQuality = 1.0;
+			if (hasReceiverPos)
+				signalQuality = EC29_GetSignalQuality(playerId, frequency, receiverPos);
 			AudioSystem.SetVariableByName("EC29_SignalQuality", signalQuality, EC29_EAR_ROUTING_CONFIG);
 		}
 
 		if (s_bEC29JamStrengthValid)
 		{
-			float jamStrength = EC29_GetJamStrength(receiverPos);
+			float jamStrength = 1.0;
+			if (hasReceiverPos)
+				jamStrength = EC29_GetJamStrength(receiverPos);
 			AudioSystem.SetVariableByName("EC29_JamStrength", jamStrength, EC29_EAR_ROUTING_CONFIG);
 		}
 

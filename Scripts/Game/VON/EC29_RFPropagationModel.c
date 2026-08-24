@@ -17,6 +17,14 @@ class EC29_RFPropagationModel
     protected static const float POOR_THRESHOLD = 92.0;
     protected static const float CUTOFF_THRESHOLD = 100.0;
 
+    //! Beyond this separation the terrain model is skipped entirely. Real
+    //! transceivers cap out around 2 km, so anything farther is a special net
+    //! (spectator/admin radios advertise 50 km) - and marching 200 terrain
+    //! samples across the whole map, likely through unloaded cells, is exactly
+    //! the load pattern behind the 2026-08-23 server stalls when spectators
+    //! talked. Special nets get clean audio instead of a terrain simulation.
+    protected static const float MODEL_MAX_DISTANCE_M = 5000.0;
+
     //! Scratch buffers for CalculateTerrainDiffractionLoss. The model is a
     //! long-lived member of EC29_RadioState and the method runs on the
     //! per-packet hot path - reusing these avoids three array allocations per
@@ -47,6 +55,9 @@ class EC29_RFPropagationModel
         float horizontalDist = Math.Sqrt(dx * dx + dz * dz);
 
         if (horizontalDist < MIN_DISTANCE)
+            return 1.0;
+
+        if (horizontalDist > MODEL_MAX_DISTANCE_M)
             return 1.0;
 
         float txTerrainY = world.GetSurfaceY(txPos[0], txPos[2]);
