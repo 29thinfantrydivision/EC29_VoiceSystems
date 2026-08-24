@@ -1,11 +1,18 @@
 //! Repairs the two Reforger 1.8.0.10 defects that kill radio VON until a radio is
 //! power-cycled or a relay entity exists in the world (issue #4 research):
 //!
-//! 1. Game Master and custom terrain worlds ship without a RadioManagerEntity. The
-//!    native VoN system requires one for any radio traffic; official Conflict and
-//!    CombatOps worlds place it in the world file, GM and custom worlds do not.
-//!    The game mode hook below spawns the vanilla prefab server-side when absent
-//!    (the prefab replicates - RplComponent, Streamable Disabled).
+//! 1. Game Master and custom terrain worlds ship without a RadioManagerEntity.
+//!    The game mode hook below spawns the vanilla prefab server-side when absent.
+//!    FIELD REALITY (2026-08-24, server logs from every fleet box): on any
+//!    populated world the null check reads "already present" and the spawn
+//!    never runs - ChimeraWorld.GetRadioManager() returns a non-null native
+//!    stub once any radio initialized before the check, whether or not the
+//!    entity exists. Radio VON demonstrably works fleet-wide without the
+//!    entity, so this path is a safety net for genuinely empty worlds (where
+//!    the getter does return null - observed in Workbench), not the
+//!    load-bearing repair it was designed as. The getter can NEVER prove the
+//!    entity exists, and on manager-less worlds calling methods on its
+//!    non-null result is a native access violation (the 2026-08-21 CTD).
 //!
 //! 2. An already-powered radio can miss receiver registration with the native
 //!    radio system around the time its VON entry registers: it transmits but never
