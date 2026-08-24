@@ -22,11 +22,15 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 	[RplProp()] protected bool m_bGateNameTagVonByRange        = true;
 	[RplProp()] protected bool m_bShowVoiceModeInOverlay       = true;
 
-	//! Server flips this once the RadioManagerEntity provably exists (found or
-	//! spawned). Replication delivers it to every client - including late
-	//! joiners via JIP initial state - so no client ever needs to poll the
-	//! native manager getter, which returns a non-null degraded handle on
-	//! manager-less worlds (the 2026-08-21 client CTD class).
+	//! Server flips this when the game mode's radio-system check has run at
+	//! world start. The native getter cannot actually prove the entity exists
+	//! (it returns non-null on any world where a radio initialized first -
+	//! field-confirmed on every fleet box), so the flag's real meaning is
+	//! "the moment after which radio registration can stick": clients re-cycle
+	//! radios that registered before it. Replication delivers it to every
+	//! client - late joiners included via JIP initial state - so no client
+	//! ever polls the native getter, whose non-null degraded handle was the
+	//! 2026-08-21 client CTD class.
 	[RplProp(onRplName: "EC29_OnRadioSystemReady")]
 	protected bool m_bEC29_RadioSystemReady;
 
