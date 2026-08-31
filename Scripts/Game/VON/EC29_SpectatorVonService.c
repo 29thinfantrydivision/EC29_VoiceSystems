@@ -118,6 +118,31 @@ class EC29_SpectatorVonService
 			return;
 		}
 
+		// TRUST BOUNDARY TRIPWIRE. This service drives capture, transmit routing and mute state on
+		// whatever radio it is handed, and the whole concealment design assumes that radio is the
+		// spectator net (the special-net triple: sub-band frequency, super-physical range). The
+		// caller resolves it by inventory scan, so a future ghost loadout carrying a second,
+		// LIVING-net radio could hand us a transceiver the guard/squelch/RF stack actively manages -
+		// and spectator speech would ride a real net. Refuse it loudly instead: a dead spectator
+		// radio is diagnosable, a dead player talking on a living net is the failure this system
+		// exists to prevent.
+		if (radio && radio.TransceiversCount() > 0)
+		{
+			BaseTransceiver checkTrx = radio.GetTransceiver(0);
+			if (checkTrx && !EC29_CoexistenceGuard.EC29_IsSpecialNet(checkTrx))
+			{
+				PrintFormat("[EC29-DBG][SpecVon] Registered radio is NOT a special net (freq %1 kHz, range %2 m) - refusing it; spectator radio stays dead rather than keying a living net", checkTrx.GetFrequency(), checkTrx.GetRange(), level: LogLevel.WARNING);
+				radio = null;
+			}
+		}
+
+		// Change detection gates the deferred re-assert. Callers re-register on every talk press
+		// and net toggle (the per-use radio self-heal), and an unconditional queue here would land
+		// a tier re-select one frame into a transmission that just swapped to the quiet tier. With
+		// unchanged handles this call is mute-sync only; the re-assert queues only when something
+		// actually changed (body arrival, a late-streamed radio or tier resolving).
+		bool changed = (body != m_SpectatorBody || normalTier != m_NormalTier || quietTier != m_QuietTier || radio != m_Radio);
+
 		m_SpectatorBody = body;
 		m_NormalTier = normalTier;
 		m_QuietTier = quietTier;
@@ -126,11 +151,13 @@ class EC29_SpectatorVonService
 		if (!body)
 			return;
 
-		if (EC29_Debug.VERBOSE)
+		if (changed && EC29_Debug.VERBOSE)
 			PrintFormat("[EC29-DBG][SpecVon] Spectator body registered (normalTier=%1 quietTier=%2 radio=%3)", normalTier != null, quietTier != null, radio != null);
 
 		ApplyMuteSync();
-		QueueReassert();
+
+		if (changed)
+			QueueReassert();
 	}
 
 	//------------------------------------------------------------------------------------------------

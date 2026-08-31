@@ -26,7 +26,11 @@
 //!   SCR_VoNComponent       { Enabled 0 }
 //! The last line matters as much as the others: FindComponent RETURNS DISABLED COMPONENTS, so the
 //! inherited base component being switched off does not stop it being found - which is why
-//! consumers must ask for the tier TYPE and only fall back to the base type.
+//! consumers must resolve the tier TYPE strictly, and must NEVER fall back to the base type: the
+//! fallback would return that disabled inherited component, EC29_SelectVonComponent would select
+//! it and report success (it verifies the pointer took, not enabled-ness), and the spectator
+//! would sit on a dead component with no warning anywhere. A missing tier must fail loud
+//! (dead radio, warned at registration) instead.
 //!
 //! THE RANGE CUTS BOTH WAYS, and that measured fact is why there are two tiers rather than one.
 //! The original spectator design was a SINGLE permanently-quiet component, on the assumption that
