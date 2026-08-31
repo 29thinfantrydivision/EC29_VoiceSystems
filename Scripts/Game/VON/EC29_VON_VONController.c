@@ -77,6 +77,11 @@ modded class SCR_VONController
         // Coexistence: a known conflicting mod also cycles voice range on F3; firing both would double-cycle.
         if (EC29_CoexistenceGuard.ShouldYieldVoiceRange())
             return;
+
+        // Spectator block: cycling voice range on a ghost body writes replicated VoN state on an
+        // entity whose direct speech is locked - pointless at best, confusing telemetry at worst.
+        if (EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
+            return;
         if (!m_VONComp)
         {
             PrintFormat("[EC29_VON] Cycle pressed but no SCR_VoNComponent on controlled entity", level: LogLevel.WARNING);
@@ -342,8 +347,136 @@ modded class SCR_VONController
         }
     }
 
+    //! ------------------------------------------------------------------------------------------
+    //! Spectator voice primitives (consumed by EC29_SpectatorVonService).
+    //!
+    //! Both exist because the vanilla members they touch are PROTECTED with no public accessor -
+    //! a modded class inherits access, ordinary script does not. Absorbed from the spectator
+    //! mod's controller layer together with their reasoning.
+    //! ------------------------------------------------------------------------------------------
+
+    //! True restores normal local speech; false makes local direct-speech transmission
+    //! IMPOSSIBLE rather than merely quiet. Vanilla gates both direct-speech transmit paths
+    //! (SetVONProximity / SetVONProximityToggle) on m_DirectSpeechEntry.IsUsable(), so clearing
+    //! usability beats a zero speech range: no attenuation curve to tune, no distance at which
+    //! it leaks anyway. Receiving is untouched - usability is consulted only on the transmit
+    //! path - which is what leaves a spectator able to hear everything while saying nothing.
+    //!
+    //! SAFE FOR EC29'S OWN USABILITY MACHINERY, verified: both EC29 re-sync sites
+    //! (SetVONBroadcast above and EC29_ResyncRadioEntries) cast to SCR_VONEntryRadio before
+    //! touching usability, so neither can ever re-arm the plain direct-speech entry this locks.
+    //!
+    //! MUST BE RESTORED ON THE WAY OUT. This controller lives on the player controller, which
+    //! outlives any single life, so a spectator who is never re-enabled stays mute for the rest
+    //! of the session. EC29_SpectatorVonService.ExitSpectate owns that restore, and its
+    //! self-healing auto-exit covers a missed exit path. Safe to call repeatedly and safe before
+    //! the entry exists - a controller mid-initialisation simply has nothing to set yet.
+    void EC29_SetDirectSpeechTransmitLocked(bool locked)
+    {
+        if (m_DirectSpeechEntry)
+            m_DirectSpeechEntry.SetUsable(!locked);
+    }
+
+    //! Selects which SCR_VoNComponent the controller transmits through - the spectator body's
+    //! near-silent tier, in the service's case. LIVES HERE BECAUSE THE SEQUENCE IS PROTECTED,
+    //! and because the switch must be ATOMIC.
+    //!
+    //! The obvious implementation - DeactivateVON(); SetVONProximityToggle(false);
+    //! SetVONComponent() - does NOT reliably work (community-documented across several
+    //! structurally different attempts: the audible range "kept sticking to whichever tier's
+    //! component was first on the entity, regardless of which one actually captured"). The
+    //! reason is visible in the vanilla source:
+    //!   SetVONProximityToggle(bool activate)
+    //!     if (!m_VONComp) return;
+    //!     if (!m_DirectSpeechEntry.IsUsable()) return;   <- deliberately false while spectating
+    //!     if (m_bIsToggledDirect == activate) return;
+    //! Every early-return leaves m_bIsToggledDirect stale, and the middle one is guaranteed to
+    //! fire while the direct-speech lock is on. So the setter cannot be used to clear the latch -
+    //! the field is written directly instead, which a modded class may do and outside script may
+    //! not.
+    bool EC29_SelectVonComponent(SCR_VoNComponent comp)
+    {
+        if (!comp)
+            return false;
+
+        if (m_VONComp == comp)
+            return true;
+
+        // Captured BEFORE anything is torn down, so a transmission in progress can be resumed
+        // on the new component rather than silently dropped.
+        bool wasDirectActive = (m_bIsActive && m_eVONType == EVONTransmitType.DIRECT);
+        bool wasDirectToggled = m_bIsToggledDirect;
+
+        m_bIsToggledDirect = false;
+
+        if (m_bIsActive)
+            DeactivateVON(m_eVONType);
+
+        SetVONComponent(comp);
+
+        if (wasDirectActive && wasDirectToggled)
+            SetVONProximityToggle(true);
+
+        // Reports whether it actually took, rather than assuming - the whole point of this
+        // method is that the naive version silently did not. A false return after a game update
+        // is the tripwire that vanilla's protected members changed underneath us.
+        return m_VONComp == comp;
+    }
+
+    //! ------------------------------------------------------------------------------------------
+    //! VANILLA RADIO/DIRECT TRANSMIT IS REMOVED WHILE DRIVING THE SPECTATOR GHOST - the
+    //! capability, not one key binding. A spectator has the service's own push-to-talk, which
+    //! drives capture directly; vanilla's VON actions are a SECOND, parallel route to the same
+    //! microphone and radio that the spectator system never asked for - it transmits on whatever
+    //! entry vanilla picked, and double-tap could cycle radio nets straight past everything the
+    //! service set up. ALL FIVE vanilla VON actions are blocked, not just the transmit ones: the
+    //! two direct-speech blocks are belt and braces over the usability lock (concealment must
+    //! not DEPEND on one mechanism holding), and the cycle/long-range blocks close the
+    //! net-change route.
+    //!
+    //! The gate is DERIVED PER CALL ("is the local player driving the registered ghost"), never
+    //! latched - see EC29_SpectatorVonService for why. For everyone else this is one check and
+    //! then straight into vanilla; the blocks only ever SHORT-CIRCUIT, so whatever the rest of
+    //! the modded chain does still happens exactly as it would have for living players.
+    //! Signatures must match vanilla EXACTLY, including the default argument, or the override is
+    //! rejected at compile time.
+    //!
+    //! NOTE the asymmetry with the service's own machinery: EC29_SelectVonComponent calls
+    //! SetVONProximityToggle, which is a DIFFERENT method from ActionVONProximityToggle - the
+    //! action is the input handler, the setter is the state change. Blocking the actions does
+    //! not disturb the tier swap.
+    //! ------------------------------------------------------------------------------------------
+    override protected void ActionVONBroadcast(float value, EActionTrigger reason = EActionTrigger.UP)
+    {
+        if (EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
+            return;
+
+        super.ActionVONBroadcast(value, reason);
+    }
+
+    override protected void ActionVONLongRangeToggle(float value, EActionTrigger reason = EActionTrigger.UP)
+    {
+        if (EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
+            return;
+
+        super.ActionVONLongRangeToggle(value, reason);
+    }
+
+    override protected void ActionVONProximity(float value, EActionTrigger reason = EActionTrigger.UP)
+    {
+        if (EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
+            return;
+
+        super.ActionVONProximity(value, reason);
+    }
+
     override protected void ActionVONProximityToggle(float value, EActionTrigger reason = EActionTrigger.UP)
     {
+        // Spectator block first - before the toggle beeps below, so a blocked press makes no
+        // sound at all instead of beeping over a refused action.
+        if (EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
+            return;
+
         // Chain hygiene: still forward to super when we have nothing to do, so a
         // third mod's override further down the modded chain keeps running.
         if (!m_VONComp)
@@ -377,6 +510,11 @@ modded class SCR_VONController
 
     override protected void ActionVONTransceiverCycle(float value, EActionTrigger reason = EActionTrigger.UP)
     {
+        // Spectator block first - before the cycle sound, so a blocked press does not play
+        // feedback for an action that will not happen.
+        if (EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
+            return;
+
         if (reason == EActionTrigger.DOWN && !EC29_CoexistenceGuard.ShouldYieldRadio())
         {
             if (m_AudioHandleCycle != 0 && AudioSystem.IsSoundPlayed(m_AudioHandleCycle))
@@ -397,6 +535,14 @@ modded class SCR_VONController
 
         // Coexistence: a known conflicting VON mod polls the same default keys; ours yields.
         if (EC29_CoexistenceGuard.ShouldYieldRadio())
+            return;
+
+        // Spectator block: the alternate-PTT poll below is action-value driven, so it bypasses
+        // action-level transmit blocks entirely - with an alternate frequency set it would hand
+        // a spectator a transmit route the blocks above deliberately removed. The radial-menu
+        // actions are equally meaningless while driving a ghost. One derived gate closes the
+        // whole polled surface.
+        if (EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
             return;
 
         // Original bind behavior: radio actions are frame-polled exactly as the
