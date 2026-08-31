@@ -26,6 +26,7 @@ class EC29_RadioState
 	protected ref EC29_JammerRegistry m_Jammers;
 	protected ref EC29_RFPropagationModel m_Propagation;
 	protected ref EC29_RadioReceiverGuard m_ReceiverGuard;
+	protected ref EC29_SpectatorVonService m_SpectatorVon;
 
 	//! The propagation model raymarches up to 200 terrain samples per query and
 	//! the query sits on the per-voice-packet hot path, so results are cached
@@ -62,6 +63,16 @@ class EC29_RadioState
 		m_Jammers = new EC29_JammerRegistry();
 		m_Propagation = new EC29_RFPropagationModel();
 		m_ReceiverGuard = new EC29_RadioReceiverGuard();
+		m_SpectatorVon = new EC29_SpectatorVonService();
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Spectator voice service - the EC29-owned half of the spectator mod's voice split (the
+	//! spectator mod keeps lifecycle and input, this keeps voice). Sharing the world-scoped
+	//! lifecycle here is what guarantees no spectator voice state survives a scenario change.
+	EC29_SpectatorVonService SpectatorVon()
+	{
+		return m_SpectatorVon;
 	}
 
 	//------------------------------------------------------------------------------------------------
