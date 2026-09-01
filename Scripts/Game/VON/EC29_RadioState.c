@@ -27,6 +27,7 @@ class EC29_RadioState
 	protected ref EC29_RFPropagationModel m_Propagation;
 	protected ref EC29_RadioReceiverGuard m_ReceiverGuard;
 	protected ref EC29_SpectatorVonService m_SpectatorVon;
+	protected ref EC29_VonActivityService m_VonActivity;
 
 	//! The propagation model raymarches up to 200 terrain samples per query and
 	//! the query sits on the per-voice-packet hot path, so results are cached
@@ -64,6 +65,15 @@ class EC29_RadioState
 		m_Propagation = new EC29_RFPropagationModel();
 		m_ReceiverGuard = new EC29_RadioReceiverGuard();
 		m_SpectatorVon = new EC29_SpectatorVonService();
+		m_VonActivity = new EC29_VonActivityService();
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Who is talking, as heard by the local client - the data feed behind spectator speaking
+	//! indicators. Spectator-scoped at the feed; see EC29_VonActivityService.
+	EC29_VonActivityService VonActivity()
+	{
+		return m_VonActivity;
 	}
 
 	//------------------------------------------------------------------------------------------------

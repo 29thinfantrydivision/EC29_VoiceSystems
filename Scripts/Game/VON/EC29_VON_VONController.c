@@ -537,14 +537,6 @@ modded class SCR_VONController
         if (EC29_CoexistenceGuard.ShouldYieldRadio())
             return;
 
-        // Spectator block: the alternate-PTT poll below is action-value driven, so it bypasses
-        // action-level transmit blocks entirely - with an alternate frequency set it would hand
-        // a spectator a transmit route the blocks above deliberately removed. The radial-menu
-        // actions are equally meaningless while driving a ghost. One derived gate closes the
-        // whole polled surface.
-        if (EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
-            return;
-
         // Original bind behavior: radio actions are frame-polled exactly as the
         // absorbed implementation did - PTT by action value, menu actions only
         // while the radial menu is open. Polling keeps these keys inert in every
@@ -556,11 +548,31 @@ modded class SCR_VONController
         if (!inputMgr)
             return;
 
+        // Spectator block placement is asymmetric ON PURPOSE. The alternate-PTT poll is an edge
+        // detector over a latched state (m_bAlternatePTTActive), not a stateless action - and the
+        // spectator gate, unlike the session-constant coexistence yield above, is derived per
+        // frame and can flip TRUE mid-hold when a player dies into the ghost with the key down.
+        // A whole-tail early-return here would strand the latch: the release edge would never be
+        // seen, the saved primary entry never restored, and the transmitting-on-alternate flag
+        // (and its CYAN HUD state) stuck for the entire spectate. So only the START edge is
+        // gated - closing the documented action-block bypass - while the END edge always runs,
+        // which is exactly the pre-absorption behavior (the poll ran through death and cleaned
+        // the latch on release).
         float altValue = inputMgr.GetActionValue("EC29_AlternateChannel");
         if (altValue > 0 && !m_bAlternatePTTActive)
-            OnAlternatePTTStart();
+        {
+            if (!EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
+                OnAlternatePTTStart();
+        }
         else if (altValue <= 0 && m_bAlternatePTTActive)
+        {
             OnAlternatePTTEnd();
+        }
+
+        // The radial-menu actions are stateless per-press handlers, so the blanket gate is safe
+        // here - and while driving a ghost they are all meaningless at best.
+        if (EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
+            return;
 
         if (m_VONMenu && m_VONMenu.GetRadialMenu() && m_VONMenu.GetRadialMenu().IsOpened())
         {

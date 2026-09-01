@@ -170,6 +170,12 @@ modded class SCR_VoNComponent
 		if (!GetGame().GetPlayerController())
 			return;
 
+		// Feed the VON activity service BEFORE every policy gate below: a packet that arrived is
+		// a player talking, no matter what faction filters, range gating or mute policy do with
+		// the audio. The service itself is spectator-scoped and one flag read when it is not -
+		// see EC29_VonActivityService.
+		EC29_RadioState.GetInstance().VonActivity().EC29_RecordVonPacket(playerId, receiver != null);
+
 		// Packet-type gate keeps the two systems from stomping each other's global
 		// audio variables: direct packets (receiver == null) own EC29_VonRange,
 		// radio packets own the ear-routing/quality/jam/volume set. Without the
