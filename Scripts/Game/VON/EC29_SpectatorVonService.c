@@ -61,6 +61,20 @@ class EC29_SpectatorVonService
 	protected SCR_VoNComponent m_QuietTier;
 	protected BaseRadioComponent m_Radio;
 
+	//! Ghost-radio receiver repair state (see GhostRadioCycleOff for the whole story).
+	protected BaseRadioComponent m_CycledRadio;
+	protected BaseRadioComponent m_PendingCycleRadio;
+	protected int m_iRestoreAttempts;
+
+	//! Community-established timing for the 1.8 receiver-registration repair: the native VoN
+	//! system performs additional radio setup after the VON entry registers, and a cycle earlier
+	//! than ~3 s gets overwritten by it; 150 ms off is a separate call-queue turn, long enough
+	//! for native to actually unregister the receiver.
+	protected static const int GHOST_RADIO_CYCLE_DELAY_MS = 3000;
+	protected static const int GHOST_RADIO_OFF_WINDOW_MS = 150;
+	protected static const int GHOST_RADIO_RETRY_MS = 500;
+	protected static const int GHOST_RADIO_MAX_RESTORE_ATTEMPTS = 3;
+
 	//------------------------------------------------------------------------------------------------
 	//! True while the local player is driving the REGISTERED spectator ghost. This is the gate the
 	//! vanilla VON action blocks and the alternate-PTT poll consult - re-derived on every call, so a
@@ -162,10 +176,105 @@ class EC29_SpectatorVonService
 		if (changed && EC29_Debug.VERBOSE)
 			PrintFormat("[EC29-DBG][SpecVon] Spectator body registered (normalTier=%1 quietTier=%2 radio=%3)", normalTier != null, quietTier != null, radio != null);
 
+		// Every NEW ghost radio gets the 1.8 receiver-registration repair - see GhostRadioCycleOff.
+		// Handle-compared against both the repaired and the in-flight radio, so the per-press and
+		// per-toggle re-registrations of the same instance never schedule a second cycle.
+		if (m_Radio && m_Radio != m_CycledRadio && m_Radio != m_PendingCycleRadio)
+		{
+			m_PendingCycleRadio = m_Radio;
+			m_iRestoreAttempts = 0;
+			GetGame().GetCallqueue().CallLater(GhostRadioCycleOff, GHOST_RADIO_CYCLE_DELAY_MS, false);
+		}
+
 		ApplyMuteSync();
 
 		if (changed)
 			QueueReassert();
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! THE GHOST RADIO NEEDS THE 1.8 RECEIVER REPAIR TOO, AND ONLY THIS SERVICE CAN GIVE IT.
+	//!
+	//! The 1.8 receiver-registration defect: an already-powered radio whose VON entry registers
+	//! can end up with its receiver NOT registered in the native VoN system - it transmits fine
+	//! and receives NOTHING, repaired only by a power cycle. The spectator ghost radio is the
+	//! textbook victim: it spawns powered in the body's wristwatch slot and registers during the
+	//! body's own streaming-in. The receiver guard repairs every normal radio this way, but it
+	//! deliberately exempts special nets (EC29_RadioSystemGuard.OnRadioEntryAdded) because a
+	//! blind cycle used to fight the owning mod's mute state - "their mod owns that radio's
+	//! lifecycle". That exemption and the unit-side disable of spectator speaking landed the same
+	//! day, so no live spectator traffic ever crossed it - until the first field test of the
+	//! absorbed stack, where spectators transmitted fine and heard each other never.
+	//!
+	//! THE OWNING MOD IS NOW US. This service holds the radio handle and the mute state, so the
+	//! conflict that justified the exemption dissolves by ordering: cycle, then re-assert our own
+	//! mute state. The guard's exemption stays exactly as it is - it still protects third-party
+	//! special nets this service knows nothing about.
+	//!
+	//! Deferred while a transmission is open (a cycle mid-capture is the stuck-mic shape), and
+	//! the restore is retried and LOUD on abandon - a radio silently left OFF is the
+	//! RestorePower hole all over again.
+	protected void GhostRadioCycleOff()
+	{
+		BaseRadioComponent radio = m_PendingCycleRadio;
+		if (!radio)
+			return;
+
+		// Stale: spectate ended or the body re-registered a different radio while we waited.
+		if (!m_bSpectating || radio != m_Radio)
+		{
+			m_PendingCycleRadio = null;
+			return;
+		}
+
+		if (m_bTransmitting)
+		{
+			GetGame().GetCallqueue().CallLater(GhostRadioCycleOff, GHOST_RADIO_RETRY_MS, false);
+			return;
+		}
+
+		radio.SetPower(false);
+		GetGame().GetCallqueue().CallLater(GhostRadioCycleOn, GHOST_RADIO_OFF_WINDOW_MS, false);
+	}
+
+	//------------------------------------------------------------------------------------------------
+	protected void GhostRadioCycleOn()
+	{
+		BaseRadioComponent radio = m_PendingCycleRadio;
+		if (!radio)
+			return;
+
+		radio.SetPower(true);
+
+		if (!radio.IsPowered())
+		{
+			if (m_iRestoreAttempts < GHOST_RADIO_MAX_RESTORE_ATTEMPTS)
+			{
+				m_iRestoreAttempts++;
+				GetGame().GetCallqueue().CallLater(GhostRadioCycleOn, GHOST_RADIO_RETRY_MS, false);
+				return;
+			}
+
+			Print("[EC29-DBG][SpecVon] Ghost radio power restore FAILED after retries - spectator radio left unpowered", LogLevel.WARNING);
+			m_PendingCycleRadio = null;
+			return;
+		}
+
+		m_CycledRadio = radio;
+		m_PendingCycleRadio = null;
+
+		// The cycle window can latch VON entry usability from the unpowered snapshot; re-sync it
+		// from the real power state, the same repair the receiver guard applies.
+		SCR_VONController von = EC29_GetLocalVonController();
+		if (von)
+			von.EC29_ResyncRadioEntries(radio);
+
+		// Re-assert OUR mute state last - this ordering is what retires the cycle-vs-mute
+		// conflict that kept the guard away from this radio.
+		ApplyMuteSync();
+
+		if (EC29_Debug.VERBOSE)
+			Print("[EC29-DBG][SpecVon] Ghost radio receiver repair cycle complete", LogLevel.NORMAL);
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -376,6 +485,15 @@ class EC29_SpectatorVonService
 
 		Unsubscribe();
 		GetGame().GetCallqueue().Remove(ReassertSpectatorVoN);
+
+		// Cancel any in-flight receiver repair, and never leave the radio in the off-window: the
+		// body is usually about to be deleted anyway, but "usually" is not a power-state policy.
+		GetGame().GetCallqueue().Remove(GhostRadioCycleOff);
+		GetGame().GetCallqueue().Remove(GhostRadioCycleOn);
+		if (m_PendingCycleRadio && !m_PendingCycleRadio.IsPowered())
+			m_PendingCycleRadio.SetPower(true);
+		m_PendingCycleRadio = null;
+		m_CycledRadio = null;
 
 		ApplyDirectSpeechLock(false);
 
