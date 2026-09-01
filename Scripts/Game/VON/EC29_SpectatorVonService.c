@@ -46,6 +46,14 @@ class EC29_SpectatorVonService
 	protected bool m_bNetEnabled = true;
 	protected bool m_bSubscribed;
 
+	//! True from successful capture start to key-up. Local audible range follows the
+	//! CONTROLLER'S ACTIVE COMPONENT, not the capturing one (field-observed: switching the
+	//! controller back to normal "restored full audible range on a capture that was still
+	//! running") - so while this is set, the deferred re-assert must never select the normal
+	//! tier: a changed-handle registration on the same press (a late-streaming radio healing at
+	//! key-down) queues one, and it would land one frame into the hold.
+	protected bool m_bTransmitting;
+
 	//! All four are plain engine handles, not owned refs - they auto-null when the entity or
 	//! component is deleted, which is exactly the degradation the derived checks rely on.
 	protected IEntity m_SpectatorBody;
@@ -177,6 +185,9 @@ class EC29_SpectatorVonService
 	{
 		if (!talk)
 		{
+			// Cleared FIRST, so the inline re-assert below is free to restore the normal tier.
+			m_bTransmitting = false;
+
 			// STOP CAPTURE ON EVERY TIER, not just the active one.
 			//
 			// Key-down captures on the QUIET tier, but by key-up the active component can have
@@ -236,21 +247,25 @@ class EC29_SpectatorVonService
 		//
 		// Absent quiet tier = old behaviour rather than a broken one: transmission still works,
 		// it is simply audible locally.
-		if (m_QuietTier)
+		// STRICT: no quiet tier means NO TRANSMISSION, not a louder one. The old shape warned and
+		// transmitted on the normal tier - full local audibility to 40 m, fading to 68 - which is
+		// the exact outcome the quiet tier exists to prevent, handed out on the failure path. Same
+		// trade already accepted for the strict tier resolve: dead radio beats audible spectator,
+		// and the missing tier is warned at registration.
+		if (!m_QuietTier)
 		{
-			SCR_VONController quietVon = EC29_GetLocalVonController();
-			if (quietVon)
-				quietVon.EC29_SelectVonComponent(m_QuietTier);
-			else
-				Print("[EC29-DBG][SpecVon] tier swap SKIPPED - no VON controller", LogLevel.WARNING);
+			Print("[EC29-DBG][SpecVon] transmit refused - no quiet tier registered, staying silent rather than speaking at audible range", LogLevel.WARNING);
+			return;
+		}
 
-			// Capture on the tier that is now active, so the two cannot disagree.
-			von = m_QuietTier;
-		}
+		SCR_VONController quietVon = EC29_GetLocalVonController();
+		if (quietVon)
+			quietVon.EC29_SelectVonComponent(m_QuietTier);
 		else
-		{
-			Print("[EC29-DBG][SpecVon] tier swap SKIPPED - no quiet tier registered", LogLevel.WARNING);
-		}
+			Print("[EC29-DBG][SpecVon] tier swap SKIPPED - no VON controller", LogLevel.WARNING);
+
+		// Capture on the tier that is now active, so the two cannot disagree.
+		von = m_QuietTier;
 
 		if (!m_Radio || m_Radio.TransceiversCount() == 0)
 			return;
@@ -300,6 +315,11 @@ class EC29_SpectatorVonService
 		}
 
 		von.SetCapture(true);
+
+		// Set only on the one successful exit, after capture actually opened - every refusal
+		// above leaves it false, so the flag can never claim a transmission that was never
+		// started.
+		m_bTransmitting = true;
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -476,11 +496,25 @@ class EC29_SpectatorVonService
 		if (!m_SpectatorBody || controlled != m_SpectatorBody)
 			return;
 
-		if (!m_NormalTier)
-			return;
-
 		SCR_VONController von = EC29_GetLocalVonController();
 		if (!von)
+			return;
+
+		// MID-TRANSMISSION, THE QUIET TIER IS THE ONLY LEGAL SELECTION. Local audible range
+		// follows the controller's active component, not the capturing one - selecting the
+		// normal tier here while a capture is running is full-volume local audio to 40 m for the
+		// rest of the hold, aimed at exactly the living players the system hides from. A deferred
+		// call CAN land mid-hold: a changed-handle registration at key-down (late-streaming radio
+		// healing on the press) queues one. The direct-speech re-lock above still ran
+		// unconditionally; only the tier choice branches.
+		if (m_bTransmitting)
+		{
+			if (m_QuietTier)
+				von.EC29_SelectVonComponent(m_QuietTier);
+			return;
+		}
+
+		if (!m_NormalTier)
 			return;
 
 		// Via the modded controller - the underlying vanilla members are protected, and the
