@@ -170,11 +170,19 @@ class EC29_RadioReceiverGuard
     //------------------------------------------------------------------------------------------------
     void OnRadioEntryAdded(notnull BaseTransceiver transceiver)
     {
-        // Another system's net (spectator ghost radio): a silent 150 ms power
-        // cycle would drop their reception and re-key state - their mod owns
-        // that radio's lifecycle (observed in the field: a 29000 kHz cycle).
+        // Another system's net: a silent 150 ms power cycle would drop their
+        // reception and re-key state - whoever owns that radio's lifecycle
+        // owns its repair (observed in the field: a 29000 kHz cycle). For the
+        // spectator ghost radio that owner is EC29's own spectator voice
+        // service, which holds the mute state this cycle used to fight - hand
+        // it the entry so ITS repair anchors on AddEntry like every other
+        // radio's, instead of on the camera's later body registration. The
+        // service ignores the call unless the local player is spectating.
         if (EC29_CoexistenceGuard.EC29_IsSpecialNet(transceiver))
+        {
+            EC29_RadioState.GetInstance().SpectatorVon().OnSpecialNetEntryAdded(transceiver);
             return;
+        }
 
         BaseRadioComponent radio = transceiver.GetRadio();
         if (!radio || radio.IsEditorRadio() || !radio.IsPowered())

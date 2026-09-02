@@ -28,7 +28,17 @@
 //!
 //! Owned by EC29_RadioState (world-scoped, dies with the world). The ticker follows the squelch
 //! singleton's self-stopping pattern: feeds call EnsureTicking, the loop reschedules itself only
-//! while entries exist and exits cleanly when the world is torn down under it.
+//! while entries exist, and exits cleanly when the world is torn down under it or when
+//! EC29_RadioState has already been rebuilt around a newer instance.
+//!
+//! CONSUMER CONTRACT: the invoker belongs to ONE world's instance. Re-resolve the service (and
+//! re-subscribe) per world - a cached invoker from a previous world is a dead object. Polling
+//! consumers that fetch the service per pass are immune by construction.
+//!
+//! TELEMETRY: every transition prints a VERBOSE line. This is deliberately the ONE per-
+//! transmission signature the spectator net has - the special-net exemptions keep it out of the
+//! squelch and heartbeat logs - so a spectator who hears nothing can be diagnosed from their own
+//! log: transitions present = packets arrive, look at playback; absent = delivery/registration.
 class EC29_VonActivityEntry
 {
 	float m_fLastPacketMs;
@@ -86,6 +96,12 @@ class EC29_VonActivityService
 		if (!EC29_RadioState.GetInstance().SpectatorVon().IsSpectating())
 			return;
 
+		// The receive path fires for the local sender's own stream too (the squelch tracker
+		// filters the same case). "You are talking" is not activity anyone needs reported.
+		PlayerController localPc = GetGame().GetPlayerController();
+		if (localPc && localPc.GetPlayerId() == playerId)
+			return;
+
 		BaseWorld world = GetGame().GetWorld();
 		if (!world)
 			return;
@@ -99,6 +115,8 @@ class EC29_VonActivityService
 			entry.m_fLastPacketMs = nowMs;
 			entry.m_bIsRadio = isRadio;
 			m_mTransmitting.Set(playerId, entry);
+			if (EC29_Debug.VERBOSE)
+				PrintFormat("[EC29-DBG][SpecVon] RX activity pid=%1 talking=1 radio=%2", playerId, isRadio);
 			m_OnVonActivityChanged.Invoke(playerId, true, isRadio);
 		}
 		else
@@ -132,6 +150,15 @@ class EC29_VonActivityService
 			return;
 		}
 
+		// A queued tick can outlive its world: EC29_RadioState rebuilds around a fresh instance
+		// on world change while this call is still in the queue, and firing on would expire and
+		// invoke on a dead invoker. Stale instance stops here.
+		if (EC29_RadioState.GetInstance().VonActivity() != this)
+		{
+			m_bTicking = false;
+			return;
+		}
+
 		float nowMs = world.GetWorldTime();
 
 		array<int> expired = {};
@@ -149,6 +176,8 @@ class EC29_VonActivityService
 			if (m_mTransmitting.Find(playerId, entry))
 			{
 				m_mTransmitting.Remove(playerId);
+				if (EC29_Debug.VERBOSE)
+					PrintFormat("[EC29-DBG][SpecVon] RX activity pid=%1 talking=0 radio=%2", playerId, entry.m_bIsRadio);
 				m_OnVonActivityChanged.Invoke(playerId, false, entry.m_bIsRadio);
 			}
 		}

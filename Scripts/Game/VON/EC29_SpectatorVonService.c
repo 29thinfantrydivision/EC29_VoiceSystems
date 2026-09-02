@@ -176,20 +176,51 @@ class EC29_SpectatorVonService
 		if (changed && EC29_Debug.VERBOSE)
 			PrintFormat("[EC29-DBG][SpecVon] Spectator body registered (normalTier=%1 quietTier=%2 radio=%3)", normalTier != null, quietTier != null, radio != null);
 
-		// Every NEW ghost radio gets the 1.8 receiver-registration repair - see GhostRadioCycleOff.
-		// Handle-compared against both the repaired and the in-flight radio, so the per-press and
+		// Registration-time fallback for the receiver repair (the primary trigger is the guard's
+		// AddEntry hand-off, see OnSpecialNetEntryAdded). Dedupe by handle, so the per-press and
 		// per-toggle re-registrations of the same instance never schedule a second cycle.
-		if (m_Radio && m_Radio != m_CycledRadio && m_Radio != m_PendingCycleRadio)
-		{
-			m_PendingCycleRadio = m_Radio;
-			m_iRestoreAttempts = 0;
-			GetGame().GetCallqueue().CallLater(GhostRadioCycleOff, GHOST_RADIO_CYCLE_DELAY_MS, false);
-		}
+		ScheduleGhostRadioCycle(m_Radio);
 
 		ApplyMuteSync();
 
 		if (changed)
 			QueueReassert();
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Called by the receiver guard for every special-net VON entry it declines to repair. While
+	//! spectating, the only special-net entry the local controller can register is the ghost
+	//! radio's, so this is the AddEntry-anchored trigger for the receiver repair - the same anchor
+	//! the community fixes and the guard use, and the one that catches a radio that streamed in
+	//! AFTER the camera's body registration: a listen-only spectator never presses talk, so the
+	//! per-press registration refresh would never have re-resolved it. Registration-time
+	//! scheduling stays as the fallback; the handle dedupe keeps the two paths from double-cycling.
+	//! No-op unless spectating (so a dedicated server and every living player pass straight
+	//! through), and ignored for a radio that is not the registered ghost radio once one is known.
+	void OnSpecialNetEntryAdded(BaseTransceiver transceiver)
+	{
+		if (!m_bSpectating || !transceiver)
+			return;
+
+		BaseRadioComponent radio = transceiver.GetRadio();
+		if (!radio)
+			return;
+
+		if (m_Radio && radio != m_Radio)
+			return;
+
+		ScheduleGhostRadioCycle(radio);
+	}
+
+	//------------------------------------------------------------------------------------------------
+	protected void ScheduleGhostRadioCycle(BaseRadioComponent radio)
+	{
+		if (!radio || radio == m_CycledRadio || radio == m_PendingCycleRadio)
+			return;
+
+		m_PendingCycleRadio = radio;
+		m_iRestoreAttempts = 0;
+		GetGame().GetCallqueue().CallLater(GhostRadioCycleOff, GHOST_RADIO_CYCLE_DELAY_MS, false);
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -220,8 +251,10 @@ class EC29_SpectatorVonService
 		if (!radio)
 			return;
 
-		// Stale: spectate ended or the body re-registered a different radio while we waited.
-		if (!m_bSpectating || radio != m_Radio)
+		// Stale: spectate ended, or the body registered a DIFFERENT radio while we waited. A still-
+		// null m_Radio is not stale - the AddEntry trigger legitimately runs ahead of the camera's
+		// body registration.
+		if (!m_bSpectating || (m_Radio && radio != m_Radio))
 		{
 			m_PendingCycleRadio = null;
 			return;
@@ -230,6 +263,19 @@ class EC29_SpectatorVonService
 		if (m_bTransmitting)
 		{
 			GetGame().GetCallqueue().CallLater(GhostRadioCycleOff, GHOST_RADIO_RETRY_MS, false);
+			return;
+		}
+
+		// ARRIVAL PROVES REGISTRATION - never cycle a radio that has already received. The guard
+		// learned this in the field (2026-08-24: a cycle on a provably-working radio left it deaf
+		// all session). The squelch stamps last-RX per radio BEFORE its own special-net gate, so
+		// the evidence exists for this radio too.
+		if (EC29_RadioState.GetInstance().Squelch().EC29_GetLastRadioRxMs(radio) >= 0)
+		{
+			m_CycledRadio = radio;
+			m_PendingCycleRadio = null;
+			if (EC29_Debug.VERBOSE)
+				Print("[EC29-DBG][SpecVon] Ghost radio already receiving - repair cycle skipped", LogLevel.NORMAL);
 			return;
 		}
 
@@ -256,6 +302,9 @@ class EC29_SpectatorVonService
 			}
 
 			Print("[EC29-DBG][SpecVon] Ghost radio power restore FAILED after retries - spectator radio left unpowered", LogLevel.WARNING);
+			// Give up on THIS instance for good: otherwise every later press/toggle re-registration
+			// would schedule a fresh cycle and repeat the failure and the warning.
+			m_CycledRadio = radio;
 			m_PendingCycleRadio = null;
 			return;
 		}
@@ -322,7 +371,12 @@ class EC29_SpectatorVonService
 			// there is no spectator left to be deaf, and the component it would select belongs
 			// to a ghost that is about to be deleted. Vanilla re-resolves the VoN component on
 			// the next controlled-entity change regardless.
-			ReassertSpectatorVoN();
+			//
+			// NO AUTO-EXIT FROM HERE. The synchronous stop path runs in half-armed windows - the
+			// entry-time preference feed, a fast re-entry while the OLD ghost is still under
+			// control - where "no registered body" is not evidence of a missed exit. Only the
+			// deferred, entity-change-driven pass may auto-exit.
+			ReassertSpectatorVoN(false);
 			return;
 		}
 
@@ -491,7 +545,15 @@ class EC29_SpectatorVonService
 		GetGame().GetCallqueue().Remove(GhostRadioCycleOff);
 		GetGame().GetCallqueue().Remove(GhostRadioCycleOn);
 		if (m_PendingCycleRadio && !m_PendingCycleRadio.IsPowered())
+		{
 			m_PendingCycleRadio.SetPower(true);
+
+			// Same usability re-sync the normal completion does - an emergency restore must not
+			// leave the entry latched unusable from the unpowered snapshot.
+			SCR_VONController exitVon = EC29_GetLocalVonController();
+			if (exitVon)
+				exitVon.EC29_ResyncRadioEntries(m_PendingCycleRadio);
+		}
 		m_PendingCycleRadio = null;
 		m_CycledRadio = null;
 
@@ -565,7 +627,7 @@ class EC29_SpectatorVonService
 	//------------------------------------------------------------------------------------------------
 	protected void QueueReassert()
 	{
-		GetGame().GetCallqueue().CallLater(ReassertSpectatorVoN, 0, false);
+		GetGame().GetCallqueue().CallLater(ReassertSpectatorVoN, 0, false, true);
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -577,7 +639,12 @@ class EC29_SpectatorVonService
 	//! stale call used to re-apply the direct-speech kill after the restore, permanently,
 	//! because SCR_VONController outlives the life. ExitSpectate also drops any queued call;
 	//! this guard covers every other path that could ever queue one.
-	protected void ReassertSpectatorVoN()
+	//! allowAutoExit is true only from the deferred, entity-change-driven queue. The synchronous
+	//! stop-path call passes false: it runs inside half-armed windows (entry-time preference
+	//! feed, fast re-entry while the old ghost is still controlled) where a null registered body
+	//! plus an ALIVE ghost would satisfy the exit test for the wrong reason - the ghost body IS
+	//! ECharacterLifeState.ALIVE. Two field-found bugs shared exactly that shape.
+	protected void ReassertSpectatorVoN(bool allowAutoExit)
 	{
 		if (!m_bSpectating)
 			return;
@@ -595,7 +662,7 @@ class EC29_SpectatorVonService
 		// architecture exists to rule out - so the service exits spectator voice instead and
 		// says so. Corpses and null transitions are NOT exits: the direct-speech kill must hold
 		// through them (a dead player's entity swaps several times on the way into spectate).
-		if (controlled && controlled != m_SpectatorBody && IsAliveCharacter(controlled))
+		if (allowAutoExit && controlled && controlled != m_SpectatorBody && IsAliveCharacter(controlled))
 		{
 			Print("[EC29-DBG][SpecVon] Live character under control while spectator voice active - auto-exiting spectator voice (missed ExitSpectate upstream?)", LogLevel.WARNING);
 			ExitSpectate();
