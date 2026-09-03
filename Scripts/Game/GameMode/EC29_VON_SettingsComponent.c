@@ -25,11 +25,8 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 	//! Kill-switch for the 1.8 receiver-registration repair cycles (guard + spectator ghost
 	//! radio). Mission-header seeded, replicated, default ON. The measuring instrument for
 	//! "did the game update fix it natively": with this OFF, radios are left untouched and the
-	//! RX heartbeat WARNING / registration probe report what native registration actually did.
+	//! RX heartbeat WARNING reports what native registration actually did.
 	[RplProp()] protected bool m_bReceiverRepairEnabled = true;
-	//! DIAGNOSTIC: registry-membership probe (see EC29_RadioRegistrationProbe.c). Default OFF;
-	//! only ever enable on a world with a real RadioManagerEntity - see the CTD note there.
-	[RplProp()] protected bool m_bRegistrationProbe = false;
 
 	//! Server flips this when the game mode's radio-system check has run at
 	//! world start. The native getter cannot actually prove the entity exists
@@ -106,12 +103,6 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 	bool EC29_IsReceiverRepairEnabled()
 	{
 		return m_bReceiverRepairEnabled;
-	}
-
-	//------------------------------------------------------------------------------------------------
-	bool EC29_IsRegistrationProbeEnabled()
-	{
-		return m_bRegistrationProbe;
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -248,7 +239,6 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 		m_bGateNameTagVonByRange       = src.m_bGateNameTagVonByRange;
 		m_bShowVoiceModeInOverlay      = src.m_bShowVoiceModeInOverlay;
 		m_bReceiverRepairEnabled       = src.m_bReceiverRepairEnabled;
-		m_bRegistrationProbe           = src.m_bRegistrationProbe;
 
 		Replication.BumpMe();
 	}
