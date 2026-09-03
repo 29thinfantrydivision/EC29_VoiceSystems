@@ -28,6 +28,9 @@ class EC29_VON_Settings : ScriptAndConfig
 		m_bHideRoleInVonOverlay         = true;
 		m_bShowVoiceModeInOverlay       = true;
 		m_bGateNameTagVonByRange        = true;
+
+		m_bReceiverRepairEnabled = true;
+		m_bRegistrationProbe     = false;
 	}
 
 	// VoN Range Setings
@@ -80,4 +83,11 @@ class EC29_VON_Settings : ScriptAndConfig
 	// Nametag UI Settings
 	[Attribute(defvalue: "1", uiwidget: UIWidgets.CheckBox, desc: "Suppress the over-head nametag VON icon for direct transmissions when the speaker is out of audible range, so whispers/distant talkers don't reveal themselves visually.", category: "EC29_VON")]
 	bool m_bGateNameTagVonByRange;
+
+	// Radio repair diagnostics (1.8 receiver-registration defect)
+	[Attribute(defvalue: "1", uiwidget: UIWidgets.CheckBox, desc: "Run EC29 receiver-registration repair: a one-time silent power cycle per radio shortly after its VON entry registers (plus the spectator ghost radio). Turn OFF to measure whether a game update fixed the defect natively - with this off, the RX heartbeat WARNING and the registration probe are the evidence.", category: "EC29_VON")]
+	bool m_bReceiverRepairEnabled;
+
+	[Attribute(defvalue: "0", uiwidget: UIWidgets.CheckBox, desc: "DIAGNOSTIC ONLY. Query the native transceiver registry at +1/3/5/10 s after every controlled-entity change and log whether each carried, powered radio is registered ([EC29-PROBE] lines). ONLY on worlds that contain a real RadioManagerEntity (vanilla Conflict worlds): on Game Master / manager-less worlds the native getter returns a degraded non-null handle and the query is a guaranteed client crash (2026-08-21).", category: "EC29_VON")]
+	bool m_bRegistrationProbe;
 }

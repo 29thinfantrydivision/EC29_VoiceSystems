@@ -266,6 +266,17 @@ class EC29_SpectatorVonService
 			return;
 		}
 
+		// Same mission-header kill-switch as the receiver guard: repair off = measure native.
+		EC29_VONSettingsComponent repairSettings = EC29_VONSettingsComponent.GetInstance();
+		if (repairSettings && !repairSettings.EC29_IsReceiverRepairEnabled())
+		{
+			m_CycledRadio = radio;
+			m_PendingCycleRadio = null;
+			if (EC29_Debug.VERBOSE)
+				Print("[EC29-DBG][SpecVon] Receiver repair DISABLED by mission settings - ghost radio left untouched", LogLevel.NORMAL);
+			return;
+		}
+
 		// ARRIVAL PROVES REGISTRATION - never cycle a radio that has already received. The guard
 		// learned this in the field (2026-08-24: a cycle on a provably-working radio left it deaf
 		// all session). The squelch stamps last-RX per radio BEFORE its own special-net gate, so
