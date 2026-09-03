@@ -1,36 +1,31 @@
-//! Repairs the two Reforger 1.8.0.10 defects that kill radio VON until a radio is
-//! power-cycled or a relay entity exists in the world (issue #4 research):
+//! Radio VON prerequisites and receive-health telemetry.
 //!
-//! 1. Game Master and custom terrain worlds ship without a RadioManagerEntity.
-//!    The game mode hook below spawns the vanilla prefab server-side when absent.
-//!    FIELD REALITY (2026-08-24, server logs from every fleet box): on any
-//!    populated world the null check reads "already present" and the spawn
-//!    never runs - ChimeraWorld.GetRadioManager() returns a non-null native
-//!    stub once any radio initialized before the check, whether or not the
-//!    entity exists. Radio VON demonstrably works fleet-wide without the
-//!    entity, so this path is a safety net for genuinely empty worlds (where
-//!    the getter does return null - observed in Workbench), not the
-//!    load-bearing repair it was designed as. The getter can NEVER prove the
-//!    entity exists, and on manager-less worlds calling methods on its
-//!    non-null result is a native access violation (the 2026-08-21 CTD).
+//! HISTORY. Reforger 1.8.0.10 shipped a native receiver-registration defect: an already-powered
+//! radio could miss receiver registration around the time its VON entry registered - it
+//! transmitted but never received until power-cycled. From 2026-08-20 to the 1.8.0.13 update
+//! this file carried the repair the community fix mods converged on (a silent 150 ms power
+//! cycle per radio 3 s after its VON entry registered, with restore retries, entry-usability
+//! re-sync, a replicated ready flag to re-cycle radios that registered before the manager
+//! existed, and a spectator ghost-radio variant in EC29_SpectatorVonService). 1.8.0.13
+//! ("Fixed: Radio would not work sometimes") was measured with that repair switched off - the
+//! registration probe reported every carried radio REGISTERED and the RX heartbeat stayed
+//! silent under live traffic - and the repair machinery was removed. The git history holds
+//! the whole implementation if the defect ever returns; the heartbeat below is the detector
+//! that would say so.
 //!
-//! 2. An already-powered radio can miss receiver registration with the native
-//!    radio system around the time its VON entry registers: it transmits but never
-//!    receives, and a manual off/on repairs it. The receiver guard below reproduces
-//!    that off/on transition once per radio shortly after its VON entry registers -
-//!    the pattern every community 1.8 fix mod converged on.
-//!
-//! The registry-verification variant shipped in v1.0.3 ("cycle only radios provably
-//! missing from the native registry") is gone deliberately: on a client whose world
-//! loaded without a RadioManagerEntity, ChimeraWorld.GetRadioManager() still
-//! returns non-null, and calling GetTransceiversInRange on that handle is a native
-//! access violation - a guaranteed client CTD on exactly the GM worlds this file
-//! exists to repair (2026-08-21 field crashes). No runtime signal distinguishes a
-//! usable manager from that degraded handle, so the guard must never query it.
-//!
-//! Both defects are native-code regressions: the 1.7.0.54 -> 1.8.0.10 script diff
-//! (BohemiaInteractive/Arma-Reforger-Script-Diff) contains no functional change in
-//! the radio/VON chain.
+//! WHAT REMAINS.
+//! 1. Game Master and custom terrain worlds can ship without a RadioManagerEntity. The game
+//!    mode hook spawns the vanilla prefab server-side when absent. FIELD REALITY (2026-08-24,
+//!    every fleet box): on any populated world ChimeraWorld.GetRadioManager() returns a
+//!    non-null native stub once any radio initialized before the check, so the spawn only ever
+//!    runs on genuinely empty worlds (observed in Workbench). The getter can NEVER prove the
+//!    entity exists, and on manager-less worlds calling methods on its non-null result is a
+//!    native access violation (the 2026-08-21 CTD) - no code path here or anywhere in EC29
+//!    may call methods on it.
+//! 2. Receive-health telemetry: every powered radio the local controller registers is
+//!    tracked, and a client-side heartbeat WARNs on any powered, tuned radio that has gone
+//!    5 minutes without a single voice packet. A quiet net is normal; a warning while others
+//!    were transmitting on that net is the field signature of a dead receiver.
 
 //------------------------------------------------------------------------------------------------
 //! Server-side: guarantee the radio VON prerequisite entity exists in every world.
@@ -95,71 +90,48 @@ modded class SCR_BaseGameMode
 
         Print("[EC29-DBG][RadioGuard] World had no RadioManagerEntity (radio VON prerequisite, absent from GM/custom worlds) - spawned vanilla prefab", LogLevel.WARNING);
     }
-
 }
 
 //------------------------------------------------------------------------------------------------
-//! Client and server: power-cycle each radio once shortly after its VON entry
-//! registers, reproducing the manual off/on that repairs the 1.8 receiver defect.
-//! Owned by EC29_RadioState (world-scoped - state discards with the world).
+//! Client and server: track every powered radio whose VON entry registers, for the
+//! receive-health heartbeat. Owned by EC29_RadioState (world-scoped - state discards with the
+//! world). The name is historical: this class carried the 1.8 receiver repair until 1.8.0.13.
 class EC29_RadioReceiverGuard
 {
-    //! Native radio setup continues after AddEntry; earlier cycles get overwritten
-    //! (community-established timing - shorter delays lose the repair).
-    protected static const int STABILIZATION_DELAY_MS = 3000;
-    //! Separate call-queue turn so the native side actually unregisters the receiver.
-    protected static const int POWER_OFF_MS = 150;
-    //! An owner that is transiently invalid at restore time (inventory transfer
-    //! or spawn streaming landing inside the off-window) gets retried instead
-    //! of abandoned - abandoning leaves a radio this guard switched off stuck
-    //! OFF with no trace: deaf RX plus key-ups silently rerouting to direct
-    //! speech (2026-08-24 field case, dead RX all session).
-    protected static const int RESTORE_RETRY_MS = 500;
-    protected static const int RESTORE_MAX_ATTEMPTS = 4;
     //! Receive-health telemetry: a powered, tuned radio that has gone this long
     //! without a single voice packet is either on a quiet net or holding a dead
-    //! receiver. The log line is the field signature this class was missing -
-    //! Chan's 2026-08-24 dead-RX session produced zero EC29 lines.
+    //! receiver. The log line is the field signature the 1.8 defect never had -
+    //! the 2026-08-24 dead-RX session produced zero EC29 lines.
     protected static const int RX_HEARTBEAT_INTERVAL_MS = 300000;
 
-    //! Dedupe: multiple VON entries share one physical radio; cycle each radio once.
-    protected ref array<BaseRadioComponent> m_aScheduledRadios = {};
+    //! Multiple VON entries share one physical radio; track each radio once.
+    protected ref array<BaseRadioComponent> m_aTrackedRadios = {};
     protected bool m_bHeartbeatRunning;
 
     //------------------------------------------------------------------------------------------------
     void OnRadioEntryAdded(notnull BaseTransceiver transceiver)
     {
-        // Another system's net: a silent 150 ms power cycle would drop their
-        // reception and re-key state - whoever owns that radio's lifecycle
-        // owns its repair (observed in the field: a 29000 kHz cycle). For the
-        // spectator ghost radio that owner is EC29's own spectator voice
-        // service, which holds the mute state this cycle used to fight - hand
-        // it the entry so ITS repair anchors on AddEntry like every other
-        // radio's, instead of on the camera's later body registration. The
-        // service ignores the call unless the local player is spectating.
+        // Another system's net (spectator ghost radio, third-party special nets):
+        // its traffic pattern is not ours to judge, so it is not tracked.
         if (EC29_CoexistenceGuard.EC29_IsSpecialNet(transceiver))
-        {
-            EC29_RadioState.GetInstance().SpectatorVon().OnSpecialNetEntryAdded(transceiver);
             return;
-        }
 
         BaseRadioComponent radio = transceiver.GetRadio();
         if (!radio || radio.IsEditorRadio() || !radio.IsPowered())
             return;
 
-        // Deleted radios null their handles; sweep them so the dedupe list
-        // cannot grow for the world lifetime.
-        for (int i = m_aScheduledRadios.Count() - 1; i >= 0; i--)
+        // Deleted radios null their handles; sweep them so the list cannot
+        // grow for the world lifetime.
+        for (int i = m_aTrackedRadios.Count() - 1; i >= 0; i--)
         {
-            if (!m_aScheduledRadios[i])
-                m_aScheduledRadios.Remove(i);
+            if (!m_aTrackedRadios[i])
+                m_aTrackedRadios.Remove(i);
         }
 
-        if (m_aScheduledRadios.Contains(radio))
+        if (m_aTrackedRadios.Contains(radio))
             return;
 
-        m_aScheduledRadios.Insert(radio);
-        GetGame().GetCallqueue().CallLater(CycleRadio, STABILIZATION_DELAY_MS, false, radio);
+        m_aTrackedRadios.Insert(radio);
 
         EC29_EnsureHeartbeat();
     }
@@ -202,7 +174,7 @@ class EC29_RadioReceiverGuard
         EC29_RadioRxSquelch squelch = EC29_RadioState.GetInstance().Squelch();
         squelch.EC29_SweepDeadRadioRxRecords();
 
-        foreach (BaseRadioComponent radio : m_aScheduledRadios)
+        foreach (BaseRadioComponent radio : m_aTrackedRadios)
         {
             if (!IsRadioAlive(radio) || !radio.IsPowered() || radio.IsEditorRadio())
                 continue;
@@ -214,8 +186,6 @@ class EC29_RadioReceiverGuard
             if (!transceiver || transceiver.GetFrequency() <= 0)
                 continue;
 
-            // Another system's net stays their business (and its traffic
-            // pattern is not ours to judge).
             if (EC29_CoexistenceGuard.EC29_IsSpecialNet(transceiver))
                 continue;
 
@@ -244,100 +214,5 @@ class EC29_RadioReceiverGuard
             return false;
 
         return true;
-    }
-
-    //------------------------------------------------------------------------------------------------
-    protected void CycleRadio(BaseRadioComponent radio)
-    {
-        // A radio the player deliberately powered off is left alone.
-        if (!IsRadioAlive(radio) || !radio.IsPowered())
-            return;
-
-        // Kill-switch (mission header, replicated): with the repair off, the radio is left
-        // exactly as native registration made it, and the RX heartbeat below becomes the
-        // measurement of whether the game fixed the defect. Covers the ready-flag re-cycle
-        // too, since that path lands here as well.
-        EC29_VONSettingsComponent repairSettings = EC29_VONSettingsComponent.GetInstance();
-        if (repairSettings && !repairSettings.EC29_IsReceiverRepairEnabled())
-        {
-            if (EC29_Debug.VERBOSE)
-                Print("[EC29-DBG][RadioGuard] Receiver repair DISABLED by mission settings - radio left untouched (measuring native registration)", LogLevel.NORMAL);
-            return;
-        }
-
-        // A radio that has already delivered voice packets has a provably
-        // registered receiver - the defect this cycle repairs cannot be
-        // present, and the 150 ms off-window is pure risk (2026-08-24 field
-        // case: a fresh spawn's radio received fine at t+0s, was cycled at
-        // t+3s, and never received again).
-        if (EC29_RadioState.GetInstance().Squelch().EC29_GetLastRadioRxMs(radio) >= 0)
-        {
-            if (EC29_Debug.VERBOSE)
-                Print("[EC29-DBG][RadioGuard] Radio already receiving - receiver provably registered, skipping repair cycle", LogLevel.NORMAL);
-            return;
-        }
-
-        if (EC29_Debug.VERBOSE)
-        {
-            int freq = -1;
-            if (radio.TransceiversCount() > 0)
-            {
-                BaseTransceiver tsv = radio.GetTransceiver(0);
-                if (tsv)
-                    freq = tsv.GetFrequency();
-            }
-            PrintFormat("[EC29-DBG][RadioGuard] Power-cycling radio (freq %1 kHz) to re-register its receiver (1.8 registration defect)", freq, level: LogLevel.NORMAL);
-        }
-
-        radio.SetPower(false);
-        GetGame().GetCallqueue().CallLater(RestorePower, POWER_OFF_MS, false, radio);
-    }
-
-    //------------------------------------------------------------------------------------------------
-    protected void RestorePower(BaseRadioComponent radio)
-    {
-        RestorePowerAttempt(radio, 1);
-    }
-
-    //------------------------------------------------------------------------------------------------
-    protected void RestorePowerAttempt(BaseRadioComponent radio, int attempt)
-    {
-        // Deleted radios null their handles - nothing is left powered off.
-        if (!radio)
-            return;
-
-        // Transiently invalid owner (inventory transfer / spawn streaming
-        // landing inside the off-window): retry, never abandon silently -
-        // see RESTORE_RETRY_MS comment for the field case this closes.
-        if (!IsRadioAlive(radio))
-        {
-            if (attempt >= RESTORE_MAX_ATTEMPTS)
-            {
-                Print("[EC29-DBG][RadioGuard] Radio owner never returned during power restore - a radio this guard switched off may be stuck OFF (deaf RX, key-ups fall back to direct speech)", LogLevel.WARNING);
-                return;
-            }
-
-            GetGame().GetCallqueue().CallLater(RestorePowerAttempt, RESTORE_RETRY_MS, false, radio, attempt + 1);
-            return;
-        }
-
-        radio.SetPower(true);
-
-        if (!radio.IsPowered())
-            Print("[EC29-DBG][RadioGuard] SetPower(true) did not stick after the repair cycle - radio remains OFF", LogLevel.WARNING);
-        else if (EC29_Debug.VERBOSE)
-            PrintFormat("[EC29-DBG][RadioGuard] Repair cycle complete (restore attempt %1) - radio back ON", attempt);
-
-        // Entry usability snapshots the power state at entry init or menu
-        // refresh; one taken during the 150 ms off-window silently reroutes
-        // this radio's key-ups to direct speech until the next refresh
-        // (2026-08-23 field case: dead TX, working RX). Re-sync now.
-        PlayerController pc = GetGame().GetPlayerController();
-        if (pc)
-        {
-            SCR_VONController vonController = SCR_VONController.Cast(pc.FindComponent(SCR_VONController));
-            if (vonController)
-                vonController.EC29_ResyncRadioEntries(radio);
-        }
     }
 }

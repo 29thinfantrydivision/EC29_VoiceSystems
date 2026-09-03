@@ -29,7 +29,6 @@ class EC29_VON_Settings : ScriptAndConfig
 		m_bShowVoiceModeInOverlay       = true;
 		m_bGateNameTagVonByRange        = true;
 
-		m_bReceiverRepairEnabled = true;
 	}
 
 	// VoN Range Setings
@@ -82,8 +81,4 @@ class EC29_VON_Settings : ScriptAndConfig
 	// Nametag UI Settings
 	[Attribute(defvalue: "1", uiwidget: UIWidgets.CheckBox, desc: "Suppress the over-head nametag VON icon for direct transmissions when the speaker is out of audible range, so whispers/distant talkers don't reveal themselves visually.", category: "EC29_VON")]
 	bool m_bGateNameTagVonByRange;
-
-	// Radio repair diagnostics (1.8 receiver-registration defect)
-	[Attribute(defvalue: "1", uiwidget: UIWidgets.CheckBox, desc: "Run EC29 receiver-registration repair: a one-time silent power cycle per radio shortly after its VON entry registers (plus the spectator ghost radio). Turn OFF to measure whether a game update fixed the defect natively - with this off, the RX heartbeat WARNING under live traffic is the evidence.", category: "EC29_VON")]
-	bool m_bReceiverRepairEnabled;
 }
