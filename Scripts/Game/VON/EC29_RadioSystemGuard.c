@@ -294,6 +294,18 @@ class EC29_RadioReceiverGuard
         if (!IsRadioAlive(radio) || !radio.IsPowered())
             return;
 
+        // Kill-switch (mission header, replicated): with the repair off, the radio is left
+        // exactly as native registration made it, and the RX heartbeat below becomes the
+        // measurement of whether the game fixed the defect. Covers the ready-flag re-cycle
+        // too, since that path lands here as well.
+        EC29_VONSettingsComponent repairSettings = EC29_VONSettingsComponent.GetInstance();
+        if (repairSettings && !repairSettings.EC29_IsReceiverRepairEnabled())
+        {
+            if (EC29_Debug.VERBOSE)
+                Print("[EC29-DBG][RadioGuard] Receiver repair DISABLED by mission settings - radio left untouched (measuring native registration)", LogLevel.NORMAL);
+            return;
+        }
+
         // A radio that has already delivered voice packets has a provably
         // registered receiver - the defect this cycle repairs cannot be
         // present, and the 150 ms off-window is pure risk (2026-08-24 field

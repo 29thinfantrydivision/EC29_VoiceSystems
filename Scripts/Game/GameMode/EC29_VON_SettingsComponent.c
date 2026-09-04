@@ -22,6 +22,12 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 	[RplProp()] protected bool m_bGateNameTagVonByRange        = true;
 	[RplProp()] protected bool m_bShowVoiceModeInOverlay       = true;
 
+	//! Kill-switch for the 1.8 receiver-registration repair cycles (guard + spectator ghost
+	//! radio). Mission-header seeded, replicated, default ON. The measuring instrument for
+	//! "did the game update fix it natively": with this OFF, radios are left untouched and the
+	//! RX heartbeat WARNING reports what native registration actually did.
+	[RplProp()] protected bool m_bReceiverRepairEnabled = true;
+
 	//! Server flips this when the game mode's radio-system check has run at
 	//! world start. The native getter cannot actually prove the entity exists
 	//! (it returns non-null on any world where a radio initialized first -
@@ -92,6 +98,12 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 	bool GetHideRoleInVonOverlay()         { return m_bHideRoleInVonOverlay; }
 	bool GetGateNameTagVonByRange()        { return m_bGateNameTagVonByRange; }
 	bool GetShowVoiceModeInOverlay()       { return m_bShowVoiceModeInOverlay; }
+
+	//------------------------------------------------------------------------------------------------
+	bool EC29_IsReceiverRepairEnabled()
+	{
+		return m_bReceiverRepairEnabled;
+	}
 
 	//------------------------------------------------------------------------------------------------
 	//! Server-side: mark the radio system usable and notify all machines.
@@ -226,6 +238,7 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 		m_bHideRoleInVonOverlay        = src.m_bHideRoleInVonOverlay;
 		m_bGateNameTagVonByRange       = src.m_bGateNameTagVonByRange;
 		m_bShowVoiceModeInOverlay      = src.m_bShowVoiceModeInOverlay;
+		m_bReceiverRepairEnabled       = src.m_bReceiverRepairEnabled;
 
 		Replication.BumpMe();
 	}
