@@ -76,7 +76,6 @@ modded class SCR_BaseGameMode
         {
             if (EC29_Debug.VERBOSE)
                 Print("[EC29-DBG][RadioGuard] RadioManagerEntity already present in world", LogLevel.NORMAL);
-            EC29_MarkRadioSystemReady();
             return;
         }
 
@@ -95,21 +94,8 @@ modded class SCR_BaseGameMode
         }
 
         Print("[EC29-DBG][RadioGuard] World had no RadioManagerEntity (radio VON prerequisite, absent from GM/custom worlds) - spawned vanilla prefab", LogLevel.WARNING);
-        EC29_MarkRadioSystemReady();
     }
 
-    //------------------------------------------------------------------------------------------------
-    //! Flip the replicated ready flag so every machine - including any client
-    //! whose radios registered before the manager existed - re-runs the
-    //! receiver repair against a radio system that can actually hold it.
-    protected void EC29_MarkRadioSystemReady()
-    {
-        EC29_VONSettingsComponent settings = EC29_VONSettingsComponent.GetInstance();
-        if (settings)
-            settings.EC29_MarkRadioSystemReady();
-        else
-            Print("[EC29-DBG][RadioGuard] Radio system up but EC29_VONSettingsComponent missing - clients will not be told to re-verify radios", LogLevel.WARNING);
-    }
 }
 
 //------------------------------------------------------------------------------------------------
@@ -138,34 +124,7 @@ class EC29_RadioReceiverGuard
 
     //! Dedupe: multiple VON entries share one physical radio; cycle each radio once.
     protected ref array<BaseRadioComponent> m_aScheduledRadios = {};
-    protected bool m_bRadioSystemReadySeen;
     protected bool m_bHeartbeatRunning;
-
-    //------------------------------------------------------------------------------------------------
-    //! Server confirmed the RadioManagerEntity exists (replicated ready flag).
-    //! Radios cycled before that confirmation were repaired into a possibly
-    //! manager-less radio system; cycle them once more now that registration
-    //! can stick. Radios scheduled after this point get their normal
-    //! entry-add cycle, so the one-shot flag is enough.
-    void OnRadioSystemReady()
-    {
-        if (m_bRadioSystemReadySeen)
-            return;
-        m_bRadioSystemReadySeen = true;
-
-        int recycled = 0;
-        foreach (BaseRadioComponent radio : m_aScheduledRadios)
-        {
-            if (!radio)
-                continue;
-
-            GetGame().GetCallqueue().CallLater(CycleRadio, STABILIZATION_DELAY_MS, false, radio);
-            recycled++;
-        }
-
-        if (recycled > 0)
-            PrintFormat("[EC29-DBG][RadioGuard] Radio system ready - re-cycling %1 radio(s) that registered before the manager was confirmed", recycled, level: LogLevel.WARNING);
-    }
 
     //------------------------------------------------------------------------------------------------
     void OnRadioEntryAdded(notnull BaseTransceiver transceiver)
