@@ -38,7 +38,7 @@ The 2026-08-24 Master Sync plan proposed EC29 as single VON authority across thr
 
 | Resource | GUID | Notes |
 |---|---|---|
-| `Prefabs/Items/Core/EC29_Radio_Spectator.et` | `FD81CA0FE2BAED7C` | Byte-identical to the spectator mod's `Radio_spectator.et`: 29000 kHz / 50 km / `SPEC29_KEY`, powered. Those three values are the **interop ABI** — changing any of them is a cross-mod breaking change. |
+| `Prefabs/Items/Core/EC29_Radio_Spectator.et` | `FD81CA0FE2BAED7C` | Byte-identical to the spectator mod's `Radio_spectator.et`: 29000 kHz / `SPEC29_KEY`, powered. Those two values are the **interop ABI** — changing either is a cross-mod breaking change. Range is a tunable: 50 km until 2026-09-05, then 2 km (server-FPS experiment; see `EC29_SpectatorVonService.c` header). |
 | `Sounds/VON/EC29_SpectatorVon.acp` | `5C819950A693EB52` | Hearing tier: vanilla VON graph, innerRange 40 / outerRange 68. |
 | `Sounds/VON/EC29_SpectatorVonQuiet.acp` | `6BA89BD90EA9220F` | Talk tier: innerRange 0 / outerRange 0.0001. |
 | `Scripts/Game/VON/EC29_SpectatorVonTiers.c` | — | `EC29_VoNSpectator` / `EC29_VoNSpectatorQuiet` empty component subclasses. |
