@@ -17,13 +17,20 @@
 //! CM_DIRECT fallback guard's root cause was never established, so "cleanup" of that path is
 //! banned - see SetTransmitting.
 //!
-//! THE INTEROP ABI: the spectator net is a radio with encryption key "SPEC29_KEY" at 29000 kHz
-//! with 50 km range. Privacy is the ENCRYPTION KEY, not the frequency. Those three values are
-//! shared identity between this mod and the spectator mod - EC29_Radio_Spectator.et carries the
-//! same triple as the spectator mod's Radio_spectator.et, and EC29's special-net heuristic
+//! THE INTEROP ABI: the spectator net is a radio with encryption key "SPEC29_KEY" at 29000 kHz.
+//! Privacy is the ENCRYPTION KEY, not the frequency. Those two values are shared identity
+//! between this mod and the spectator mod - EC29_Radio_Spectator.et carries the same pair as
+//! the spectator mod's Radio_spectator.et, and EC29's special-net heuristic
 //! (EC29_CoexistenceGuard.EC29_IsSpecialNet: below 30000 kHz, or ranged past 10 km) exempts any
 //! such radio from guard power-cycling, retune, alternate PTT, squelch and RF simulation.
-//! Changing any of the three values is a cross-mod breaking change.
+//! Changing either value is a cross-mod breaking change.
+//!
+//! RANGE IS A TUNABLE, NOT ABI. It shipped at 50 km (map-wide) and was cut to 2 km on
+//! 2026-09-05 as the first experiment against a server-side stall: with spectators keying the
+//! net, the dedicated server's frame rate fell to ~2 FPS. EC29 runs no per-packet work on a
+//! server (OnReceive exits with no local PlayerController), so the suspect is the engine's own
+//! relay over a 50 km sphere that covers every transceiver on the map. The 29000 kHz floor
+//! keeps the net special at any range, so this change is invisible to the heuristic.
 //!
 //! WHY STATE IS DERIVED, NOT LATCHED. SCR_VONController lives on the player controller, which
 //! outlives every life - a session-lifetime boolean that gates voice behaviour permanently mutes

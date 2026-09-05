@@ -19,7 +19,9 @@ class EC29_CoexistenceGuard
 	//! nets do (the spectator system's ghost radio sits at 29000 kHz).
 	protected static const int EC29_SPECIAL_NET_BAND_FLOOR_KHZ = 30000;
 	//! No physical radio in the modset reaches past ~6 km; a transceiver
-	//! engineered far beyond that (spectator ghost: 50 km) is a magic net.
+	//! engineered far beyond that is a magic net. (The spectator ghost radio
+	//! sat here at 50 km until 2026-09-05; it is now 2 km and relies on the
+	//! frequency floor above instead.)
 	protected static const float EC29_SPECIAL_NET_RANGE_M = 10000.0;
 
 	//------------------------------------------------------------------------------------------------

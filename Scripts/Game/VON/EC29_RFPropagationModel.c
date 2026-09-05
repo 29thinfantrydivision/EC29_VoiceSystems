@@ -19,7 +19,8 @@ class EC29_RFPropagationModel
 
     //! Beyond this separation the terrain model is skipped entirely. Real
     //! transceivers cap out around 2 km, so anything farther is a special net
-    //! (spectator/admin radios advertise 50 km) - and marching 200 terrain
+    //! (admin radios advertise 50 km; the spectator ghost did until 2026-09-05)
+    //! - and marching 200 terrain
     //! samples across the whole map, likely through unloaded cells, is exactly
     //! the load pattern behind the 2026-08-23 server stalls when spectators
     //! talked. Special nets get clean audio instead of a terrain simulation.
