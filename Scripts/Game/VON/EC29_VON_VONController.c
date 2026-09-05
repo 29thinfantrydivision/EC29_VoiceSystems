@@ -42,7 +42,7 @@ modded class SCR_VONController
 
     //------------------------------------------------------------------------------------------------
     //! Every radio VON entry passes through here on client and server; hand the
-    //! radio to the receiver guard (1.8 receiver-registration repair - see
+    //! radio to the receive-health tracker (RX heartbeat - see
     //! EC29_RadioSystemGuard.c).
     override void AddEntry(SCR_VONEntry entry)
     {
@@ -131,11 +131,12 @@ modded class SCR_VONController
     //! Vanilla's transmit gate silently reroutes to direct speech when the
     //! active entry is flagged unusable. Entry usability is a snapshot of the
     //! radio's power state taken at entry init or menu refresh - a refresh
-    //! landing inside the receiver guard's 150 ms power-off window latches the
-    //! entry unusable while the radio itself is powered and receiving: dead TX,
-    //! working RX, no feedback (2026-08-23 field case). Re-sync the flag from
-    //! the actual power state at the moment of use, so a stale snapshot can
-    //! never eat a key-up.
+    //! landing while the radio was momentarily off latches the entry unusable
+    //! after it is powered again and receiving: dead TX, working RX, no
+    //! feedback (2026-08-23 field case, then caused by the since-removed repair
+    //! cycle; a manual off/on with a menu refresh in between produces the same
+    //! stale snapshot). Re-sync the flag from the actual power state at the
+    //! moment of use, so a stale snapshot can never eat a key-up.
     override protected void SetVONBroadcast(bool activate, EVONTransmitType transmitType = EVONTransmitType.CHANNEL)
     {
         if (activate && m_ActiveEntry && !m_ActiveEntry.IsUsable() && !EC29_CoexistenceGuard.ShouldYieldRadio())
@@ -316,37 +317,6 @@ modded class SCR_VONController
         return FindEntryByFrequency(frequency);
     }
 
-    //! Re-sync usability for every entry of one physical radio from its actual
-    //! power state. The receiver guard calls this after restoring power, so an
-    //! entry that snapshotted "unpowered" during the 150 ms cycle window does
-    //! not stay dead until the next menu refresh.
-    void EC29_ResyncRadioEntries(BaseRadioComponent radio)
-    {
-        if (!radio)
-            return;
-
-        array<ref SCR_VONEntry> entries = {};
-        GetVONEntries(entries);
-
-        foreach (SCR_VONEntry entry : entries)
-        {
-            SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(entry);
-            if (!radioEntry)
-                continue;
-
-            BaseTransceiver transceiver = radioEntry.GetTransceiver();
-            if (!transceiver || transceiver.GetRadio() != radio)
-                continue;
-
-            if (radioEntry.IsUsable() != radio.IsPowered())
-            {
-                radioEntry.SetUsable(radio.IsPowered());
-                if (EC29_Debug.VERBOSE)
-                    PrintFormat("[EC29-DBG][RadioTX] Entry usability re-synced after power cycle (freq %1 kHz, usable=%2)", transceiver.GetFrequency(), radio.IsPowered());
-            }
-        }
-    }
-
     //! ------------------------------------------------------------------------------------------
     //! Spectator voice primitives (consumed by EC29_SpectatorVonService).
     //!
@@ -362,9 +332,9 @@ modded class SCR_VONController
     //! it leaks anyway. Receiving is untouched - usability is consulted only on the transmit
     //! path - which is what leaves a spectator able to hear everything while saying nothing.
     //!
-    //! SAFE FOR EC29'S OWN USABILITY MACHINERY, verified: both EC29 re-sync sites
-    //! (SetVONBroadcast above and EC29_ResyncRadioEntries) cast to SCR_VONEntryRadio before
-    //! touching usability, so neither can ever re-arm the plain direct-speech entry this locks.
+    //! SAFE FOR EC29'S OWN USABILITY MACHINERY, verified: EC29's usability re-sync site
+    //! (SetVONBroadcast above) casts to SCR_VONEntryRadio before touching usability, so it can
+    //! never re-arm the plain direct-speech entry this locks.
     //!
     //! MUST BE RESTORED ON THE WAY OUT. This controller lives on the player controller, which
     //! outlives any single life, so a spectator who is never re-enabled stays mute for the rest
