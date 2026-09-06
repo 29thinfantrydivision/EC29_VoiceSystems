@@ -25,11 +25,21 @@
 //! note in this repo claimed: vanilla character voice is curve "1/r", outerRange 40, slopeFactor 11
 //! - silent at 40 m, not 68. So ours is already louder than vanilla across vanilla's whole range.
 //!
-//! A slopeFactor override was tried on 2026-09-06 against a reported cutoff at 40 m and changed
-//! NOTHING, so it was removed rather than left as an unexplained difference from the configuration
-//! that worked in the spectator-body era. If the cutoff is chased again, first establish whether
-//! direct packets even arrive past 40 m - the EC29 RX activity log line answers that - because a
-//! listener curve cannot shape audio the engine never delivered.
+//! HEARING STOPS DEAD AT 40 m AND THIS NODE DOES NOT CONTROL THAT (field-measured 2026-09-06).
+//! Two experiments, both negative: overriding slopeFactor changed nothing, and raising innerRange
+//! to 60 changed nothing - the ceiling stayed at 40 either way. Both were reverted rather than
+//! left as unexplained differences from the configuration that worked in the spectator-body era.
+//!
+//! Two explanations survive and the tests above cannot separate them: either the engine stops
+//! DELIVERING direct speech around 40 m, in which case no listener curve can shape audio that
+//! never arrived; or this node is not in the playback path at all and the stock amplitude (which
+//! inherits outerRange 40) is what you hear. The one measurement that separates them is whether
+//! a direct packet arrives at all from a speaker 60-80 m away - EC29's RX activity log line
+//! reports exactly that - so run it before touching these numbers again.
+//!
+//! What DOES work and is not in question: a spectator hears at full volume across the whole
+//! delivered range, whisper included, because EC29 holds its range gain at 1.0 for a spectating
+//! listener. That is the "louder than usual" half of the requirement and it is script-side.
 //!
 //! THE EAR ALSO PROTECTS REAL GAME MASTERS. Vanilla's SCR_EditorManagerEntity.Open() wires editor
 //! voice through FindComponent(SCR_VoNComponent), which returns that same first component - so
