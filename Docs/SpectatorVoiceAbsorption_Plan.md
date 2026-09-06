@@ -58,7 +58,7 @@ Receiver guard decision tree, ready flag and `STABILIZATION_DELAY_MS` untouched;
 ## 2026-09-05 - manager model (supersedes the ghost radio)
 
 Spectator voice is anchored to the player's own **editor manager entity**, never opened: `EC29_EditorManager.et`
-(routed to every player by `EC29_EditorSettingsEntity`) adds a 29000 kHz / 4 km `RadioTransceiver` and the quiet
+(routed to every player by `EC29_EditorSettingsEntity`) adds a 29000 kHz / 5 km `RadioTransceiver` and the quiet
 transmit tier to the vanilla manager. The service wires it the way `SCR_EditorManagerEntity.Open()` wires voice.
 The engine's active-editor question is answered from a flag replicated on the manager (`EC29_EditorManagerEntity`);
 power, interpolation and position snaps are authored on the server (`EC29_SpectatorVoiceController`). Spectator

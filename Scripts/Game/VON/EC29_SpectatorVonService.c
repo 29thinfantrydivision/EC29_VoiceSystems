@@ -333,7 +333,21 @@ class EC29_SpectatorVonService
 				quiet.DisconnectEditorFromVoNSystem();
 
 			BaseRadioComponent radio = BaseRadioComponent.Cast(mgr.FindComponent(BaseRadioComponent));
+
+			// Session mutes off (a Game Master's editor channels come back), the spectator net
+			// muted and the LOCAL radio copy unpowered. The server unpowers its copy through
+			// EC29_AskSpectatorVoice below and the cleared flag stops routing - but a living player's
+			// own manager radio must not sit powered and unmuted on the spectator net for the length
+			// of two round trips, or ever if one is lost: the dead audible to the living is the one
+			// failure this system exists to prevent. Skipped while a real editor is open: vanilla owns
+			// power then, and Open() muted the net itself. Re-entry re-derives both (ApplyMuteSync,
+			// SetPower in EnterSpectate).
 			SetOtherChannelsMuted(radio, null, false);
+			BaseTransceiver net = SpectatorTransceiver(radio);
+			if (net && !net.IsMuted())
+				net.SetMuteState(true);
+			if (radio && radio.IsPowered() && !mgr.IsOpened())
+				radio.SetPower(false);
 		}
 
 		if (ctl)
@@ -482,7 +496,36 @@ class EC29_SpectatorVonService
 		if (!m_bSpectating)
 			return;
 
+		// SELF-HEALING AUTO-EXIT. A LIVE character arriving under local control while this service
+		// still thinks it is spectating means the caller's exit path was missed (crash teardown, a
+		// refactor dropping a Leave call). Running spectator state forward from here would re-lock
+		// direct speech on a living player - SCR_VONController outlives the life, so that is a
+		// session-long mute. Unambiguous now that no ghost body exists: a spectator controls
+		// nothing, and everything on the way in is a corpse or null. Corpses and null are NOT exits.
+		if (to && IsAliveCharacter(to))
+		{
+			Print("[EC29-DBG][SpecVon] Live character under control while spectator voice active - auto-exiting spectator voice (missed ExitSpectate upstream?)", LogLevel.WARNING);
+			ExitSpectate();
+			return;
+		}
+
 		GetGame().GetCallqueue().CallLater(Reassert, 0, false);
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Alive test for the self-heal only: a corpse is a character too, so life state - not
+	//! character-ness - is what separates a respawn from the dead-entity shuffle on the way in.
+	protected bool IsAliveCharacter(IEntity ent)
+	{
+		ChimeraCharacter character = ChimeraCharacter.Cast(ent);
+		if (!character)
+			return false;
+
+		CharacterControllerComponent cc = character.GetCharacterController();
+		if (!cc)
+			return false;
+
+		return cc.GetLifeState() == ECharacterLifeState.ALIVE;
 	}
 
 	//------------------------------------------------------------------------------------------------
