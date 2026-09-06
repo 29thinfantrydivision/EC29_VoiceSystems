@@ -1,77 +1,68 @@
 //------------------------------------------------------------------------------------------------
 //! EC29_SpectatorVonService - spectator voice, owned by EC29.
 //!
-//! The spectator mod (29th_Spectator_V3) owns spectator LIFECYCLE and INPUT; this service owns
-//! spectator VOICE. The state machine, the direct-speech concealment, the tier swap and the
-//! push-to-talk pipeline all live here; the spectator mod's camera calls in through five
-//! methods (EnterSpectate / RegisterSpectatorBody / SetTransmitting / SetReceiveEnabled /
-//! ExitSpectate) and passes its own body, tier components and radio. The service is
-//! component-agnostic on purpose: during the delegation phase the spectator mod registers its
-//! own resources, and after its voice stack is deleted it registers the EC29-shipped ones
-//! (EC29_VoNSpectator tiers + EC29_Radio_Spectator.et). No EC29 code references any spectator-mod
-//! type - the dependency points the other way only.
+//! Whatever runs the spectating (a spectator mod, any camera-driven observer mode) owns LIFECYCLE,
+//! INPUT and CAMERA; this service owns VOICE. Voice is anchored to the player's own editor manager
+//! entity WITHOUT opening the editor: every player has one, and it already carries a radio, a VoN
+//! component and network movement. EC29_EditorManager.et (routed to every player by
+//! EC29_EditorSettingsEntity) adds the spectator transceiver, the ear and the quiet transmit tier.
+//! The caller uses six methods - EnterSpectate, FollowCamera, SetTransmitting, SetReceiveEnabled,
+//! ExitSpectate, IsSpectating - and passes nothing but its camera. No character is involved here.
 //!
-//! Every non-obvious rule in this file was learned in the field by the absorbed implementation
-//! (29th_Spectator_V3, SPEC29_Camera.c voice section) and is carried over with its original
-//! reasoning. The push-to-talk path in particular is under a VERBATIM-INVARIANT rule: the
-//! CM_DIRECT fallback guard's root cause was never established, so "cleanup" of that path is
-//! banned - see SetTransmitting.
+//! FIELD RULES (2026-09-05, Workbench host + Peer Tool client; each one cost a run):
+//!  - The engine plays an incoming stream through the FIRST VoN component on the manager, and an
+//!    entity orders its components BY CLASS NAME. That first component's own audible range gates
+//!    delivery, so a near-silent tier sitting in front of the real one makes the spectator deaf no
+//!    matter which component is connected, selected or listed first in the prefab (cost: a full
+//!    session of runs, 2026-09-05). EC29_VoNSpectatorLoud exists to own that slot - see
+//!    EC29_SpectatorVonTiers.c. It must also be ConnectEditorToVoNSystem'd on the receiving client.
+//!  - A component connected as an editor gets SQUAD_RADIO rewritten to GAME_MASTER_RADIO by the
+//!    engine; both are radio paths. Transmit goes through the QUIET tier so the local emission
+//!    every radio transmission carries stays inaudible to the living.
+//!  - On this path a NON-blank encryption key reaches NOBODY (not even a same-keyed receiver);
+//!    a blank key reaches every powered receiver on the frequency. Privacy is the frequency (no
+//!    player radio tunes below 30000 kHz) plus receivers: a living player's manager radio is
+//!    unpowered, a Game Master's spectator transceiver is muted (EC29_EditorManagerEntity).
+//!  - Radio state on a client-owned manager is owner-authoritative as the server sees it: key
+//!    and range come from the prefab, power is set by the SERVER (EC29_SpectatorVoiceController).
+//!  - The server copy of the manager moves only through the movement interpolator at a capped
+//!    speed (a teleport left it 13 km behind; interpolation off parks it at the origin), so the
+//!    owner snaps it through the server per 25 m of camera travel.
+//!  - The engine's "is this an active editor" question is answered from a flag replicated on the
+//!    manager itself (EC29_EditorManagerEntity) - remote controllers do not exist on clients.
+//!  - The editor channel (frequency 0) ignores keys and frequency and is shared with real GMs;
+//!    it and the faction channels are muted for spectators. The spectator net is NOT one of them:
+//!    it is an ordinary RadioTransceiver we add to the manager's radio, and SpectatorTransceiver
+//!    finds it by skipping every EditorTransceiver and EditorFactionTransceiver. Range is 5000 m,
+//!    vanilla's own maximum (the large transmitter tower); no player radio exceeds 2000 m.
 //!
-//! THE INTEROP ABI: the spectator net is a radio with encryption key "SPEC29_KEY" at 29000 kHz.
-//! Privacy is the ENCRYPTION KEY, not the frequency. Those two values are shared identity
-//! between this mod and the spectator mod - EC29_Radio_Spectator.et carries the same pair as
-//! the spectator mod's Radio_spectator.et, and EC29's special-net heuristic
-//! (EC29_CoexistenceGuard.EC29_IsSpecialNet: below 30000 kHz, or ranged past 10 km) exempts any
-//! such radio from guard power-cycling, retune, alternate PTT, squelch and RF simulation.
-//! Changing either value is a cross-mod breaking change.
-//!
-//! RANGE IS A TUNABLE, NOT ABI. It shipped at 50 km (map-wide) and was cut to 2 km on
-//! 2026-09-05 as the first experiment against a server-side stall: with spectators keying the
-//! net, the dedicated server's frame rate fell to ~2 FPS. EC29 runs no per-packet work on a
-//! server (OnReceive exits with no local PlayerController), so the suspect is the engine's own
-//! relay over a 50 km sphere that covers every transceiver on the map. The 29000 kHz floor
-//! keeps the net special at any range, so this change is invisible to the heuristic.
-//!
-//! WHY STATE IS DERIVED, NOT LATCHED. SCR_VONController lives on the player controller, which
-//! outlives every life - a session-lifetime boolean that gates voice behaviour permanently mutes
-//! anyone whose exit path misses one restore (that bug class shipped once in the spectator mod's
-//! own history). So the vanilla-action block re-derives "is the local player driving the
-//! registered ghost" on every call and self-heals by construction: the body handle nulls when
-//! the entity is deleted, and everything degrades to vanilla behaviour instead of a
-//! session-long mute. The one unavoidable latch - the direct-speech usability kill, which
-//! vanilla consults on its transmit path - is re-asserted per controlled-entity change while
-//! spectating, unconditionally restored on exit, and covered by a self-healing auto-exit if a
-//! live character shows up while the service still thinks it is spectating.
-//!
-//! Owned by EC29_RadioState (world-scoped, rebuilt on world change), so no state here survives
-//! a scenario change. Client-side by nature: every path starts from the local PlayerController,
-//! so on a dedicated server every method no-ops.
+//! Owned by EC29_RadioState (world-scoped, rebuilt on world change): no state here survives a
+//! scenario change or a Workbench game reload. Client-side by nature.
 //------------------------------------------------------------------------------------------------
 class EC29_SpectatorVonService
 {
+	static const int EC29_SPECTATOR_NET_KHZ = 29000;
+	protected static const string EC29_LISTENING_VAR  = "EC29_SpectatorListening";
+	protected static const string EC29_LISTENING_CONF = "{33A27275C95E0302}Sounds/VON/EC29_LocalVariables_VON.conf";
+
+	protected static const float SNAP_DIST_M = 25;
+	protected static const float SNAP_MIN_MS = 200;
+	protected static const int POWER_RETRY_MS = 1000;
+	protected static const int POWER_RETRY_MAX = 5;
+
 	protected bool m_bSpectating;
 	protected bool m_bNetEnabled = true;
 	protected bool m_bSubscribed;
-
-	//! True from successful capture start to key-up. Local audible range follows the
-	//! CONTROLLER'S ACTIVE COMPONENT, not the capturing one (field-observed: switching the
-	//! controller back to normal "restored full audible range on a capture that was still
-	//! running") - so while this is set, the deferred re-assert must never select the normal
-	//! tier: a changed-handle registration on the same press (a late-streaming radio healing at
-	//! key-down) queues one, and it would land one frame into the hold.
 	protected bool m_bTransmitting;
+	protected bool m_bListeningVarSet;
 
-	//! All four are plain engine handles, not owned refs - they auto-null when the entity or
-	//! component is deleted, which is exactly the degradation the derived checks rely on.
-	protected IEntity m_SpectatorBody;
-	protected SCR_VoNComponent m_NormalTier;
-	protected SCR_VoNComponent m_QuietTier;
-	protected BaseRadioComponent m_Radio;
+	protected vector m_vLastSnapPos;
+	protected bool m_bHasSnapPos;
+	protected float m_fLastSnapMs;
 
 	//------------------------------------------------------------------------------------------------
-	//! True while the local player is driving the REGISTERED spectator ghost. This is the gate the
-	//! vanilla VON action blocks and the alternate-PTT poll consult - re-derived on every call, so a
-	//! deleted body or a missed exit degrades to vanilla behaviour rather than a stuck block.
+	//! Gate for the vanilla VON action blocks in EC29_VON_VONController: a spectator has no vanilla
+	//! voice, radio or direct.
 	static bool EC29_ShouldBlockVanillaVonActions()
 	{
 		return EC29_RadioState.GetInstance().SpectatorVon().IsBlockingVanillaVonActions();
@@ -80,14 +71,7 @@ class EC29_SpectatorVonService
 	//------------------------------------------------------------------------------------------------
 	bool IsBlockingVanillaVonActions()
 	{
-		if (!m_bSpectating || !m_SpectatorBody)
-			return false;
-
-		PlayerController pc = GetGame().GetPlayerController();
-		if (!pc)
-			return false;
-
-		return pc.GetControlledEntity() == m_SpectatorBody;
+		return m_bSpectating;
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -97,256 +81,217 @@ class EC29_SpectatorVonService
 	}
 
 	//------------------------------------------------------------------------------------------------
-	//! Spectate begins. Runs BEFORE any ghost body exists - the deploy menu is typically still
-	//! open - so this only arms state, kills local direct speech and subscribes to
-	//! controlled-entity changes. The direct-speech kill must land here rather than at body
-	//! arrival because it must hold even if the body never lands: a dead player controlling a
-	//! live entity could otherwise talk to the people they are watching.
+	bool IsReceiveEnabled()
+	{
+		return m_bNetEnabled;
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! The spectator transceiver on a manager radio: the one that is neither the editor channel
+	//! nor a faction channel. Null for a vanilla manager or a null radio.
+	static BaseTransceiver SpectatorTransceiver(BaseRadioComponent radio)
+	{
+		if (!radio)
+			return null;
+
+		for (int i = 0, count = radio.TransceiversCount(); i < count; i++)
+		{
+			BaseTransceiver trx = radio.GetTransceiver(i);
+			if (!trx || trx.IsInherited(EditorTransceiver) || trx.IsInherited(EditorFactionTransceiver))
+				continue;
+
+			return trx;
+		}
+
+		return null;
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Wires the manager the way SCR_EditorManagerEntity.Open() wires it for voice, in Open()'s
+	//! order, minus the editor: gadget init, connect, select, lock direct speech, movement sync.
 	void EnterSpectate()
 	{
 		if (m_bSpectating)
 			return;
 
+		SCR_PlayerController pc = SCR_PlayerController.Cast(GetGame().GetPlayerController());
+		SCR_EditorManagerEntity mgr = SCR_EditorManagerEntity.GetInstance();
+		SCR_VONController ctl = EC29_GetLocalVonController();
+		if (!pc || !mgr || !ctl)
+		{
+			Print("[EC29-DBG][SpecVon] EnterSpectate: no player controller, editor manager or VON controller - spectator voice unavailable", LogLevel.WARNING);
+			return;
+		}
+
+		SCR_VoNComponent hearing = HearingComponent(mgr);
+		if (!hearing)
+		{
+			Print("[EC29-DBG][SpecVon] EnterSpectate: editor manager has no SCR_VoNComponent - spectator voice unavailable", LogLevel.WARNING);
+			return;
+		}
+
+		SCR_VoNComponent quiet = QuietTier(mgr);
+		if (!quiet)
+			Print("[EC29-DBG][SpecVon] EnterSpectate: manager has no quiet transmit tier - EC29_EditorManager.et not in use? Transmit would be audible to the living", LogLevel.WARNING);
+
+		SCR_RadioComponent gadget = SCR_RadioComponent.Cast(mgr.FindComponent(SCR_RadioComponent));
+		if (gadget)
+			gadget.OnPostInit(mgr);
+
+		BaseRadioComponent radio = BaseRadioComponent.Cast(mgr.FindComponent(BaseRadioComponent));
+		BaseTransceiver net = SpectatorTransceiver(radio);
+		if (!net)
+			Print("[EC29-DBG][SpecVon] EnterSpectate: manager radio has no spectator transceiver - EC29_EditorManager.et not in use? Push-to-talk will be dead", LogLevel.WARNING);
+
+		// Spectators hear ONLY the spectator net: the editor channel is GM chatter, the faction
+		// channels are the living. Both muted for the session, restored on exit.
+		SetOtherChannelsMuted(radio, net, true);
+
+		if (radio && !radio.IsPowered())
+			radio.SetPower(true);
+
+		pc.EC29_AskSpectatorVoice(true);
+
+		int pid = pc.GetPlayerId();
+		hearing.ConnectEditorToVoNSystem(pid);
+		if (quiet)
+			quiet.ConnectEditorToVoNSystem(pid);
+
+		ctl.EC29_SelectVonComponent(hearing);
+		ctl.EC29_SetDirectSpeechTransmitLocked(true);
+		mgr.EnableCameraNwkSimulation(true);
+
 		m_bSpectating = true;
 		m_bNetEnabled = true; // per-entry default; the caller re-feeds a remembered preference via SetReceiveEnabled
+		m_bTransmitting = false;
+		m_bHasSnapPos = false;
 
-		ApplyDirectSpeechLock(true);
 		Subscribe();
+		GetGame().GetCallqueue().CallLater(RetryPower, POWER_RETRY_MS, false, 0);
 
-		if (EC29_Debug.VERBOSE)
-			Print("[EC29-DBG][SpecVon] EnterSpectate - direct speech locked, watching controlled-entity changes", LogLevel.NORMAL);
-	}
-
-	//------------------------------------------------------------------------------------------------
-	//! The caller hands over the ghost and its voice components once the body actually lands
-	//! (and again on every re-possess). The caller resolves the components because only it knows
-	//! their concrete types; this service stores base-typed handles. Pass null body to
-	//! unregister. Registration applies the receive-mute state immediately - receiving needs the
-	//! radio unmuted from the moment the body exists, not from the first time someone presses
-	//! the talk key - and queues the deferred tier/lock re-assert.
-	void RegisterSpectatorBody(IEntity body, SCR_VoNComponent normalTier, SCR_VoNComponent quietTier, BaseRadioComponent radio)
-	{
-		if (!m_bSpectating)
-		{
-			if (body)
-				Print("[EC29-DBG][SpecVon] RegisterSpectatorBody outside spectate - ignored (call EnterSpectate first)", LogLevel.WARNING);
-			return;
-		}
-
-		// TRUST BOUNDARY TRIPWIRE. This service drives capture, transmit routing and mute state on
-		// whatever radio it is handed, and the whole concealment design assumes that radio is the
-		// spectator net (the special-net triple: sub-band frequency, super-physical range). The
-		// caller resolves it by inventory scan, so a future ghost loadout carrying a second,
-		// LIVING-net radio could hand us a transceiver the guard/squelch/RF stack actively manages -
-		// and spectator speech would ride a real net. Refuse it loudly instead: a dead spectator
-		// radio is diagnosable, a dead player talking on a living net is the failure this system
-		// exists to prevent.
-		if (radio && radio.TransceiversCount() > 0)
-		{
-			BaseTransceiver checkTrx = radio.GetTransceiver(0);
-			if (checkTrx && !EC29_CoexistenceGuard.EC29_IsSpecialNet(checkTrx))
-			{
-				PrintFormat("[EC29-DBG][SpecVon] Registered radio is NOT a special net (freq %1 kHz, range %2 m) - refusing it; spectator radio stays dead rather than keying a living net", checkTrx.GetFrequency(), checkTrx.GetRange(), level: LogLevel.WARNING);
-				radio = null;
-			}
-		}
-
-		// Change detection gates the deferred re-assert. Callers re-register on every talk press
-		// and net toggle (the per-use radio self-heal), and an unconditional queue here would land
-		// a tier re-select one frame into a transmission that just swapped to the quiet tier. With
-		// unchanged handles this call is mute-sync only; the re-assert queues only when something
-		// actually changed (body arrival, a late-streamed radio or tier resolving).
-		bool changed = (body != m_SpectatorBody || normalTier != m_NormalTier || quietTier != m_QuietTier || radio != m_Radio);
-
-		m_SpectatorBody = body;
-		m_NormalTier = normalTier;
-		m_QuietTier = quietTier;
-		m_Radio = radio;
-
-		if (!body)
-			return;
-
-		if (changed && EC29_Debug.VERBOSE)
-			PrintFormat("[EC29-DBG][SpecVon] Spectator body registered (normalTier=%1 quietTier=%2 radio=%3)", normalTier != null, quietTier != null, radio != null);
+		SyncListeningVar();
 
 		ApplyMuteSync();
 
-		if (changed)
-			QueueReassert();
+		if (EC29_Debug.VERBOSE)
+		{
+			int freq = -1;
+			float range = -1;
+			if (net)
+			{
+				freq = net.GetFrequency();
+				range = net.GetRange();
+			}
+			PrintFormat("[EC29-DBG][SpecVon] EnterSpectate pid=%1 ear=%2 quietTier=%3 net(freq=%4 range=%5)", pid, hearing.Type(), quiet != null, freq, range);
+		}
 	}
 
 	//------------------------------------------------------------------------------------------------
-	//! SPECTATOR RADIO PUSH-TO-TALK. Direct speech is locked for the whole spectate session, so
-	//! this is the ONLY way a spectator can be heard - by other spectators, never by the living.
-	//! Drives SCR_VoNComponent DIRECTLY (SetTransmitRadio / SetCommMethod / SetCapture),
-	//! bypassing SCR_VONEntryRadio and the VON menu entirely - a spectator has no selectable
-	//! channel, so waiting for vanilla to offer one would leave them mute.
-	//!
-	//! VERBATIM-INVARIANT PATH (absorbed from the spectator mod, which learned each rule in the
-	//! field): refuse-start-never-refuse-stop; stop capture on BOTH tiers at key-up and BEFORE
-	//! the tier switch; swap to the quiet tier BEFORE capture starts; GetTransceiver(0) with NO
-	//! typed cast; and the read-back guard that forces capture OFF if the engine would fall back
-	//! to CM_DIRECT. The original CM_DIRECT cast-null root cause was never established, so
-	//! "cleanup" of this path is banned.
-	void SetTransmitting(bool talk)
+	//! Per frame from the caller's camera tick: what SCR_CameraEditorComponent.EOnFrame does for a
+	//! Game Master, plus the server-side snap the movement interpolator cannot provide.
+	void FollowCamera(IEntity camera)
 	{
-		if (!talk)
-		{
-			// Cleared FIRST, so the inline re-assert below is free to restore the normal tier.
-			m_bTransmitting = false;
-
-			// STOP CAPTURE ON EVERY TIER, not just the active one.
-			//
-			// Key-down captures on the QUIET tier, but by key-up the active component can have
-			// been re-pointed at the NORMAL one, so stopping only that left the quiet component
-			// transmitting forever - a stuck microphone. Switching the controller back to normal
-			// then restored full audible range on a capture that was still running, which is why
-			// a spectator was heard at range and could not stop.
-			//
-			// Both are stopped explicitly, and BEFORE the tier switch, so nothing is ever
-			// capturing while the active component changes underneath it. Deliberately NOT gated
-			// on who is controlled or whether spectate is still on: a hot mic must always be
-			// closable, and stopping capture on a null handle is a no-op.
-			if (m_QuietTier)
-				m_QuietTier.SetCapture(false);
-
-			if (m_NormalTier)
-				m_NormalTier.SetCapture(false);
-
-			// Back to the normal tier the moment the key is released, or the spectator stays
-			// deaf. Unconditional: this must run even if the quiet tier was never selected.
-			// NO-OPS DURING ExitSpectate, by design - the flag flips first there, so the capture
-			// stop above still runs (the part that matters) while the tier restore is skipped:
-			// there is no spectator left to be deaf, and the component it would select belongs
-			// to a ghost that is about to be deleted. Vanilla re-resolves the VoN component on
-			// the next controlled-entity change regardless.
-			//
-			// NO AUTO-EXIT FROM HERE. The synchronous stop path runs in half-armed windows - the
-			// entry-time preference feed, a fast re-entry while the OLD ghost is still under
-			// control - where "no registered body" is not evidence of a missed exit. Only the
-			// deferred, entity-change-driven pass may auto-exit.
-			ReassertSpectatorVoN(false);
-			return;
-		}
-
-		// THE OFF-SWITCH REFUSES TO START, BUT NEVER REFUSES TO STOP. Guarding both directions
-		// would mean toggling the net off mid-sentence could leave a capture running with no way
-		// to end it - the stuck-microphone failure again by another route.
-		if (!m_bNetEnabled)
+		if (!m_bSpectating || !camera)
 			return;
 
-		// Only ever transmits FROM the registered ghost. If control is anywhere else - the
-		// corpse before the body lands, a real character after a respawn - this does nothing, so
-		// the key cannot broadcast from a living player's radio.
-		PlayerController pc = GetGame().GetPlayerController();
+		SCR_EditorManagerEntity mgr = SCR_EditorManagerEntity.GetInstance();
+		if (!mgr)
+			return;
+
+		vector mat[4];
+		camera.GetWorldTransform(mat);
+		mgr.SetWorldTransform(mat);
+
+		if (m_bHasSnapPos && vector.DistanceSq(mat[3], m_vLastSnapPos) < SNAP_DIST_M * SNAP_DIST_M)
+			return;
+
+		BaseWorld world = GetGame().GetWorld();
+		if (!world)
+			return;
+
+		float now = world.GetWorldTime();
+		if (m_bHasSnapPos && now - m_fLastSnapMs < SNAP_MIN_MS)
+			return;
+
+		SCR_PlayerController pc = SCR_PlayerController.Cast(GetGame().GetPlayerController());
 		if (!pc)
 			return;
 
-		if (!m_SpectatorBody || pc.GetControlledEntity() != m_SpectatorBody)
-			return;
-
-		SCR_VoNComponent von = m_NormalTier;
-		if (!von)
-			return;
-
-		// SWAP TO THE SILENT TIER BEFORE TRANSMITTING.
-		//
-		// Talking on the radio also speaks ALOUD LOCALLY - vanilla behaviour, and the reason a
-		// spectator was audible to living players standing near their body. It cannot be
-		// refused, only made inaudible, so the speaking range is dropped for exactly the
-		// duration of the key press. Doing it before capture starts means the very first packet
-		// is already quiet.
-		//
-		// Absent quiet tier = old behaviour rather than a broken one: transmission still works,
-		// it is simply audible locally.
-		// STRICT: no quiet tier means NO TRANSMISSION, not a louder one. The old shape warned and
-		// transmitted on the normal tier - full local audibility to 40 m, fading to 68 - which is
-		// the exact outcome the quiet tier exists to prevent, handed out on the failure path. Same
-		// trade already accepted for the strict tier resolve: dead radio beats audible spectator,
-		// and the missing tier is warned at registration.
-		if (!m_QuietTier)
-		{
-			Print("[EC29-DBG][SpecVon] transmit refused - no quiet tier registered, staying silent rather than speaking at audible range", LogLevel.WARNING);
-			return;
-		}
-
-		SCR_VONController quietVon = EC29_GetLocalVonController();
-		if (quietVon)
-			quietVon.EC29_SelectVonComponent(m_QuietTier);
-		else
-			Print("[EC29-DBG][SpecVon] tier swap SKIPPED - no VON controller", LogLevel.WARNING);
-
-		// Capture on the tier that is now active, so the two cannot disagree.
-		von = m_QuietTier;
-
-		if (!m_Radio || m_Radio.TransceiversCount() == 0)
-			return;
-
-		// NO CAST. The signature is SetTransmitRadio(BaseTransceiver), and
-		// BaseRadioComponent.GetTransceiver already returns exactly that. The absorbed
-		// implementation once used RadioTransceiver.Cast(...) here, which silently produced null
-		// on this radio and left the engine complaining:
-		//   "VoNComponent: CommMethod is CM_SQUAD_RADIO without any radio assigned. Fallbacking
-		//    to CM_DIRECT"
-		// - a fallback that would have made a spectator audible to LIVING players. WHY THE CAST
-		// FAILED WAS NEVER ESTABLISHED (the prefab declares RadioTransceiver, so type mismatch
-		// cannot have been it). Do not reintroduce the cast on the strength of the prefab
-		// looking compatible - it looked compatible then too, and the call needs no cast either
-		// way.
-		//
-		// NO FORCED UNMUTE HERE. An unconditional unmute would silently override the spectator's
-		// own off-switch the moment they pressed talk - a toggle that undoes itself is worse
-		// than no toggle. The mute state is owned by SetReceiveEnabled/ApplyMuteSync;
-		// transmitting must respect it, not fight it.
-		BaseTransceiver trx = m_Radio.GetTransceiver(0);
-		if (!trx)
-			return;
-
-		von.SetTransmitRadio(trx);
-		von.SetCommMethod(ECommMethod.SQUAD_RADIO);
-
-		// VERIFIED BEFORE CAPTURING, and this is a safety property rather than tidiness.
-		//
-		// The engine's response to SQUAD_RADIO with no radio assigned is to FALL BACK TO DIRECT,
-		// which would make a dead spectator audible to the living players standing around their
-		// invisible body - the single worst outcome this system can produce, and one that looks
-		// completely normal from the spectator's own side. There is no way to switch that
-		// fallback off, so the guard is to never START. Read back through the engine's own
-		// getters rather than trusting the setters, because the null-transceiver case reached
-		// exactly this point once already.
-		if (!von.GetTransmitRadio() || von.GetCommMethod() != ECommMethod.SQUAD_RADIO)
-		{
-			// Force capture OFF rather than merely declining to switch it on. Anything that
-			// started a capture by another route - a stray vanilla bind, an earlier press that
-			// half succeeded - would otherwise keep running on CM_DIRECT, which is a live
-			// microphone audible to the players being spectated.
-			von.SetCapture(false);
-
-			Print("[EC29-DBG][SpecVon] radio transmit refused - no transceiver assigned, staying silent rather than falling back to direct", LogLevel.WARNING);
-			return;
-		}
-
-		von.SetCapture(true);
-
-		// Set only on the one successful exit, after capture actually opened - every refusal
-		// above leaves it false, so the flag can never claim a transmission that was never
-		// started.
-		m_bTransmitting = true;
+		pc.EC29_AskManagerSnap(mat[3]);
+		m_vLastSnapPos = mat[3];
+		m_bHasSnapPos = true;
+		m_fLastSnapMs = now;
 	}
 
 	//------------------------------------------------------------------------------------------------
-	//! The spectator net, both directions, in one switch. MUTE COVERS THE INCOMING HALF - it is
-	//! vanilla's own "do not hear this channel" control (SCR_VONEntryRadio.ToggleMuteEntry walks
-	//! SetMuteState behind the mute icon), so the HUD radio icon already shows the state for
-	//! free. THE OUTGOING HALF IS NOT LEFT TO MUTE: SetTransmitting refuses to start while the
-	//! net is off, in script, so transmission is blocked whether or not mute happens to stop it
-	//! as well. That independence is deliberate - an earlier account credited transmit-blocking
-	//! to mute on the strength of a field failure that was really the CM_DIRECT fallback. Do not
-	//! rebuild the transmit block on top of mute.
-	//!
-	//! STOPS ANY TRANSMISSION IN PROGRESS FIRST when disabling, and that ordering is not
-	//! incidental: muting a transceiver mid-capture is how a microphone gets stuck open with no
-	//! key left to release it.
+	//! SPECTATOR PUSH-TO-TALK. Refuse-start-never-refuse-stop; stop capture on BOTH tiers before any
+	//! tier switch; swap to the quiet tier BEFORE capture starts; read back through the engine's
+	//! own getters and never capture on a CM_DIRECT fallback (that would be a dead spectator
+	//! audible to the living players around their camera).
+	void SetTransmitting(bool talk)
+	{
+		SCR_EditorManagerEntity mgr = SCR_EditorManagerEntity.GetInstance();
+		SCR_VONController ctl = EC29_GetLocalVonController();
+		SCR_VoNComponent hearing;
+		SCR_VoNComponent quiet;
+		if (mgr)
+		{
+			hearing = HearingComponent(mgr);
+			quiet = QuietTier(mgr);
+		}
+
+		if (!talk)
+		{
+			m_bTransmitting = false;
+
+			if (quiet)
+				quiet.SetCapture(false);
+
+			if (hearing)
+				hearing.SetCapture(false);
+
+			if (m_bSpectating && ctl && hearing)
+				ctl.EC29_SelectVonComponent(hearing);
+
+			return;
+		}
+
+		if (!m_bSpectating || !m_bNetEnabled || m_bTransmitting || !hearing || !ctl)
+			return;
+
+		BaseRadioComponent radio = BaseRadioComponent.Cast(mgr.FindComponent(BaseRadioComponent));
+		BaseTransceiver net = SpectatorTransceiver(radio);
+		if (!net)
+		{
+			Print("[EC29-DBG][SpecVon] transmit refused - no spectator transceiver on the manager radio", LogLevel.WARNING);
+			return;
+		}
+
+		SCR_VoNComponent von = hearing;
+		if (quiet)
+		{
+			ctl.EC29_SelectVonComponent(quiet);
+			von = quiet;
+		}
+
+		von.SetCommMethod(ECommMethod.SQUAD_RADIO);
+		von.SetTransmitRadio(net);
+
+		ECommMethod method = von.GetCommMethod();
+		if (!von.GetTransmitRadio() || (method != ECommMethod.SQUAD_RADIO && method != ECommMethod.GAME_MASTER_RADIO))
+		{
+			von.SetCapture(false);
+			ctl.EC29_SelectVonComponent(hearing);
+			PrintFormat("[EC29-DBG][SpecVon] transmit refused - read-back failed (radio=%1 method=%2), staying silent rather than falling back to direct", von.GetTransmitRadio() != null, method, level: LogLevel.WARNING);
+			return;
+		}
+
+		m_bTransmitting = von.SetCapture(true);
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! The spectator net, both directions. Stops any transmission in progress BEFORE muting: a
+	//! transceiver muted mid-capture is a microphone stuck open with no key left to release it.
 	void SetReceiveEnabled(bool enabled)
 	{
 		m_bNetEnabled = enabled;
@@ -358,52 +303,167 @@ class EC29_SpectatorVonService
 	}
 
 	//------------------------------------------------------------------------------------------------
-	bool IsReceiveEnabled()
-	{
-		return m_bNetEnabled;
-	}
-
-	//------------------------------------------------------------------------------------------------
-	//! Spectate ends. Idempotent, safe from any teardown path, and the ORDER is the verified
-	//! invariant order of the absorbed implementation:
-	//!   1. flag flips FIRST, so no queued or re-entrant call re-applies spectator state;
-	//!   2. stop capture on every tier (a capture left running on a body about to be deleted
-	//!      would be a hot mic nobody can switch off) - the tier restore inside no-ops on the
-	//!      already-flipped flag;
-	//!   3. cancel the pending deferred re-assert, or the restore below is undone one frame
-	//!      later (the re-assert re-applies the direct-speech kill, which it must while
-	//!      spectating - but on the respawn exit path it lands on the far side of this teardown
-	//!      with nothing left to restore speech afterwards);
-	//!   4. give local speech back - NOT optional and NOT skippable on any exit path:
-	//!      SCR_VONController lives on the player controller, which outlives this life, so a
-	//!      spectator left locked stays mute for the rest of the session.
+	//! Mirrors Close(): stop capture, disconnect, hand the controller back to the character, and
+	//! give local speech back UNCONDITIONALLY - SCR_VONController outlives this life.
 	void ExitSpectate()
 	{
 		if (!m_bSpectating)
 			return;
 
 		m_bSpectating = false;
-
 		SetTransmitting(false);
-
 		Unsubscribe();
-		GetGame().GetCallqueue().Remove(ReassertSpectatorVoN);
+		GetGame().GetCallqueue().Remove(Reassert);
+		GetGame().GetCallqueue().Remove(RetryPower);
 
-		ApplyDirectSpeechLock(false);
+		SCR_PlayerController pc = SCR_PlayerController.Cast(GetGame().GetPlayerController());
+		SCR_EditorManagerEntity mgr = SCR_EditorManagerEntity.GetInstance();
+		SCR_VONController ctl = EC29_GetLocalVonController();
 
-		m_SpectatorBody = null;
-		m_NormalTier = null;
-		m_QuietTier = null;
-		m_Radio = null;
+		if (mgr)
+		{
+			mgr.EnableCameraNwkSimulation(false);
+
+			SCR_VoNComponent hearing = HearingComponent(mgr);
+			if (hearing)
+				hearing.DisconnectEditorFromVoNSystem();
+
+			SCR_VoNComponent quiet = QuietTier(mgr);
+			if (quiet)
+				quiet.DisconnectEditorFromVoNSystem();
+
+			BaseRadioComponent radio = BaseRadioComponent.Cast(mgr.FindComponent(BaseRadioComponent));
+
+			// Session mutes off (a Game Master's editor channels come back), the spectator net
+			// muted and the LOCAL radio copy unpowered. The server unpowers its copy through
+			// EC29_AskSpectatorVoice below and the cleared flag stops routing - but a living player's
+			// own manager radio must not sit powered and unmuted on the spectator net for the length
+			// of two round trips, or ever if one is lost: the dead audible to the living is the one
+			// failure this system exists to prevent. Skipped while a real editor is open: vanilla owns
+			// power then, and Open() muted the net itself. Re-entry re-derives both (ApplyMuteSync,
+			// SetPower in EnterSpectate).
+			SetOtherChannelsMuted(radio, null, false);
+			BaseTransceiver net = SpectatorTransceiver(radio);
+			if (net && !net.IsMuted())
+				net.SetMuteState(true);
+			if (radio && radio.IsPowered() && !mgr.IsOpened())
+				radio.SetPower(false);
+		}
+
+		if (ctl)
+		{
+			ctl.EC29_SetDirectSpeechTransmitLocked(false);
+
+			IEntity ent;
+			if (pc)
+				ent = pc.GetControlledEntity();
+
+			if (ent)
+			{
+				SCR_VoNComponent charVon = SCR_VoNComponent.Cast(ent.FindComponent(SCR_VoNComponent));
+				if (charVon)
+					ctl.EC29_SelectVonComponent(charVon);
+			}
+		}
+
+		if (pc)
+			pc.EC29_AskSpectatorVoice(false);
+
+		SyncListeningVar();
 
 		if (EC29_Debug.VERBOSE)
-			Print("[EC29-DBG][SpecVon] ExitSpectate - direct speech restored, spectator voice state cleared", LogLevel.NORMAL);
+			Print("[EC29-DBG][SpecVon] ExitSpectate - direct speech restored, manager voice disconnected", LogLevel.NORMAL);
 	}
 
 	//------------------------------------------------------------------------------------------------
-	//! The service watches controlled-entity changes ITSELF rather than trusting the caller to
-	//! forward them - the re-kill and the self-healing auto-exit must not depend on the caller
-	//! being healthy, because a missed exit path in the caller is exactly the failure they cover.
+	//! SPECTATOR NET LOUDNESS, 0..1, on THIS client only.
+	//!
+	//! Routed through EC29's own per-channel radio volume rather than a second mechanism: the net
+	//! is a radio channel, EC29_RadioEarSettings already keeps a volume per transceiver, and the
+	//! Channel Control Volume bus that applies it already sits on the path the net takes. So this
+	//! is a lookup and a clamp, and the audio graph does the work.
+	//!
+	//! Purely local, like every other listening preference here - nobody else's mix changes, and
+	//! nothing is replicated.
+	float GetNetVolume()
+	{
+		BaseTransceiver net = LocalNetTransceiver();
+		if (!net)
+			return 1.0;
+
+		return EC29_RadioState.GetInstance().EarSettings().GetVolume(net);
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Returns the volume actually in force afterwards, which is the clamped value - so a caller
+	//! stepping past either end can report the real number rather than its own running total.
+	float AdjustNetVolume(float delta)
+	{
+		BaseTransceiver net = LocalNetTransceiver();
+		if (!net)
+			return 1.0;
+
+		float applied = EC29_RadioState.GetInstance().EarSettings().AdjustVolume(net, delta);
+
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][SpecVon] net volume %1", applied);
+
+		return applied;
+	}
+
+	//------------------------------------------------------------------------------------------------
+	float SetNetVolume(float volume)
+	{
+		BaseTransceiver net = LocalNetTransceiver();
+		if (!net)
+			return 1.0;
+
+		EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
+		settings.SetVolume(net, volume);
+		return settings.GetVolume(net);
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! The local player's own spectator transceiver. Null off a manager, which every caller treats
+	//! as "no net to adjust" rather than an error - a player who is not spectating has none.
+	protected BaseTransceiver LocalNetTransceiver()
+	{
+		SCR_EditorManagerEntity mgr = SCR_EditorManagerEntity.GetInstance();
+		if (!mgr)
+			return null;
+
+		return SpectatorTransceiver(BaseRadioComponent.Cast(mgr.FindComponent(BaseRadioComponent)));
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Keeps the EC29_SpectatorListening audio variable equal to the spectating state. The variables
+	//! conf only exists once the audio system has loaded von.acp for a playing stream, so the set can
+	//! fail at EnterSpectate; SCR_VoNComponent.OnReceive calls this again per packet until it sticks.
+	void SyncListeningVar()
+	{
+		if (m_bSpectating == m_bListeningVarSet)
+			return;
+
+		float value = 0;
+		if (m_bSpectating)
+			value = 1;
+
+		if (AudioSystem.SetVariableByName(EC29_LISTENING_VAR, value, EC29_LISTENING_CONF))
+		{
+			m_bListeningVarSet = m_bSpectating;
+			if (EC29_Debug.VERBOSE)
+				PrintFormat("[EC29-DBG][SpecVon] EC29_SpectatorListening = %1", value);
+		}
+		else if (!m_bSpectating)
+		{
+			// conf never loaded during this spectate - nothing to reset
+			m_bListeningVarSet = false;
+		}
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! SCR_VONController re-resolves its component to the controlled entity on this same invoker,
+	//! so ours is re-selected one frame later - the last word.
 	protected void Subscribe()
 	{
 		if (m_bSubscribed)
@@ -411,10 +471,7 @@ class EC29_SpectatorVonService
 
 		SCR_PlayerController pc = SCR_PlayerController.Cast(GetGame().GetPlayerController());
 		if (!pc)
-		{
-			Print("[EC29-DBG][SpecVon] No local player controller at EnterSpectate - controlled-entity watch unavailable", LogLevel.WARNING);
 			return;
-		}
 
 		pc.m_OnControlledEntityChanged.Insert(OnControlledEntityChanged);
 		m_bSubscribed = true;
@@ -439,138 +496,25 @@ class EC29_SpectatorVonService
 		if (!m_bSpectating)
 			return;
 
-		// Receiving needs the radio's mute state re-applied from the moment the ghost is (back)
-		// under control, not from the first time someone presses the talk key.
-		if (to && to == m_SpectatorBody)
-			ApplyMuteSync();
-
-		// NEXT FRAME, not now - SCR_VONController subscribes to this same invoker and re-resolves
-		// its component itself:
-		//   if (!m_VONComp || !m_VONComp.IsLocalActiveEditor())
-		//       SetVONComponent(SCR_VoNComponent.Cast(to.FindComponent(SCR_VoNComponent)));
-		// Subscriber order is not ours to control, so setting ours inline can simply be
-		// overwritten a moment later. Worse, that FindComponent asks for the BASE type and
-		// FindComponent returns DISABLED components - so vanilla can land on the inherited
-		// component the body prefab switched off, and the spectator ends up on a dead component.
-		// One frame later the controller has finished, and ours is the last word.
-		QueueReassert();
-	}
-
-	//------------------------------------------------------------------------------------------------
-	protected void QueueReassert()
-	{
-		GetGame().GetCallqueue().CallLater(ReassertSpectatorVoN, 0, false, true);
-	}
-
-	//------------------------------------------------------------------------------------------------
-	//! Deferred re-assert of everything vanilla's per-entity-change rebuild discards.
-	//!
-	//! DEFERRED CALL, SO IT MUST RE-CHECK THAT SPECTATE IS STILL ON, and that guard is the first
-	//! line for a specific reason: on the respawn exit path the invoker queues this while
-	//! spectate is still on, and the teardown then runs BEFORE the queued call lands - so a
-	//! stale call used to re-apply the direct-speech kill after the restore, permanently,
-	//! because SCR_VONController outlives the life. ExitSpectate also drops any queued call;
-	//! this guard covers every other path that could ever queue one.
-	//! allowAutoExit is true only from the deferred, entity-change-driven queue. The synchronous
-	//! stop-path call passes false: it runs inside half-armed windows (entry-time preference
-	//! feed, fast re-entry while the old ghost is still controlled) where a null registered body
-	//! plus an ALIVE ghost would satisfy the exit test for the wrong reason - the ghost body IS
-	//! ECharacterLifeState.ALIVE. Two field-found bugs shared exactly that shape.
-	protected void ReassertSpectatorVoN(bool allowAutoExit)
-	{
-		if (!m_bSpectating)
-			return;
-
-		PlayerController pc = GetGame().GetPlayerController();
-		if (!pc)
-			return;
-
-		IEntity controlled = pc.GetControlledEntity();
-
-		// SELF-HEALING AUTO-EXIT: a LIVE character under local control while this service still
-		// thinks it is spectating means the caller's exit path was missed (crash teardown, a
-		// future refactor dropping a Leave call). Running the spectator state forward from here
-		// would re-lock direct speech on a living player - the session-long-mute failure this
-		// architecture exists to rule out - so the service exits spectator voice instead and
-		// says so. Corpses and null transitions are NOT exits: the direct-speech kill must hold
-		// through them (a dead player's entity swaps several times on the way into spectate).
-		if (allowAutoExit && controlled && controlled != m_SpectatorBody && IsAliveCharacter(controlled))
+		// SELF-HEALING AUTO-EXIT. A LIVE character arriving under local control while this service
+		// still thinks it is spectating means the caller's exit path was missed (crash teardown, a
+		// refactor dropping a Leave call). Running spectator state forward from here would re-lock
+		// direct speech on a living player - SCR_VONController outlives the life, so that is a
+		// session-long mute. Unambiguous now that no ghost body exists: a spectator controls
+		// nothing, and everything on the way in is a corpse or null. Corpses and null are NOT exits.
+		if (to && IsAliveCharacter(to))
 		{
 			Print("[EC29-DBG][SpecVon] Live character under control while spectator voice active - auto-exiting spectator voice (missed ExitSpectate upstream?)", LogLevel.WARNING);
 			ExitSpectate();
 			return;
 		}
 
-		// RE-APPLY THE DIRECT-SPEECH KILL HERE, not only in EnterSpectate.
-		// SCR_VONController.OnControlledEntityChanged calls ResetVON() and clears its encryption
-		// key before re-resolving the component. EnterSpectate runs BEFORE the body exists, so
-		// the lock applied there is set on state that this rebuild then discards - which would
-		// leave a spectator able to talk on direct at full range, the exact leak this system
-		// exists to prevent. Applied on the same deferred pass as the component swap, so it
-		// lands after vanilla has finished rebuilding rather than racing it.
-		ApplyDirectSpeechLock(true);
-
-		if (!m_SpectatorBody || controlled != m_SpectatorBody)
-			return;
-
-		SCR_VONController von = EC29_GetLocalVonController();
-		if (!von)
-			return;
-
-		// MID-TRANSMISSION, THE QUIET TIER IS THE ONLY LEGAL SELECTION. Local audible range
-		// follows the controller's active component, not the capturing one - selecting the
-		// normal tier here while a capture is running is full-volume local audio to 40 m for the
-		// rest of the hold, aimed at exactly the living players the system hides from. A deferred
-		// call CAN land mid-hold: a changed-handle registration at key-down (late-streaming radio
-		// healing on the press) queues one. The direct-speech re-lock above still ran
-		// unconditionally; only the tier choice branches.
-		if (m_bTransmitting)
-		{
-			if (m_QuietTier)
-				von.EC29_SelectVonComponent(m_QuietTier);
-			return;
-		}
-
-		if (!m_NormalTier)
-			return;
-
-		// Via the modded controller - the underlying vanilla members are protected, and the
-		// swap must be atomic. See EC29_SelectVonComponent.
-		von.EC29_SelectVonComponent(m_NormalTier);
+		GetGame().GetCallqueue().CallLater(Reassert, 0, false);
 	}
 
 	//------------------------------------------------------------------------------------------------
-	//! EVERY TRANSCEIVER, not just index 0. The shipped radio carries one, but a radio with more
-	//! would otherwise be half-muted, which is the sort of thing that reads as an intermittent
-	//! bug. Only ever touches the REGISTERED ghost radio - never a living player's.
-	protected void ApplyMuteSync()
-	{
-		if (!m_Radio)
-			return;
-
-		bool wantMuted = !m_bNetEnabled;
-
-		int count = m_Radio.TransceiversCount();
-		for (int i = 0; i < count; i++)
-		{
-			BaseTransceiver trx = m_Radio.GetTransceiver(i);
-			if (trx && trx.IsMuted() != wantMuted)
-				trx.SetMuteState(wantMuted);
-		}
-	}
-
-	//------------------------------------------------------------------------------------------------
-	protected void ApplyDirectSpeechLock(bool locked)
-	{
-		SCR_VONController von = EC29_GetLocalVonController();
-		if (von)
-			von.EC29_SetDirectSpeechTransmitLocked(locked);
-	}
-
-	//------------------------------------------------------------------------------------------------
-	//! Alive test for the self-heal only. A corpse is a character too, so life state - not
-	//! character-ness - is what separates "respawned without an exit" from the normal dead-entity
-	//! shuffle on the way into spectate.
+	//! Alive test for the self-heal only: a corpse is a character too, so life state - not
+	//! character-ness - is what separates a respawn from the dead-entity shuffle on the way in.
 	protected bool IsAliveCharacter(IEntity ent)
 	{
 		ChimeraCharacter character = ChimeraCharacter.Cast(ent);
@@ -585,9 +529,115 @@ class EC29_SpectatorVonService
 	}
 
 	//------------------------------------------------------------------------------------------------
-	//! Resolves the LOCAL player's VON controller - VoN is client-side, and this is the same
-	//! route SCR_VoNComponent itself uses to find its controller. Returns null before a player
-	//! controller exists; callers null-check.
+	//! Mid-transmission the quiet tier is the only legal selection: local audibility follows the
+	//! controller's active component, not the capturing one.
+	protected void Reassert()
+	{
+		if (!m_bSpectating)
+			return;
+
+		SCR_EditorManagerEntity mgr = SCR_EditorManagerEntity.GetInstance();
+		SCR_VONController ctl = EC29_GetLocalVonController();
+		if (!mgr || !ctl)
+			return;
+
+		SCR_VoNComponent tier;
+		if (m_bTransmitting)
+			tier = QuietTier(mgr);
+		if (!tier)
+			tier = HearingComponent(mgr);
+
+		if (tier)
+			ctl.EC29_SelectVonComponent(tier);
+
+		ctl.EC29_SetDirectSpeechTransmitLocked(true);
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Editor radio power is gated natively on the owner counting as an active editor, and that
+	//! answer depends on the replicated flag - which lands AFTER EnterSpectate on a real client.
+	protected void RetryPower(int attempt)
+	{
+		if (!m_bSpectating)
+			return;
+
+		SCR_EditorManagerEntity mgr = SCR_EditorManagerEntity.GetInstance();
+		if (!mgr)
+			return;
+
+		BaseRadioComponent radio = BaseRadioComponent.Cast(mgr.FindComponent(BaseRadioComponent));
+		if (!radio)
+			return;
+
+		if (!radio.IsPowered())
+			radio.SetPower(true);
+
+		if ((!radio.IsPowered() || !mgr.EC29_IsSpectatorVoice()) && attempt < POWER_RETRY_MAX)
+		{
+			GetGame().GetCallqueue().CallLater(RetryPower, POWER_RETRY_MS, false, attempt + 1);
+			return;
+		}
+
+		if (!radio.IsPowered())
+			Print("[EC29-DBG][SpecVon] manager radio never powered - spectator net dead this session", LogLevel.WARNING);
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Receive-mute on the spectator transceiver only; the other channels are the session mutes.
+	protected void ApplyMuteSync()
+	{
+		SCR_EditorManagerEntity mgr = SCR_EditorManagerEntity.GetInstance();
+		if (!mgr)
+			return;
+
+		BaseRadioComponent radio = BaseRadioComponent.Cast(mgr.FindComponent(BaseRadioComponent));
+		BaseTransceiver net = SpectatorTransceiver(radio);
+		if (net && net.IsMuted() == m_bNetEnabled)
+			net.SetMuteState(!m_bNetEnabled);
+	}
+
+	//------------------------------------------------------------------------------------------------
+	protected void SetOtherChannelsMuted(BaseRadioComponent radio, BaseTransceiver net, bool muted)
+	{
+		if (!radio)
+			return;
+
+		for (int i = 0, count = radio.TransceiversCount(); i < count; i++)
+		{
+			BaseTransceiver trx = radio.GetTransceiver(i);
+			if (trx && trx != net && trx.IsMuted() != muted)
+				trx.SetMuteState(muted);
+		}
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! The manager's BASE component: the one the engine plays incoming streams through.
+	//! The ear: EC29_VoNSpectatorLoud, which sorts first among the manager's VoN components (see
+	//! EC29_SpectatorVonTiers.c). Falls back to the exact vanilla base on a manager without it.
+	protected SCR_VoNComponent HearingComponent(notnull SCR_EditorManagerEntity mgr)
+	{
+		SCR_VoNComponent ear = EC29_VoNSpectatorLoud.Cast(mgr.FindComponent(EC29_VoNSpectatorLoud));
+		if (ear)
+			return ear;
+
+		array<Managed> comps = {};
+		mgr.FindComponents(SCR_VoNComponent, comps);
+		foreach (Managed comp : comps)
+		{
+			if (comp.Type() == SCR_VoNComponent)
+				return SCR_VoNComponent.Cast(comp);
+		}
+
+		return null;
+	}
+
+	//------------------------------------------------------------------------------------------------
+	protected SCR_VoNComponent QuietTier(notnull SCR_EditorManagerEntity mgr)
+	{
+		return EC29_VoNSpectatorQuiet.Cast(mgr.FindComponent(EC29_VoNSpectatorQuiet));
+	}
+
+	//------------------------------------------------------------------------------------------------
 	protected SCR_VONController EC29_GetLocalVonController()
 	{
 		PlayerController pc = GetGame().GetPlayerController();

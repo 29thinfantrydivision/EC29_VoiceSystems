@@ -6,7 +6,7 @@
 //! this file carried the repair the community fix mods converged on (a silent 150 ms power
 //! cycle per radio 3 s after its VON entry registered, with restore retries, entry-usability
 //! re-sync, a replicated ready flag to re-cycle radios that registered before the manager
-//! existed, and a spectator ghost-radio variant in EC29_SpectatorVonService). 1.8.0.13
+//! existed, and a spectator-net variant in EC29_SpectatorVonService). 1.8.0.13
 //! ("Fixed: Radio would not work sometimes") was measured with that repair switched off - the
 //! registration probe reported every carried radio REGISTERED and the RX heartbeat stayed
 //! silent under live traffic - and the repair machinery was removed. The git history holds
@@ -111,7 +111,7 @@ class EC29_RadioReceiverGuard
     //------------------------------------------------------------------------------------------------
     void OnRadioEntryAdded(notnull BaseTransceiver transceiver)
     {
-        // Another system's net (spectator ghost radio, third-party special nets):
+        // Another system's net (the spectator net, third-party special nets):
         // its traffic pattern is not ours to judge, so it is not tracked.
         if (EC29_CoexistenceGuard.EC29_IsSpecialNet(transceiver))
             return;

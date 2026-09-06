@@ -16,17 +16,18 @@ class EC29_CoexistenceGuard
 	protected static const string ADDON_CONFLICT_EARPLUGS    = "612F512CD4CB21D5";
 
 	//! Below the VHF player band: no unit net lives under 30 MHz, but special
-	//! nets do (the spectator system's ghost radio sits at 29000 kHz).
+	//! nets do (the spectator net sits at 29000 kHz).
 	protected static const int EC29_SPECIAL_NET_BAND_FLOOR_KHZ = 30000;
 	//! No physical radio in the modset reaches past ~6 km; a transceiver
-	//! engineered far beyond that is a magic net. (The spectator ghost radio
-	//! sat here at 50 km until 2026-09-05; it is now 2 km and relies on the
-	//! frequency floor above instead.)
+	//! engineered far beyond that is a magic net. The spectator net does NOT
+	//! rely on this half: it sits at 5 km, inside vanilla's own maximum (the
+	//! large transmitter tower), so the frequency floor above is what catches
+	//! it. That is deliberate - range is a tunable, the frequency is the ABI.
 	protected static const float EC29_SPECIAL_NET_RANGE_M = 10000.0;
 
 	//------------------------------------------------------------------------------------------------
 	//! True for transceivers that belong to another system's net (spectator or
-	//! admin ghost radios): tuned below the player band, or ranged beyond any
+	//! admin-only nets): tuned below the player band, or ranged beyond any
 	//! physical radio. EC29's radio features leave those nets alone - no guard
 	//! power-cycling, no retuning, no alternate PTT, no squelch/beeps, no RF
 	//! simulation. Deliberately NOT keyed on encryption: a captured enemy
