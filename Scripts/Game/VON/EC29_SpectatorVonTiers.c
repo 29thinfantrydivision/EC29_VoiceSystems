@@ -20,12 +20,16 @@
 //! it cuts both ways (a 1 m range also means hearing nothing beyond 1 m). So this tier is selected
 //! ONLY while the talk key is held; hearing stays on the ear component.
 //!
-//! THE HEARING CURVE lives on AmplitudeClass 200010 in von.acp, and the PARENT'S REAL VALUES are
-//! worth writing down because they are not what an old note in this repo claimed: vanilla character
-//! voice is curve "1/r", outerRange 40, slopeFactor 11 - silent at 40 m, not 68, and very steep.
-//! Ours holds full volume to 40 and fades to 68, but inheriting slopeFactor 11 squeezed that whole
-//! steep curve into a 28 m band and produced a cliff at 40 m (field-reported 2026-09-05). The node
-//! now overrides slopeFactor; lower is gentler, and it is the knob to turn if the fade is wrong.
+//! THE HEARING CURVE lives on AmplitudeClass 200010 in von.acp: innerRange 40, outerRange 68, and
+//! nothing else. The PARENT'S REAL VALUES are worth writing down because they are not what an old
+//! note in this repo claimed: vanilla character voice is curve "1/r", outerRange 40, slopeFactor 11
+//! - silent at 40 m, not 68. So ours is already louder than vanilla across vanilla's whole range.
+//!
+//! A slopeFactor override was tried on 2026-09-06 against a reported cutoff at 40 m and changed
+//! NOTHING, so it was removed rather than left as an unexplained difference from the configuration
+//! that worked in the spectator-body era. If the cutoff is chased again, first establish whether
+//! direct packets even arrive past 40 m - the EC29 RX activity log line answers that - because a
+//! listener curve cannot shape audio the engine never delivered.
 //!
 //! THE EAR ALSO PROTECTS REAL GAME MASTERS. Vanilla's SCR_EditorManagerEntity.Open() wires editor
 //! voice through FindComponent(SCR_VoNComponent), which returns that same first component - so

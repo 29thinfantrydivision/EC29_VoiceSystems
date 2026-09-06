@@ -1250,7 +1250,6 @@ AudioClass {
    parent "{299E65568A14273A}Sounds/_SharedData/Configs/Amplitude/_SharedData/Amplitude_-45LUFS_to_-30LUFS_Character.conf"
    innerRange 40
    outerRange 68
-   slopeFactor 2
   }
  }
  frequency {
