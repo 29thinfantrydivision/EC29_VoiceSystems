@@ -12,6 +12,10 @@
 //! mission header). No per-prefab Attributes — single source of truth.
 modded class SCR_VonDisplay
 {
+	// The mission's own m_bShowEnemyNames, captured before we ever touch it - see OnReceive.
+	protected bool m_bEC29_StockShowEnemyNames;
+	protected bool m_bEC29_StockEnemyNamesCaptured;
+
 	//------------------------------------------------------------------------------------------------
 	//------------------------------------------------------------------------------------------------
 	//! Mark every active transmission for re-update so UpdateTransmission re-runs and
@@ -40,9 +44,28 @@ modded class SCR_VonDisplay
 		if (!m_wRoot || m_bIsVONUIDisabled)
 			return;
 
+		// SPECTATORS ONLY, and it has to reach vanilla's own flag. With m_bShowEnemyNames off (a
+		// player-controller prefab override in the field) vanilla drops enemy DIRECT transmissions
+		// from the overlay before UpdateTransmission returns, so the name refresh below never gets
+		// a chance and a spectator - who has no faction and is meant to see everyone - loses the
+		// whole entry.
+		//
+		// TRACKED, NEVER LATCHED. The mission's own value is captured once and restored the moment
+		// spectating ends: a living player's overlay must show exactly what the mission configured,
+		// so this cannot become a way for the spectator feature to change what the living see.
+		if (!m_bEC29_StockEnemyNamesCaptured)
+		{
+			m_bEC29_StockEnemyNamesCaptured = true;
+			m_bEC29_StockShowEnemyNames = m_bShowEnemyNames;
+		}
+
+		m_bShowEnemyNames = m_bEC29_StockShowEnemyNames || SCR_VoNComponent.EC29_IsSpectatingListener();
+
 		// Only direct (proximity) transmissions get the faction / range filtering;
 		// radio messages should display normally regardless of distance.
-		if (!receiver && !isSenderEditor && !IsLocalEditorOpened_C())
+		// A spectating listener is exempt like an opened editor: it has no faction stance to
+		// filter by and its hearing is not where its controlled entity is.
+		if (!receiver && !isSenderEditor && !IsLocalEditorOpened_C() && !SCR_VoNComponent.EC29_IsSpectatingListener())
 		{
 			if (ShouldHideDirectIncoming_C(playerId) || EC29_ShouldHideOutOfRange(playerId))
 			{

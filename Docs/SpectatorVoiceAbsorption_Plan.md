@@ -1,5 +1,7 @@
 # Spectator Voice Absorption
 
+> **STATUS 2026-09-06.** Sections 1-4 below are the ORIGINAL August plan and are kept for the reasoning, not as a description of the code. Two things in them are now false: the "dormant resources" (the spectator radio prefab and the second ACP) were deleted rather than shipped dormant, and the consumer no longer has a spectator body at all. Read the dated sections at the bottom first - they supersede.
+
 **Status:** EXECUTING — EC29 side implemented on this branch; spectator-mod delegation PR follows. **Supersedes** the full *Voice Multi Mod Master Sync* design (branch `voice-multi-mod-master-sync`, never merged) after a 2026-08-31 re-audit narrowed its scope.
 
 ## 1. The re-audit
@@ -52,3 +54,28 @@ The 2026-08-24 Master Sync plan proposed EC29 as single VON authority across thr
 ## 4. Regression contract (carried from the Master Sync plan, still binding)
 
 Receiver guard decision tree, ready flag and `STABILIZATION_DELAY_MS` untouched; usability re-sync sites untouched (radio-entry-only, verified); squelch `IsMuted` checks verbatim; CH1-left/CH2-right routing untouched; 5 km RF cap keeps its perf role; editor steady-1.0 gain and the strict-`<` hold byte-identical; safe early-outs and the no-PlayerController DS guards untouched; no new code path calls methods on `ChimeraWorld.GetRadioManager()`.
+
+## 2026-09-05 - manager model (supersedes the ghost radio)
+
+Spectator voice is anchored to the player's own **editor manager entity**, never opened: `EC29_EditorManager.et`
+(routed to every player by `EC29_EditorSettingsEntity`) adds a 29000 kHz / 4 km `RadioTransceiver` and the quiet
+transmit tier to the vanilla manager. The service wires it the way `SCR_EditorManagerEntity.Open()` wires voice.
+The engine's active-editor question is answered from a flag replicated on the manager (`EC29_EditorManagerEntity`);
+power, interpolation and position snaps are authored on the server (`EC29_SpectatorVoiceController`). Spectator
+audio (clean radio voice, full-volume direct hearing to 40 m) is variable-gated in `von.acp` and applies only on a
+spectating client. The ghost radio, `EC29_Radio_Spectator.et` and the normal-tier ACP are gone; the caller passes
+its camera (`FollowCamera`) and nothing else. Field rules are in the service header.
+
+### 2026-09-05 later - the ear (`EC29_VoNSpectatorLoud`)
+
+An entity orders its components **by class name**, and the engine plays an incoming stream through
+the **first** VoN component on the editor manager, gated by *that* component's ACP range. Nothing in
+script overrides it: not `ConnectEditorToVoNSystem`, not `SetVONComponent`, not connect order, not
+prefab listing order, not GUIDs (all measured, five runs). So `EC29_VoNSpectatorQuiet`
+(`outerRange 0.0001`) sorted ahead of `SCR_VoNComponent` and became the ear - total deafness. The
+pre-consolidation build escaped only because `SPEC29_VoNSpectatorQuiet` sorts *after* `SCR_`.
+
+`EC29_VoNSpectatorLoud` (stock `von.acp`, full range) now owns the first slot: `L` < `Q`, `E` < `S`.
+It is what the service connects and selects; the quiet tier is transmit-only. **Any VoN class added
+to this manager later must sort after `Loud`.** This also protects real Game Masters, whose
+`Open()` resolves the editor voice component the same way.

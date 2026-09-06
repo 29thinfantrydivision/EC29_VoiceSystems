@@ -6,7 +6,7 @@ AudioClass {
    tl -776.622 -515.118
    res "{CF1F9C4B120DE5F8}Sounds/VON/EC29_Von.sig"
    conns {
-    IOPConnectionClass iopConnection {
+    IOPConnectionClass "iop:1" {
      port 1
      conn {
       ConnectionsClass connections {
@@ -36,7 +36,6 @@ AudioClass {
    inputvaluesmax {
     1
    }
-   path "{CF1F9C4B120DE5F8}Sounds/VON/EC29_Von.sig"
   }
   SignalClass "66573" {
    id 66573
@@ -58,7 +57,6 @@ AudioClass {
    inputvaluesmax {
     1 1 1 10000
    }
-   path "{2DE6099BBD60C620}Sounds/_SharedData/Signals/Character/Character_Occlusion.sig"
   }
   SignalClass "77837" {
    id 77837
@@ -80,7 +78,6 @@ AudioClass {
    inputvaluesmax {
     100 1 16000
    }
-   path "{76CBB40EF7F227B6}Sounds/_SharedData/Signals/Reverb/Reverb_Base.sig"
   }
   SignalClass "95245" {
    id 95245
@@ -88,7 +85,7 @@ AudioClass {
    tl 122.001 -545.02
    res "{4D6CC8A4D1FED38F}Sounds/VON/EC29_Routing.sig"
    conns {
-    IOPConnectionClass iopConnection {
+    IOPConnectionClass "iop:1" {
      port 1
      conn {
       ConnectionsClass connections {
@@ -118,7 +115,6 @@ AudioClass {
    inputvaluesmax {
     1
    }
-   path "{4D6CC8A4D1FED38F}Sounds/VON/EC29_Routing.sig"
   }
   SignalClass "105485" {
    id 105485
@@ -126,7 +122,7 @@ AudioClass {
    tl -780.6 -266.008
    res "{D59B06686BE2B58F}Sounds/VON/EC29_SignalQuality.sig"
    conns {
-    IOPConnectionClass iopConnection {
+    IOPConnectionClass "iop:1" {
      port 1
      conn {
       ConnectionsClass connections {
@@ -156,7 +152,6 @@ AudioClass {
    inputvaluesmax {
     1
    }
-   path "{D59B06686BE2B58F}Sounds/VON/EC29_SignalQuality.sig"
   }
  }
  filters {
@@ -420,8 +415,6 @@ AudioClass {
    varResource "{33A27275C95E0302}Sounds/VON/EC29_LocalVariables_VON.conf"
    curve {
     CurvePoint "1" {
-     X 0
-     Y 0
     }
     CurvePoint "2" {
      X 3
@@ -434,7 +427,7 @@ AudioClass {
    name "Routing Selection"
    comment "0 = Center, 1 = Right, 2 = Left"
    version 5
-   tl -57.996 -545.274
+   tl -64 -528
    ctl 0 -24
    varName "EC29_EarRouting"
    varResource "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf"
@@ -463,9 +456,45 @@ AudioClass {
    id 108574
    name "EC29_ChannelVolume"
    version 5
-   tl -59.702 -470.737
+   tl -64 -464
    varName "EC29_ChannelVolume"
    varResource "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf"
+  }
+  VariableClass "200001" {
+   id 200001
+   name "Spectator Off Gate"
+   comment "1 - EC29_SpectatorListening: stock processing for everyone but a spectating client"
+   version 5
+   tl -60 -600
+   ctl 0 -24
+   varName "EC29_SpectatorListening"
+   varResource "{33A27275C95E0302}Sounds/VON/EC29_LocalVariables_VON.conf"
+   curve {
+    CurvePoint "1" {
+     Y 1
+    }
+    CurvePoint "2" {
+     X 1
+    }
+   }
+  }
+  VariableClass "200002" {
+   id 200002
+   name "Spectator On Gate"
+   comment "EC29_SpectatorListening: spectator paths, spectating client only"
+   version 5
+   tl -60 -660
+   ctl 0 -24
+   varName "EC29_SpectatorListening"
+   varResource "{33A27275C95E0302}Sounds/VON/EC29_LocalVariables_VON.conf"
+   curve {
+    CurvePoint "1" {
+    }
+    CurvePoint "2" {
+     X 1
+     Y 1
+    }
+   }
   }
  }
  sounds {
@@ -541,6 +570,10 @@ AudioClass {
      links {
       ConnectionClass "22546:65" {
        id 22546
+       port 65
+      }
+      ConnectionClass "200011:65" {
+       id 200011
        port 65
       }
      }
@@ -707,6 +740,43 @@ AudioClass {
     ConnectionsClass "con:64" {
      id 64
      links {
+      ConnectionClass "200003:65" {
+       id 200003
+       port 65
+      }
+      ConnectionClass "200004:65" {
+       id 200004
+       port 65
+      }
+     }
+    }
+   }
+   pi {
+    1020 0
+   }
+   channels "2"
+   channelVolume 1
+  }
+  BusClass "200003" {
+   id 200003
+   name "Spectator Radio Gate"
+   comment "Radio filter chain + noise, off for a spectating client"
+   version 7
+   tl -120 -300
+   ctl 0 -24
+   ins {
+    ConnectionsClass "con:0" {
+     id 0
+     links {
+      ConnectionClass "200001:65" {
+       id 200001
+       port 65
+      }
+     }
+    }
+    ConnectionsClass "con:64" {
+     id 64
+     links {
       ConnectionClass "50183:65" {
        id 50183
        port 65
@@ -719,10 +789,124 @@ AudioClass {
     }
    }
    pi {
-    1020 0
+    1 0
    }
-   channels "2"
-   channelVolume 1
+   pu {
+    1 0
+   }
+  }
+  BusClass "200004" {
+   id 200004
+   name "Spectator Voice Clean"
+   comment "Raw decoded stream shaped by the DIRECT chain (FilterChain 53271 - the same HP/LP/shelf/comp Bus Direct Processing uses), so a spectator net voice reads as speech rather than radio. No radio chain, no distance attenuation, -10 dB trim. Spectating client only"
+   version 7
+   tl -120 -360
+   ctl 0 -24
+   ins {
+    ConnectionsClass "con:0" {
+     id 0
+     links {
+      ConnectionClass "200002:65" {
+       id 200002
+       port 65
+      }
+     }
+    }
+    ConnectionsClass "con:1" {
+     id 1
+     links {
+      ConnectionClass "53271:65" {
+       id 53271
+       port 65
+      }
+     }
+    }
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "26641:65" {
+       id 26641
+       port 65
+      }
+     }
+    }
+   }
+   pi {
+    1 0
+   }
+   pu {
+    1 0
+   }
+   volume 0.316
+   volume_dB -10
+  }
+  BusClass "200012" {
+   id 200012
+   name "Spectator Direct Gate Stock"
+   comment "Vanilla direct hearing curve, off for a spectating client"
+   version 7
+   tl -120 -720
+   ctl 0 -24
+   ins {
+    ConnectionsClass "con:0" {
+     id 0
+     links {
+      ConnectionClass "200001:65" {
+       id 200001
+       port 65
+      }
+     }
+    }
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "84999:65" {
+       id 84999
+       port 65
+      }
+     }
+    }
+   }
+   pi {
+    1 0
+   }
+   pu {
+    1 0
+   }
+  }
+  BusClass "200013" {
+   id 200013
+   name "Spectator Direct Gate"
+   comment "Spectator direct hearing curve (full to 40 m, fade to 68), spectating client only"
+   version 7
+   tl -120 -660
+   ctl 0 -24
+   ins {
+    ConnectionsClass "con:0" {
+     id 0
+     links {
+      ConnectionClass "200002:65" {
+       id 200002
+       port 65
+      }
+     }
+    }
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "84999:65" {
+       id 84999
+       port 65
+      }
+     }
+    }
+   }
+   pi {
+    1 0
+   }
+   pu {
+    1 0
+   }
   }
   BusClass "101383" {
    id 101383
@@ -909,7 +1093,6 @@ AudioClass {
    pi {
     36864 24
    }
-   path "{B764D803219C775E}Sounds/FinalMix.afm"
    inputs {
     "WPN_Handling" "WPN_Shots" "WPN_Explosions" "WNP_BulletHits" "CHAR" "ENV_AMB_2D" "VEH_Animations" "Impacts" "Dialog" "ENV_Doors" "VEH_Engine" "VEH_Tires" "VON" "SFX" "SFX_Reverb_OBSOLETE" "VON_Reverb_Small" "Dialog_Reverb" "Impacts_EXT" "ENV_AMB_3D" "WPN_SonicCracks" "CHAR_Gear" "PA" "SFX_Reverb_Exterior" "ENV_AMB_3D_Reverb_Exterior" "SFX_Direct" "SFX_Reverb_Small" "SFX_Reverb_Medium" "SFX_Reverb_Large" "WPN_Shots_Player" "Dialog_Reverb_Small" "Dialog_Reverb_Medium" "Dialog_Reverb_Large" "WPN_TravelingProjectile" "Dialog_Delay_Exterior" "SFX_Reverb_InCabin" "VON_Reverb_Medium" "VON_Reverb_Large"
    }
@@ -952,8 +1135,57 @@ AudioClass {
     ConnectionsClass "con:64" {
      id 64
      links {
-      ConnectionClass "84999:65" {
-       id 84999
+      ConnectionClass "200012:65" {
+       id 200012
+       port 65
+      }
+     }
+    }
+   }
+   pi {
+    7 0
+   }
+  }
+  ShaderClass "200011" {
+   id 200011
+   name "Spectator Shader Direct"
+   comment "Shader Direct with the spectator hearing curve; fed only while EC29_SpectatorListening = 1"
+   version 5
+   tl 0 -700
+   ctl 0 -24
+   ins {
+    ConnectionsClass "con:0" {
+     id 0
+     links {
+      ConnectionClass "48156:65" {
+       id 48156
+       port 65
+      }
+     }
+    }
+    ConnectionsClass "con:1" {
+     id 1
+     links {
+      ConnectionClass "200010:65" {
+       id 200010
+       port 65
+      }
+     }
+    }
+    ConnectionsClass "con:2" {
+     id 2
+     links {
+      ConnectionClass "78869:65" {
+       id 78869
+       port 65
+      }
+     }
+    }
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "200013:65" {
+       id 200013
        port 65
       }
      }
@@ -1010,6 +1242,16 @@ AudioClass {
    ctl 0 -21
    parent "{299E65568A14273A}Sounds/_SharedData/Configs/Amplitude/_SharedData/Amplitude_-45LUFS_to_-30LUFS_Character.conf"
   }
+  AmplitudeClass "200010" : "{299E65568A14273A}Sounds/_SharedData/Configs/Amplitude/_SharedData/Amplitude_-45LUFS_to_-30LUFS_Character.conf" {
+   id 200010
+   version 5
+   tl 0 -1000
+   ctl 0 -21
+   parent "{299E65568A14273A}Sounds/_SharedData/Configs/Amplitude/_SharedData/Amplitude_-45LUFS_to_-30LUFS_Character.conf"
+   innerRange 40
+   outerRange 68
+   slopeFactor 2
+  }
  }
  frequency {
   FrequencyClass "78869" : "{85F92D98658CB0F5}Sounds/_SharedData/Configs/Frequency/Character/Frequency_Character_Voice.conf" {
@@ -1057,21 +1299,12 @@ AudioClass {
    Samples {
     AudioBankSampleClass "Radio_RogerBeep_A_1.wav" {
      Filename "{1DB01BC81F7F7038}Sounds/RadioProtocol/Samples/RogerBeep/Radio_RogerBeep_A_1.wav"
-     Probability 100
-     Index 0
-     SampleMetadata ""
     }
     AudioBankSampleClass "Radio_RogerBeep_A_2.wav" {
      Filename "{84AEA251029841A8}Sounds/RadioProtocol/Samples/RogerBeep/Radio_RogerBeep_A_2.wav"
-     Probability 100
-     Index 0
-     SampleMetadata ""
     }
     AudioBankSampleClass "Radio_RogerBeep_A_3.wav" {
      Filename "{F3A4CAD9F63AAED8}Sounds/RadioProtocol/Samples/RogerBeep/Radio_RogerBeep_A_3.wav"
-     Probability 100
-     Index 0
-     SampleMetadata ""
     }
    }
   }
@@ -1087,21 +1320,12 @@ AudioClass {
    Samples {
     AudioBankSampleClass "Radio_RogerBeep_B_1.wav" {
      Filename "{17154B85A96F83BF}Sounds/RadioProtocol/Samples/RogerBeep/Radio_RogerBeep_B_1.wav"
-     Probability 100
-     Index 0
-     SampleMetadata ""
     }
     AudioBankSampleClass "Radio_RogerBeep_B_2.wav" {
      Filename "{8E0BF21CB488B22F}Sounds/RadioProtocol/Samples/RogerBeep/Radio_RogerBeep_B_2.wav"
-     Probability 100
-     Index 0
-     SampleMetadata ""
     }
     AudioBankSampleClass "Radio_RogerBeep_B_3.wav" {
      Filename "{F9019A94402A5D5F}Sounds/RadioProtocol/Samples/RogerBeep/Radio_RogerBeep_B_3.wav"
-     Probability 100
-     Index 0
-     SampleMetadata ""
     }
    }
   }
@@ -1243,6 +1467,6 @@ AudioClass {
    OSPort 367623
   }
  }
- version 1
+ version 2
  listenerWindowModel "{9F3AF591CD6DFE1A}Assets/Characters/Basebody/Basebody_Male_01.xob"
 }

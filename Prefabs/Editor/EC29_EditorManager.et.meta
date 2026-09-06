@@ -1,5 +1,5 @@
 MetaFileClass {
- Name "{FD81CA0FE2BAED7C}Prefabs/Items/Core/EC29_Radio_Spectator.et"
+ Name "{6A2C5D1E8B37F4D0}Prefabs/Editor/EC29_EditorManager.et"
  Configurations {
   EntityTemplateResourceClass PC {
   }

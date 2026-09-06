@@ -62,8 +62,8 @@ class EC29_RadioEarSettings
 
         SCR_RadioComponent gadget = SCR_RadioComponent.Cast(radioEntity.FindComponent(SCR_RadioComponent));
         EC29_EEarRouting routing = EC29_EEarRouting.CENTER;
-        // Another system's net (spectator ghost) keeps both ears - its owning
-        // mod decides how spectator audio is presented.
+        // Another system's net (the spectator net) keeps both ears - its owning
+        // system decides how that audio is presented.
         if (EC29_CoexistenceGuard.EC29_IsSpecialNet(transceiver))
             gadget = null;
         if (gadget)

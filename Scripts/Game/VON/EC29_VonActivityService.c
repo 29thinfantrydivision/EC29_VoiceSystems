@@ -2,9 +2,9 @@
 //!
 //! Exists for consumers that draw their own speaking indicators and therefore need DATA, not
 //! vanilla's UI: vanilla SCR_NametagDisplay rejects anyone whose faction cannot be resolved from
-//! the controlled entity, which is every non-groupmate as seen from a faction-less spectator
-//! ghost - so a spectator sees speaking indicators for their old squad and nobody else. The
-//! spectator mod's own nameplates cover every faction but have no notion of who is transmitting;
+//! the controlled entity, and a spectator controls nothing at all - so vanilla shows a spectator
+//! no speaking indicators whatsoever. A spectator system's own nameplates cover every faction but
+//! have no notion of who is transmitting;
 //! EC29 sits on exactly that, per packet, per player id, in EC29_VON_VoNComponent.OnReceive.
 //! This service is that feed, organized: an edge-triggered invoker plus two pull queries.
 //!
@@ -22,8 +22,8 @@
 //!
 //! DELIVERY CONSTRAINT (part of the API contract, not an implementation detail): this only ever
 //! reports what the local client actually RECEIVES. Direct speech delivery is gated by the
-//! sender's component range - it works for spectators because the ghost body is parked at the
-//! camera, so the spectator is physically present at what they are watching. Radio traffic on
+//! sender's component range - it works for spectators because their voice anchor (the editor
+//! manager) tracks the camera, so they are present at what they are watching. Radio traffic on
 //! nets the local machine is not tuned to never arrives, and no client-side API can change that.
 //!
 //! Owned by EC29_RadioState (world-scoped, dies with the world). The ticker follows the squelch

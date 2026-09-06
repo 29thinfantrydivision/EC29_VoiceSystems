@@ -176,6 +176,10 @@ modded class SCR_VoNComponent
 		// see EC29_VonActivityService.
 		EC29_RadioState.GetInstance().VonActivity().EC29_RecordVonPacket(playerId, receiver != null);
 
+		// Spectator audio gate: the variables conf is only resolvable once von.acp is live, which is
+		// exactly now - one bool compare per packet after it sticks (see the service).
+		EC29_RadioState.GetInstance().SpectatorVon().SyncListeningVar();
+
 		// Packet-type gate keeps the two systems from stomping each other's global
 		// audio variables: direct packets (receiver == null) own EC29_VonRange,
 		// radio packets own the ear-routing/quality/jam/volume set. Without the
@@ -210,6 +214,15 @@ modded class SCR_VoNComponent
 	{
 		if (!EC29_EnsureRangeVar())
 			return;
+
+		// SPECTATING LISTENER: hearing is anchored to the editor manager and shaped by the
+		// spectator curve in von.acp, so no distance fade here - the controlled entity (a corpse,
+		// a placeholder body, nothing) is not where this listener stands. Never an opened Game Master.
+		if (EC29_IsSpectatingListener())
+		{
+			EC29_WriteRangeGainHeld(1.0);
+			return;
+		}
 
 		float volume = 1.0;
 
@@ -256,6 +269,33 @@ modded class SCR_VoNComponent
 		}
 
 		EC29_WriteRangeGainHeld(volume);
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! True while the local player spectates through EC29_SpectatorVonService.
+	static bool EC29_IsSpectatingListener()
+	{
+		return EC29_RadioState.GetInstance().SpectatorVon().IsSpectating();
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! The engine asks this to decide whether an entity is an active editor - on every machine,
+	//! for routing and for playback. Vanilla answers "the manager is opened"; a spectating player's
+	//! manager is an active editor too, from the flag replicated on the manager itself (plus the
+	//! local shortcut, which needs no replication round trip).
+	override bool IsEntityActiveEditor(IEntity entity)
+	{
+		if (super.IsEntityActiveEditor(entity))
+			return true;
+
+		SCR_EditorManagerEntity mgr = SCR_EditorManagerEntity.Cast(entity);
+		if (!mgr)
+			return false;
+
+		if (mgr == SCR_EditorManagerEntity.GetInstance() && EC29_RadioState.GetInstance().SpectatorVon().IsSpectating())
+			return true;
+
+		return mgr.EC29_IsSpectatorVoice();
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -359,7 +399,7 @@ modded class SCR_VoNComponent
 			}
 		}
 
-		// Special nets (spectator ghost radios) are engineered to be clean:
+		// Special nets (the spectator net, admin-only nets) are engineered to be clean:
 		// running terrain propagation or jammer degradation on them fights the
 		// owning mod's audio design, so they get neutral values.
 		bool specialNet = EC29_CoexistenceGuard.EC29_IsSpecialNet(receiver);

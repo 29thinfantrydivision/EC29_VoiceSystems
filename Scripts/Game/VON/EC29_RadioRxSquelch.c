@@ -154,7 +154,7 @@ class EC29_RadioRxSquelch
         }
 
         // No squelch on a muted receiver (the engine still delivers packets to
-        // muted transceivers - the spectator mod's radio-OFF toggle is a mute),
+        // muted transceivers, and a spectator radio-off toggle is a mute),
         // and none on another system's net (their mod curates that audio).
         if (receiver && (receiver.IsMuted() || EC29_CoexistenceGuard.EC29_IsSpecialNet(receiver)))
             return;

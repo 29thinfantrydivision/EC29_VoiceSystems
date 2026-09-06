@@ -1,0 +1,21 @@
+SCR_EditorManagerEntity : "{788933FFDC706A68}Prefabs/Editor/EditorManager.et" {
+ ID "6A2C5D1E8B37F4D0"
+ components {
+  BaseRadioComponent "{6522CCCB80DB8599}" {
+   Transceivers {
+    RadioTransceiver "{6A2C5D1E8B37F4D1}" {
+     ChannelFrequency 29000
+     "Transmitting Range" 5000
+     "Min tunable frequency" 29000
+     "Max tunable frequency" 29000
+    }
+   }
+  }
+  EC29_VoNSpectatorLoud "{6A2C5D1E8B37F4D3}" {
+   Filename "{B4C3941EC8B2AD20}Sounds/VON/von.acp"
+  }
+  EC29_VoNSpectatorQuiet "{6A2C5D1E8B37F4D2}" {
+   Filename "{6BA89BD90EA9220F}Sounds/VON/EC29_SpectatorVonQuiet.acp"
+  }
+ }
+}

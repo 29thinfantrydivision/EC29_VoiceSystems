@@ -78,8 +78,8 @@ modded class SCR_VONController
         if (EC29_CoexistenceGuard.ShouldYieldVoiceRange())
             return;
 
-        // Spectator block: cycling voice range on a ghost body writes replicated VoN state on an
-        // entity whose direct speech is locked - pointless at best, confusing telemetry at worst.
+        // Spectator block: a spectator's direct speech is locked, so cycling its range writes
+        // replicated VoN state for nothing - pointless at best, confusing telemetry at worst.
         if (EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
             return;
         if (!m_VONComp)
@@ -394,7 +394,7 @@ modded class SCR_VONController
     }
 
     //! ------------------------------------------------------------------------------------------
-    //! VANILLA RADIO/DIRECT TRANSMIT IS REMOVED WHILE DRIVING THE SPECTATOR GHOST - the
+    //! VANILLA RADIO/DIRECT TRANSMIT IS REMOVED WHILE SPECTATING - the
     //! capability, not one key binding. A spectator has the service's own push-to-talk, which
     //! drives capture directly; vanilla's VON actions are a SECOND, parallel route to the same
     //! microphone and radio that the spectator system never asked for - it transmits on whatever
@@ -404,8 +404,9 @@ modded class SCR_VONController
     //! not DEPEND on one mechanism holding), and the cycle/long-range blocks close the
     //! net-change route.
     //!
-    //! The gate is DERIVED PER CALL ("is the local player driving the registered ghost"), never
-    //! latched - see EC29_SpectatorVonService for why. For everyone else this is one check and
+    //! The gate is DERIVED PER CALL from the service's own spectating state, never latched -
+    //! see EC29_SpectatorVonService. It does not depend on what the player controls, which is
+    //! nothing at all once a spectator system takes their entity away. For everyone else this is one check and
     //! then straight into vanilla; the blocks only ever SHORT-CIRCUIT, so whatever the rest of
     //! the modded chain does still happens exactly as it would have for living players.
     //! Signatures must match vanilla EXACTLY, including the default argument, or the override is
@@ -521,7 +522,7 @@ modded class SCR_VONController
         // Spectator block placement is asymmetric ON PURPOSE. The alternate-PTT poll is an edge
         // detector over a latched state (m_bAlternatePTTActive), not a stateless action - and the
         // spectator gate, unlike the session-constant coexistence yield above, is derived per
-        // frame and can flip TRUE mid-hold when a player dies into the ghost with the key down.
+        // frame and can flip TRUE mid-hold when a player enters spectate with the key down.
         // A whole-tail early-return here would strand the latch: the release edge would never be
         // seen, the saved primary entry never restored, and the transmitting-on-alternate flag
         // (and its CYAN HUD state) stuck for the entire spectate. So only the START edge is
@@ -540,7 +541,7 @@ modded class SCR_VONController
         }
 
         // The radial-menu actions are stateless per-press handlers, so the blanket gate is safe
-        // here - and while driving a ghost they are all meaningless at best.
+        // here - and while spectating they are all meaningless at best.
         if (EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
             return;
 
@@ -632,8 +633,8 @@ modded class SCR_VONController
         if (!transceiver)
             return;
 
-        // Never retune another system's net (spectator ghost radio) - a changed
-        // frequency breaks that system until the entity is rebuilt.
+        // Never retune another system's net (the spectator net, an admin-only net) - a changed
+        // frequency breaks that system until its owner rebuilds it.
         if (EC29_CoexistenceGuard.EC29_IsSpecialNet(transceiver))
             return;
 

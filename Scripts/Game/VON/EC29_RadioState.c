@@ -77,9 +77,9 @@ class EC29_RadioState
 	}
 
 	//------------------------------------------------------------------------------------------------
-	//! Spectator voice service - the EC29-owned half of the spectator mod's voice split (the
-	//! spectator mod keeps lifecycle and input, this keeps voice). Sharing the world-scoped
-	//! lifecycle here is what guarantees no spectator voice state survives a scenario change.
+	//! Spectator voice, owned by EC29: whatever runs the spectating keeps lifecycle, input and
+	//! camera, this keeps voice. Sharing the world-scoped lifecycle here is what guarantees no
+	//! spectator voice state survives a scenario change.
 	EC29_SpectatorVonService SpectatorVon()
 	{
 		return m_SpectatorVon;
