@@ -41,12 +41,22 @@
 //------------------------------------------------------------------------------------------------
 class EC29_SpectatorVonService
 {
+	//! THE NET IS SEPARATED BY FREQUENCY, NOT BY MUTING. The transceiver ships PARKED on 28000 and is
+	//! tuned to 29000 only while spectating, then parked again on the way out. Parked is the prefab
+	//! default, so a player who never spectates - and a Game Master, whose editor Open() builds a VON
+	//! entry for every transceiver whether we like it or not - is off the net with no code having to
+	//! run. Both ends of the band sit below 30000, so no player radio reaches either and EC29's own
+	//! special-net rules still apply to both. SetTransceiverFrequency is the one radio setter the
+	//! engine documents as syncing to the server (range and encryption key demonstrably do not).
 	static const int EC29_SPECTATOR_NET_KHZ = 29000;
+	static const int EC29_SPECTATOR_PARK_KHZ = 28000;
 	protected static const string EC29_LISTENING_VAR  = "EC29_SpectatorListening";
 	protected static const string EC29_LISTENING_CONF = "{33A27275C95E0302}Sounds/VON/EC29_LocalVariables_VON.conf";
 
 	protected static const float SNAP_DIST_M = 25;
 	protected static const float SNAP_MIN_MS = 200;
+	protected static const float SNAP_LOG_MS = 2000;
+	protected static const int TUNE_VERIFY_MS = 1000;
 	protected static const int POWER_RETRY_MS = 1000;
 	protected static const int POWER_RETRY_MAX = 5;
 
@@ -59,6 +69,7 @@ class EC29_SpectatorVonService
 	protected vector m_vLastSnapPos;
 	protected bool m_bHasSnapPos;
 	protected float m_fLastSnapMs;
+	protected float m_fLastSnapLogMs;
 
 	//------------------------------------------------------------------------------------------------
 	//! Gate for the vanilla VON action blocks in EC29_VON_VONController: a spectator has no vanilla
@@ -143,6 +154,8 @@ class EC29_SpectatorVonService
 		if (!net)
 			Print("[EC29-DBG][SpecVon] EnterSpectate: manager radio has no spectator transceiver - EC29_EditorManager.et not in use? Push-to-talk will be dead", LogLevel.WARNING);
 
+		EC29_TuneNet(radio, net, EC29_SPECTATOR_NET_KHZ);
+
 		// Spectators hear ONLY the spectator net: the editor channel is GM chatter, the faction
 		// channels are the living. Both muted for the session, restored on exit.
 		SetOtherChannelsMuted(radio, net, true);
@@ -182,7 +195,10 @@ class EC29_SpectatorVonService
 				freq = net.GetFrequency();
 				range = net.GetRange();
 			}
-			PrintFormat("[EC29-DBG][SpecVon] EnterSpectate pid=%1 ear=%2 quietTier=%3 net(freq=%4 range=%5)", pid, hearing.Type(), quiet != null, freq, range);
+			// The manager id is here so a reconnecting player's stale-vs-fresh manager is visible
+			// against the server's own "pid N spectator-voice" line.
+			PrintFormat("[EC29-DBG][SpecVon] EnterSpectate pid=%1 mgr=%2 ear=%3 quietTier=%4 net(freq=%5 range=%6 muted=%7) powered=%8", pid, EC29_RplIdOf(mgr), hearing.Type(), quiet != null, freq, range, net != null && net.IsMuted(), radio != null && radio.IsPowered());
+			PrintFormat("[EC29-DBG][SpecVon] manager radio transceivers:%1", EC29_DumpTransceivers(radio));
 		}
 	}
 
@@ -221,6 +237,12 @@ class EC29_SpectatorVonService
 		m_vLastSnapPos = mat[3];
 		m_bHasSnapPos = true;
 		m_fLastSnapMs = now;
+
+		if (EC29_Debug.VERBOSE && now - m_fLastSnapLogMs >= SNAP_LOG_MS)
+		{
+			m_fLastSnapLogMs = now;
+			PrintFormat("[EC29-DBG][SpecVon] snap sent cam=%1 mgrLocal=%2", mat[3], mgr.GetOrigin());
+		}
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -257,7 +279,14 @@ class EC29_SpectatorVonService
 		}
 
 		if (!m_bSpectating || !m_bNetEnabled || m_bTransmitting || !hearing || !ctl)
+		{
+			// The one refusal with no trace of its own: a key-up that never became a key-down looks
+			// exactly like a listener who heard nothing, so say which condition swallowed it.
+			if (EC29_Debug.VERBOSE)
+				PrintFormat("[EC29-DBG][SpecVon] TX refused - spectating=%1 netEnabled=%2 alreadyTx=%3 ear=%4 ctl=%5", m_bSpectating, m_bNetEnabled, m_bTransmitting, hearing != null, ctl != null);
+
 			return;
+		}
 
 		BaseRadioComponent radio = BaseRadioComponent.Cast(mgr.FindComponent(BaseRadioComponent));
 		BaseTransceiver net = SpectatorTransceiver(radio);
@@ -287,6 +316,9 @@ class EC29_SpectatorVonService
 		}
 
 		m_bTransmitting = von.SetCapture(true);
+
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][SpecVon] TX start capture=%1 freq=%2 muted=%3 powered=%4", m_bTransmitting, net.GetFrequency(), net.IsMuted(), radio != null && radio.IsPowered());
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -334,18 +366,22 @@ class EC29_SpectatorVonService
 
 			BaseRadioComponent radio = BaseRadioComponent.Cast(mgr.FindComponent(BaseRadioComponent));
 
-			// Session mutes off (a Game Master's editor channels come back), the spectator net
-			// muted and the LOCAL radio copy unpowered. The server unpowers its copy through
-			// EC29_AskSpectatorVoice below and the cleared flag stops routing - but a living player's
-			// own manager radio must not sit powered and unmuted on the spectator net for the length
-			// of two round trips, or ever if one is lost: the dead audible to the living is the one
-			// failure this system exists to prevent. Skipped while a real editor is open: vanilla owns
-			// power then, and Open() muted the net itself. Re-entry re-derives both (ApplyMuteSync,
-			// SetPower in EnterSpectate).
+			// Session mutes off (a Game Master's editor channels come back), then three independent
+			// ways of being off the net: parked back on 28000, muted, unpowered. Only the park is
+			// load-bearing; the other two cover a park that never landed. A living player audible to
+			// - or hearing - the dead is the one failure this system exists to prevent, so it does
+			// not rest on a single call surviving a crash teardown or a lost round trip. Power is
+			// left alone while a real editor is open: vanilla owns it then. Re-entry re-derives all
+			// three.
 			SetOtherChannelsMuted(radio, null, false);
 			BaseTransceiver net = SpectatorTransceiver(radio);
+			EC29_TuneNet(radio, net, EC29_SPECTATOR_PARK_KHZ);
+
+			// The mute stays as a second line: a missed park (crash teardown, a lost RPC) would
+			// otherwise leave a living player sitting on the net.
 			if (net && !net.IsMuted())
 				net.SetMuteState(true);
+
 			if (radio && radio.IsPowered() && !mgr.IsOpened())
 				radio.SetPower(false);
 		}
@@ -372,7 +408,7 @@ class EC29_SpectatorVonService
 		SyncListeningVar();
 
 		if (EC29_Debug.VERBOSE)
-			Print("[EC29-DBG][SpecVon] ExitSpectate - direct speech restored, manager voice disconnected", LogLevel.NORMAL);
+			PrintFormat("[EC29-DBG][SpecVon] ExitSpectate mgr=%1 - direct speech restored, manager voice disconnected, net muted and local radio unpowered", EC29_RplIdOf(mgr));
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -583,6 +619,82 @@ class EC29_SpectatorVonService
 	}
 
 	//------------------------------------------------------------------------------------------------
+	//! Diagnostics: what the manager radio ACTUALLY carries at runtime. The question this answers is
+	//! whether declaring Transceivers in a derived prefab appends to the inherited array or replaces
+	//! it - if the editor and faction channels are missing here, EC29_EditorManager.et has silently
+	//! taken a real Game Master's radio away from them, which no spectator symptom would reveal.
+	protected string EC29_DumpTransceivers(BaseRadioComponent radio)
+	{
+		if (!radio)
+			return " <no radio>";
+
+		string dump;
+		for (int i = 0, count = radio.TransceiversCount(); i < count; i++)
+		{
+			BaseTransceiver trx = radio.GetTransceiver(i);
+			if (!trx)
+			{
+				dump = string.Format("%1 [%2]<null>", dump, i);
+				continue;
+			}
+
+			string kind = "OTHER";
+			if (trx.IsInherited(EditorTransceiver))
+				kind = "EDITOR";
+			else if (trx.IsInherited(EditorFactionTransceiver))
+				kind = "FACTION";
+
+			dump = string.Format("%1 [%2]%3 freq=%4 range=%5 muted=%6", dump, i, kind, trx.GetFrequency(), trx.GetRange(), trx.IsMuted());
+		}
+
+		return dump;
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! No-op when already there - the setter replicates, so re-sending it every entry is traffic for
+	//! nothing. Frequency is read back rather than assumed: on a client-owned manager it is the only
+	//! radio property that has ever been observed to stick, and if that stops being true this net
+	//! silently stops existing.
+	protected void EC29_TuneNet(BaseRadioComponent radio, BaseTransceiver net, int khz)
+	{
+		if (!radio || !net || net.GetFrequency() == khz)
+			return;
+
+		// BaseTransceiver.SetFrequency, NOT BaseRadioComponent.SetTransceiverFrequency. The latter is
+		// documented as "set frequency and sync with server" - an owner-to-server request, and on a
+		// listen server that request has nothing to loop back to, so it silently no-ops on the host
+		// while working fine from a remote client (field-measured 2026-09-07: peer STUCK at 29000,
+		// host REFUSED, same code path). SetFrequency is the one the engine documents as supporting
+		// "proxies and server".
+		net.SetFrequency(khz);
+
+		// The immediate read-back means little either way - the deferred check below is the answer.
+		if (EC29_Debug.VERBOSE)
+		{
+			PrintFormat("[EC29-DBG][SpecVon] net tune asked %1 kHz (immediate read back %2)", khz, net.GetFrequency());
+			GetGame().GetCallqueue().CallLater(EC29_VerifyTune, TUNE_VERIFY_MS, false, khz);
+		}
+	}
+
+	//------------------------------------------------------------------------------------------------
+	protected void EC29_VerifyTune(int khz)
+	{
+		SCR_EditorManagerEntity mgr = SCR_EditorManagerEntity.GetInstance();
+		if (!mgr)
+			return;
+
+		BaseTransceiver net = SpectatorTransceiver(BaseRadioComponent.Cast(mgr.FindComponent(BaseRadioComponent)));
+		if (!net)
+			return;
+
+		int now = net.GetFrequency();
+		if (now == khz)
+			PrintFormat("[EC29-DBG][SpecVon] net tune STUCK at %1 kHz", now, level: LogLevel.NORMAL);
+		else
+			PrintFormat("[EC29-DBG][SpecVon] net tune REFUSED - asked %1 kHz, still %2 kHz", khz, now, level: LogLevel.WARNING);
+	}
+
+	//------------------------------------------------------------------------------------------------
 	//! Receive-mute on the spectator transceiver only; the other channels are the session mutes.
 	protected void ApplyMuteSync()
 	{
@@ -635,6 +747,20 @@ class EC29_SpectatorVonService
 	protected SCR_VoNComponent QuietTier(notnull SCR_EditorManagerEntity mgr)
 	{
 		return EC29_VoNSpectatorQuiet.Cast(mgr.FindComponent(EC29_VoNSpectatorQuiet));
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Diagnostics only - "none" for an unreplicated or null entity.
+	protected string EC29_RplIdOf(IEntity ent)
+	{
+		if (!ent)
+			return "none";
+
+		RplComponent rpl = RplComponent.Cast(ent.FindComponent(RplComponent));
+		if (!rpl)
+			return "none";
+
+		return rpl.Id().AsString();
 	}
 
 	//------------------------------------------------------------------------------------------------

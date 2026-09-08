@@ -5,6 +5,9 @@
 //------------------------------------------------------------------------------------------------
 modded class SCR_PlayerController
 {
+	protected static const float EC29_SNAP_LOG_MS = 2000;
+	protected float m_fEC29LastSnapLogMs;
+
 	//------------------------------------------------------------------------------------------------
 	//! On a listen server the requester IS the server; an Rpc to Server from the authority does
 	//! not necessarily loop back, so the handler is called directly.
@@ -46,7 +49,16 @@ modded class SCR_PlayerController
 		}
 
 		if (EC29_Debug.VERBOSE)
-			PrintFormat("[EC29-DBG][SpecVon] server: pid %1 spectator-voice=%2 radio powered=%3", GetPlayerId(), enable, powered);
+		{
+			// The manager id pairs with the owner's own EnterSpectate line: a reconnecting player
+			// whose core handed back a different manager shows up as two different ids.
+			string mgrId = "none";
+			RplComponent mgrRpl = RplComponent.Cast(mgr.FindComponent(RplComponent));
+			if (mgrRpl)
+				mgrId = mgrRpl.Id().AsString();
+
+			PrintFormat("[EC29-DBG][SpecVon] server: pid %1 mgr=%2 spectator-voice=%3 radio powered=%4", GetPlayerId(), mgrId, enable, powered);
+		}
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -66,7 +78,25 @@ modded class SCR_PlayerController
 		if (!mgr || !mgr.EC29_IsSpectatorVoice())
 			return;
 
+		vector before = mgr.GetOrigin();
 		mgr.SetOrigin(pos);
+
+		// Read back rather than trust the call: SetOrigin on a CLIENT-OWNED entity has historically
+		// reported success on the server and changed nothing. A "was/asked/now" that disagrees says
+		// the authority cannot place this manager at all, which no range tuning can fix.
+		if (!EC29_Debug.VERBOSE)
+			return;
+
+		BaseWorld world = GetGame().GetWorld();
+		if (!world)
+			return;
+
+		float now = world.GetWorldTime();
+		if (now - m_fEC29LastSnapLogMs < EC29_SNAP_LOG_MS)
+			return;
+
+		m_fEC29LastSnapLogMs = now;
+		PrintFormat("[EC29-DBG][SpecVon] server: snap pid=%1 was=%2 asked=%3 now=%4", GetPlayerId(), before, pos, mgr.GetOrigin());
 	}
 
 	//------------------------------------------------------------------------------------------------

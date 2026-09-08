@@ -21,6 +21,8 @@ modded class SCR_VoNComponent
 
 	// Debug: last gain logged per speaker so OnReceive logging doesn't spam every voice packet.
 	protected static ref map<int, float> s_mEC29DbgLastGain = new map<int, float>();
+	protected static ref map<int, float> s_mEC29DbgLastVonUsedMs = new map<int, float>();
+	protected static const int EC29_VONUSED_LOG_MS = 2000;
 
 	// One global gain variable serves every concurrently playing direct stream
 	// (last-writer-wins). The loudest recently-active stream owns it: while a
@@ -276,6 +278,79 @@ modded class SCR_VoNComponent
 	static bool EC29_IsSpectatingListener()
 	{
 		return EC29_RadioState.GetInstance().SpectatorVon().IsSpectating();
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! SERVER-SIDE TRANSMIT TRACE, diagnostics only.
+	//!
+	//! The engine routes a spectator's voice from GetEditorWorldLocation(senderId) - the SERVER's
+	//! copy of that player's editor manager, which for a client-owned manager moves ONLY through
+	//! the owner's snap RPC. So the server's idea of where a spectator is speaking from can differ
+	//! from the camera, and a receiver falls out of range with nothing to show for it. This prints
+	//! the sender's server-side manager position and its distance to every other spectating
+	//! manager, so an out-of-range receiver is visible rather than inferred.
+	//!
+	//! Throttled per sender: the engine raises this per voice packet.
+	override protected event void OnVoNUsed(int senderId)
+	{
+		super.OnVoNUsed(senderId);
+
+		if (!EC29_Debug.VERBOSE)
+			return;
+
+		BaseWorld world = GetGame().GetWorld();
+		if (!world)
+			return;
+
+		float now = world.GetWorldTime();
+		float last;
+		if (s_mEC29DbgLastVonUsedMs.Find(senderId, last) && now - last < EC29_VONUSED_LOG_MS)
+			return;
+
+		s_mEC29DbgLastVonUsedMs.Set(senderId, now);
+
+		SCR_EditorManagerCore core = SCR_EditorManagerCore.Cast(SCR_EditorManagerCore.GetInstance(SCR_EditorManagerCore));
+		if (!core)
+			return;
+
+		SCR_EditorManagerEntity sender = core.GetEditorManager(senderId);
+		if (!sender)
+			return;
+
+		vector from = sender.GetOrigin();
+
+		PlayerManager pm = GetGame().GetPlayerManager();
+		if (!pm)
+			return;
+
+		array<int> players = {};
+		pm.GetPlayers(players);
+
+		string others;
+		foreach (int pid : players)
+		{
+			if (pid == senderId)
+				continue;
+
+			SCR_EditorManagerEntity other = core.GetEditorManager(pid);
+			if (!other || !other.EC29_IsSpectatorVoice())
+				continue;
+
+			// Power is the SERVER-side receiver gate - an unpowered manager is filtered out before
+			// anything is sent, so it explains a silent listener that mute (client-side) cannot.
+			BaseRadioComponent otherRadio = BaseRadioComponent.Cast(other.FindComponent(BaseRadioComponent));
+			// Frequency comes from the SERVER's copy, so it says whether a spectator's retune actually
+			// replicated - a client that reads 29000 locally while the server still sees 28000 is on
+			// a net of one.
+			BaseTransceiver otherNet = EC29_SpectatorVonService.SpectatorTransceiver(otherRadio);
+			int otherFreq = -1;
+			if (otherNet)
+				otherFreq = otherNet.GetFrequency();
+
+			others = string.Format("%1 pid%2@%3(%4m,powered=%5,freq=%6)", others, pid, other.GetOrigin(), Math.Round(vector.Distance(from, other.GetOrigin())), otherRadio != null && otherRadio.IsPowered(), otherFreq);
+		}
+
+		PrintFormat("[EC29-DBG][SpecVon] server: VoN used by pid=%1 senderMgr=%2 spectators:%3", senderId, from, others);
 	}
 
 	//------------------------------------------------------------------------------------------------
