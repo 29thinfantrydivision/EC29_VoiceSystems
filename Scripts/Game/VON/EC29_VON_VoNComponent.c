@@ -1,12 +1,14 @@
 modded class SCR_VoNComponent
 {
+	//! The old direct-speech gain variable. Since 2026-09-12 direct range is per SOURCE - the
+	//! transmitting tier component's ACP (see EC29_VoiceTiers.c) - and this variable is no longer
+	//! modulated. It still sits on the "Bus Ducking When Many Voices" input in von.acp, so it is
+	//! pinned to unity once per world in case a stale value survived a scenario change.
 	static const string EC29_VAR_NAME   = "EC29_VonRange";
 	static const string EC29_VAR_CONFIG = "{33A27275C95E0302}Sounds/VON/EC29_LocalVariables_VON.conf";
 
 	// Radio path: ear routing / signal quality / jamming / per-channel volume
-	// audio variables. Boundary rule: EC29_VonRange gain applies to DIRECT speech
-	// falloff, the radio variables apply to the RADIO path - the two sets never
-	// touch the same audio variable.
+	// audio variables, refreshed per incoming radio packet.
 	protected static const string EC29_EAR_ROUTING_CONFIG = "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf";
 	protected static bool s_bEC29RadioVarsChecked;
 	protected static bool s_bEC29_EEarRoutingValid;
@@ -14,25 +16,21 @@ modded class SCR_VoNComponent
 	protected static bool s_bEC29JamStrengthValid;
 	protected static bool s_bEC29ChannelVolumeValid;
 
-	protected static bool s_bEC29VarValid;
 	protected static bool s_bEC29VarChecked;
 	protected static ref map<int, SCR_VoNComponent> s_mEC29PlayerVon = new map<int, SCR_VoNComponent>();
 	protected static ref map<int, IEntity> s_mEC29PlayerVonEntity = new map<int, IEntity>();
 
-	// Debug: last gain logged per speaker so OnReceive logging doesn't spam every voice packet.
-	protected static ref map<int, float> s_mEC29DbgLastGain = new map<int, float>();
+	// Server-side transmit trace throttle (see OnVoNUsed).
 	protected static ref map<int, float> s_mEC29DbgLastVonUsedMs = new map<int, float>();
 	protected static const int EC29_VONUSED_LOG_MS = 2000;
 
-	// One global gain variable serves every concurrently playing direct stream
-	// (last-writer-wins). The loudest recently-active stream owns it: while a
-	// nearby speaker is talking, a far speaker's near-floor writes - including
-	// the proximity component every radio transmission produces - are held
-	// back instead of chopping the nearby voice to silence. The hold window
-	// bounds how long a stale louder value can linger once its speaker stops.
-	protected static float s_fEC29ActiveGain;
-	protected static float s_fEC29ActiveGainSetMs;
-	protected static const int EC29_GAIN_HOLD_MS = 400;
+	// Receive-side dedupe. A character now carries four VoN components (the stock ear plus the
+	// three transmit tiers, all this modded class). Whether the engine delivers OnReceive to the
+	// first component only or to every one is not documented, so the per-packet bookkeeping
+	// below runs once per (speaker, world-time) whichever it is. Vanilla's super still runs on
+	// each call - its display update is idempotent.
+	protected static ref map<int, float> s_mEC29LastPacketMs = new map<int, float>();
+	protected static bool s_bEC29ReceiverTypeLogged;
 
 	// World-lifecycle guard for the static caches above: playerIds and component
 	// pointers are world-scoped, statics are not. Weak member nulls with its world;
@@ -51,16 +49,21 @@ modded class SCR_VoNComponent
 		s_EC29OwnerWorld = currentWorld;
 		s_mEC29PlayerVon.Clear();
 		s_mEC29PlayerVonEntity.Clear();
-		s_mEC29DbgLastGain.Clear();
+		s_mEC29LastPacketMs.Clear();
 		s_bEC29VarChecked = false;
 		s_bEC29RadioVarsChecked = false;
-		s_fEC29ActiveGain = 0;
-		s_fEC29ActiveGainSetMs = 0;
+		s_bEC29ReceiverTypeLogged = false;
 	}
 
 	//! Spawn default is WHISPER (issue #11): noise discipline out of the gate, F3
 	//! cycles up when needed. The HUD seed in EC29_VON_VoiceRangeDisplay.c must
 	//! match this initializer or the icon lies until the first F3 press.
+	//!
+	//! LIVES ON THE STOCK COMPONENT ONLY. The three tier components on a character are the same
+	//! modded class and so carry this field too, but nothing reads or writes theirs: the mode is
+	//! read from EC29_VoiceTiers.StockVoN(entity), and the transmit tier is chosen from it on
+	//! the speaker's machine (SCR_VONController.EC29_ApplyVoiceTier). Listeners use it for the
+	//! overlay label and the visual range gates only - never for audio.
 	[RplProp(onRplName: "EC29_OnVoiceRangeReplicated")]
 	protected EC29_EVoiceRange m_eEC29VoiceRange = EC29_EVoiceRange.WHISPER;
 
@@ -68,14 +71,29 @@ modded class SCR_VoNComponent
 	//! RplProp callback - fires on all clients when m_eEC29VoiceRange changes.
 	//! Used to push the new mode into the VoN overlay so the WHISPER / YELLING label
 	//! refreshes mid-transmission instead of only on the next new transmission.
+	//!
+	//! On the SPEAKER'S OWN client it is also the safety net for the transmit tier: F3 applied
+	//! the tier locally before the request left, so this is normally a no-op, but a mode that
+	//! arrives any other way (a server-side set, a rejected request leaving the old value) lands
+	//! here and re-selects the tier to match.
 	protected void EC29_OnVoiceRangeReplicated()
 	{
 		if (EC29_Debug.VERBOSE)
 			PrintFormat("[EC29-DBG][VoN] CLIENT received replicated voice range: %1", typename.EnumToString(EC29_EVoiceRange, m_eEC29VoiceRange));
 		// Can fire from JIP initial-state replication before the local PlayerController
 		// exists; vanilla GetDisplay() dereferences GetPlayerController() unguarded.
-		if (!GetGame().GetPlayerController())
+		PlayerController pc = GetGame().GetPlayerController();
+		if (!pc)
 			return;
+
+		// Engine components expose no owner to script; "is this the local player's stock
+		// component" is answered from the controlled entity's side instead.
+		if (EC29_VoiceTiers.StockVoN(pc.GetControlledEntity()) == this)
+		{
+			SCR_VONController ctl = SCR_VONController.Cast(pc.FindComponent(SCR_VONController));
+			if (ctl)
+				ctl.EC29_ApplyVoiceTier(m_eEC29VoiceRange);
+		}
 
 		SCR_VonDisplay display = GetDisplay();
 		if (display)
@@ -123,8 +141,11 @@ modded class SCR_VoNComponent
 	//!
 	//! Public/static so the UI overlay (EC29_VonDisplay), the over-head nametag
 	//! (EC29_NameTagData) and the HUD icon (EC29_VoiceRangeDisplay) share the cache instead
-	//! of re-doing FindComponent on every audio packet / frame. The cheap
-	//! GetPlayerControlledEntity lookup runs every call; FindComponent only on entity change.
+	//! of re-doing the component scan on every audio packet / frame. The cheap
+	//! GetPlayerControlledEntity lookup runs every call; the scan only on entity change.
+	//!
+	//! Always the STOCK component (exact type), never a transmit tier: the tiers carry no
+	//! replicated mode, and this lookup exists to read the mode.
 	static SCR_VoNComponent EC29_GetVoNForPlayer(int playerId)
 	{
 		IEntity ent = GetGame().GetPlayerManager().GetPlayerControlledEntity(playerId);
@@ -141,7 +162,7 @@ modded class SCR_VoNComponent
 			&& s_mEC29PlayerVonEntity.Find(playerId, cachedEnt) && cachedEnt == ent)
 			return cached;
 
-		SCR_VoNComponent fresh = SCR_VoNComponent.Cast(ent.FindComponent(SCR_VoNComponent));
+		SCR_VoNComponent fresh = EC29_VoiceTiers.StockVoN(ent);
 		if (fresh)
 		{
 			s_mEC29PlayerVon.Set(playerId, fresh);
@@ -172,6 +193,12 @@ modded class SCR_VoNComponent
 		if (!GetGame().GetPlayerController())
 			return;
 
+		if (EC29_IsDuplicatePacket(playerId))
+		{
+			super.OnReceive(playerId, isSenderEditor, receiver, frequency, quality);
+			return;
+		}
+
 		// Feed the VON activity service BEFORE every policy gate below: a packet that arrived is
 		// a player talking, no matter what faction filters, range gating or mute policy do with
 		// the audio. The service itself is spectator-scoped and one flag read when it is not -
@@ -182,24 +209,13 @@ modded class SCR_VoNComponent
 		// exactly now - one bool compare per packet after it sticks (see the service).
 		EC29_RadioState.GetInstance().SpectatorVon().SyncListeningVar();
 
-		// Packet-type gate keeps the two systems from stomping each other's global
-		// audio variables: direct packets (receiver == null) own EC29_VonRange,
-		// radio packets own the ear-routing/quality/jam/volume set. Without the
-		// gate, a far-away radio speaker drags the direct-falloff gain to the
-		// floor mid-conversation, and a nearby direct speaker resets ear routing
-		// to CENTER mid-radio-stream.
+		// DIRECT packets (receiver == null) need NO per-packet work any more: the speaker's range
+		// is applied by the engine from the transmitting tier's ACP (EC29_VoiceTiers.c). The one
+		// thing left is pinning the retired gain variable to unity, once per world. Radio packets
+		// still own the ear-routing/quality/jam/volume set.
 		if (!receiver)
 		{
-			// Editor and spectate senders (GM camera, spectator systems, deploy
-			// screen) have no meaningful position, so they get plain full gain
-			// instead of the falloff math - written steadily, because a playing
-			// editor stream is still modulated by the shared variable, and
-			// leaving it to other speakers' envelope writes pumps the GM's
-			// voice up and down (field: "GM voices fluttering").
-			if (isSenderEditor)
-				EC29_ApplyEditorGain();
-			else
-				EC29_ApplyRangeGain(playerId);
+			EC29_EnsureUnityRangeGain();
 		}
 		else
 		{
@@ -211,66 +227,30 @@ modded class SCR_VoNComponent
 	}
 
 	//------------------------------------------------------------------------------------------------
-	//! Direct-speech falloff gain (whisper/normal/yell). Writes EC29_VonRange only.
-	protected void EC29_ApplyRangeGain(int playerId)
+	//! True when this speaker's packet was already processed at this world time by another VoN
+	//! component on the local character (see s_mEC29LastPacketMs). Also logs, once per world and
+	//! only in VERBOSE, which component class the engine delivered the first packet to - the
+	//! field answer to "first component only, or all of them".
+	protected bool EC29_IsDuplicatePacket(int playerId)
 	{
-		if (!EC29_EnsureRangeVar())
-			return;
+		BaseWorld world = GetGame().GetWorld();
+		if (!world)
+			return false;
 
-		// SPECTATING LISTENER: hearing is anchored to the editor manager and shaped by the
-		// spectator curve in von.acp, so no distance fade here - the controlled entity (a corpse,
-		// a placeholder body, nothing) is not where this listener stands. Never an opened Game Master.
-		if (EC29_IsSpectatingListener())
+		if (!s_bEC29ReceiverTypeLogged)
 		{
-			EC29_WriteRangeGainHeld(1.0);
-			return;
+			s_bEC29ReceiverTypeLogged = true;
+			if (EC29_Debug.VERBOSE)
+				PrintFormat("[EC29-DBG][VoN] first incoming packet delivered to component class %1", Type());
 		}
 
-		float volume = 1.0;
+		float nowMs = world.GetWorldTime();
+		float lastMs;
+		if (s_mEC29LastPacketMs.Find(playerId, lastMs) && lastMs == nowMs)
+			return true;
 
-		EC29_VONSettingsComponent settings = EC29_VONSettingsComponent.GetInstance();
-		if (settings)
-		{
-			// A speaker with no resolvable controlled entity (dead player on the
-			// deploy screen, spectator mid-teardown) has no position to compute
-			// falloff from; ComputeListenerVolume would return the full default,
-			// and writing that seizes the shared variable at packet rate. Leave
-			// the variable to the speakers that do resolve.
-			if (!EC29_GetVoNForPlayer(playerId))
-				return;
-
-			PlayerController localPc = GetGame().GetPlayerController();
-			IEntity listener;
-			if (localPc)
-				listener = localPc.GetControlledEntity();
-
-			// Audio path applies the floor so the source stays alive in the engine.
-			volume = settings.ComputeListenerVolume(playerId, listener, true);
-		}
-		else
-		{
-			// One log per session is enough; settings==null means the GameMode_Base override didn't apply.
-			if (!s_mEC29DbgLastGain.Contains(-1))
-			{
-				s_mEC29DbgLastGain.Set(-1, 1.0);
-				Print("[EC29-DBG][VoN] EC29_VONSettingsComponent.GetInstance() is NULL during OnReceive - GameMode prefab override not applied; gain stays 1.0", LogLevel.WARNING);
-			}
-		}
-
-		// Throttled receive-path logging: only when this speaker's computed gain
-		// changes noticeably. The throttle map only exists to feed this log, so
-		// the whole block sits behind the debug gate.
-		if (EC29_Debug.VERBOSE)
-		{
-			float lastGain;
-			if (!s_mEC29DbgLastGain.Find(playerId, lastGain) || Math.AbsFloat(lastGain - volume) > 0.02)
-			{
-				s_mEC29DbgLastGain.Set(playerId, volume);
-				PrintFormat("[EC29-DBG][VoN] OnReceive: speaker playerId=%1 computed gain=%2 for audio var '%3'", playerId, volume, EC29_VAR_NAME);
-			}
-		}
-
-		EC29_WriteRangeGainHeld(volume);
+		s_mEC29LastPacketMs.Set(playerId, nowMs);
+		return false;
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -374,56 +354,24 @@ modded class SCR_VoNComponent
 	}
 
 	//------------------------------------------------------------------------------------------------
-	//! One-time AudioSystem variable lookup so callers can early-out cleanly
-	//! when the conf isn't loaded.
-	protected bool EC29_EnsureRangeVar()
+	//! Pins the retired EC29_VonRange variable to 1.0 once per world. Its conf default is already
+	//! 1, but the audio system's variables outlive a scenario, so a value written by a pre-tier
+	//! build (or a stale scenario) would otherwise keep ducking every direct stream.
+	protected void EC29_EnsureUnityRangeGain()
 	{
-		if (!s_bEC29VarChecked)
-		{
-			s_bEC29VarChecked = true;
-			s_bEC29VarValid = (AudioSystem.GetVariableIDByName(EC29_VAR_NAME, EC29_VAR_CONFIG) != -1);
-
-			if (!s_bEC29VarValid)
-				PrintFormat("[EC29_VON] AudioSystem variable lookup FAILED: name='%1' config='%2' - audio modulation disabled", EC29_VAR_NAME, EC29_VAR_CONFIG, level: LogLevel.WARNING);
-			else if (EC29_Debug.VERBOSE)
-				PrintFormat("[EC29-DBG][VoN] AudioSystem variable '%1' resolved OK - von.acp override + local variables conf are loaded", EC29_VAR_NAME);
-		}
-
-		return s_bEC29VarValid;
-	}
-
-	//------------------------------------------------------------------------------------------------
-	//! Editor/spectate speech: plain full gain, written steadily for the
-	//! stream's duration so concurrent envelope writes cannot pump it.
-	protected void EC29_ApplyEditorGain()
-	{
-		if (!EC29_EnsureRangeVar())
+		if (s_bEC29VarChecked)
 			return;
 
-		EC29_WriteRangeGainHeld(1.0);
-	}
+		// The conf is only resolvable once von.acp has been loaded for a playing stream; keep
+		// trying per packet until the lookup succeeds, then never again this world.
+		if (AudioSystem.GetVariableIDByName(EC29_VAR_NAME, EC29_VAR_CONFIG) == -1)
+			return;
 
-	//------------------------------------------------------------------------------------------------
-	//! Loudest-recently-active-stream ownership of the shared gain variable.
-	//! A quieter write only goes through once the current louder value has
-	//! gone stale (its speaker stopped or their packets paused); equal or
-	//! louder always wins and refreshes the hold, so a nearby speaker keeps
-	//! ownership while talking and a speaker walking away steps their own
-	//! gain down at worst EC29_GAIN_HOLD_MS late.
-	protected void EC29_WriteRangeGainHeld(float volume)
-	{
-		BaseWorld world = GetGame().GetWorld();
-		if (world)
-		{
-			float nowMs = world.GetWorldTime();
-			if (volume < s_fEC29ActiveGain && (nowMs - s_fEC29ActiveGainSetMs) <= EC29_GAIN_HOLD_MS)
-				return;
+		s_bEC29VarChecked = true;
+		AudioSystem.SetVariableByName(EC29_VAR_NAME, 1.0, EC29_VAR_CONFIG);
 
-			s_fEC29ActiveGain = volume;
-			s_fEC29ActiveGainSetMs = nowMs;
-		}
-
-		AudioSystem.SetVariableByName(EC29_VAR_NAME, volume, EC29_VAR_CONFIG);
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][VoN] '%1' pinned to unity - direct range is per transmit tier now", EC29_VAR_NAME);
 	}
 
 	//------------------------------------------------------------------------------------------------

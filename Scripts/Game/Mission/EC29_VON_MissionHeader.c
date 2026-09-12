@@ -1,6 +1,6 @@
 modded class SCR_MissionHeader
 {
-	[Attribute(desc: "EC29 VON voice range settings", category: "EC29_VON")]
+	[Attribute(desc: "EC29 VON overlay and nametag policy. Direct-speech ranges are fixed per transmit tier in the mod's ACPs (whisper 2/6 m, normal 15/20 m, yell 50/80 m) and are not mission-tunable.", category: "EC29_VON")]
 	ref EC29_VON_Settings m_EC29_VON_Settings;
 }
 
@@ -11,16 +11,6 @@ class EC29_VON_Settings : ScriptAndConfig
 	//------------------------------------------------------------------------------------------------
 	void EC29_VON_Settings()
 	{
-		m_fWhisperRange  = 3.0;
-		m_fNormalRange   = 15.0;
-		m_fNormalFalloffEnd = 20.0;
-		m_fYellRange     = 50.0;
-		m_fFalloffPower  = 4.0;
-		m_fWhisperVolume = 1.0;
-		m_fNormalVolume  = 1.0;
-		m_fYellVolume    = 3.0;
-		m_fMinVolume     = 0.05;
-
 		m_bAlwaysShowEnemyNames         = true;
 		m_bEnableVonFactionNameColoring = true;
 		m_bHideFriendlyDirectIncoming   = false;
@@ -30,34 +20,6 @@ class EC29_VON_Settings : ScriptAndConfig
 		m_bGateNameTagVonByRange        = true;
 
 	}
-
-	// VoN Range Setings
-	[Attribute(defvalue: "3.0", uiwidget: UIWidgets.EditBox, desc: "Whisper characteristic range in meters. Beyond this distance, volume falls off as (R/dist)^FalloffPower.", params: "0 inf 0.5", category: "EC29_VON")]
-	float m_fWhisperRange;
-
-	[Attribute(defvalue: "15.0", uiwidget: UIWidgets.EditBox, desc: "Normal voice range in meters: full volume inside this distance, then a straight-line fade to silence at NormalFalloffEnd.", params: "0 inf 0.5", category: "EC29_VON")]
-	float m_fNormalRange;
-
-	[Attribute(defvalue: "20.0", uiwidget: UIWidgets.EditBox, desc: "Distance in meters at which NORMAL voice is fully silent. Must exceed NormalRange; the fade runs linearly between the two. Set equal to NormalRange for a hard cutoff.", params: "0 inf 0.5", category: "EC29_VON")]
-	float m_fNormalFalloffEnd;
-
-	[Attribute(defvalue: "50.0", uiwidget: UIWidgets.EditBox, desc: "Yell characteristic range in meters. Beyond this distance, volume falls off but base volume is high so it still carries.", params: "0 inf 0.5", category: "EC29_VON")]
-	float m_fYellRange;
-
-	[Attribute(defvalue: "4.0", uiwidget: UIWidgets.EditBox, desc: "Falloff exponent for the inverse-power decay outside characteristic range. 2.0 = inverse-square, 1.0 = inverse-linear (gentler).", params: "0.1 8 0.1", category: "EC29_VON")]
-	float m_fFalloffPower;
-
-	[Attribute(defvalue: "1.0", uiwidget: UIWidgets.EditBox, desc: "Whisper base volume multiplier (within range).", params: "0 3 0.05", category: "EC29_VON")]
-	float m_fWhisperVolume;
-
-	[Attribute(defvalue: "1.0", uiwidget: UIWidgets.EditBox, desc: "Normal base volume multiplier.", params: "0 3 0.05", category: "EC29_VON")]
-	float m_fNormalVolume;
-
-	[Attribute(defvalue: "3.0", uiwidget: UIWidgets.EditBox, desc: "Yell base volume multiplier (within range). Capped at 3 to match the EC29_VonRange audio variable's value_max; raise both together for louder yelling.", params: "0 3 0.05", category: "EC29_VON")]
-	float m_fYellVolume;
-
-	[Attribute(defvalue: "0.05", uiwidget: UIWidgets.EditBox, desc: "Minimum amplitude floor. Volumes below this are clamped up to keep the audio source alive in the engine (otherwise it culls and won't recover until the next transmission). 0.05 (~-26 dB) is inaudible in practice but enough to keep the source warm.", params: "0 1 0.01", category: "EC29_VON")]
-	float m_fMinVolume;
 
 	// VoN UI Settings
 	[Attribute(defvalue: "1", uiwidget: UIWidgets.CheckBox, desc: "Always show enemy sender names in the VoN overlay (vanilla swaps to UNKNOWN SOURCE for enemies).", category: "EC29_VON")]

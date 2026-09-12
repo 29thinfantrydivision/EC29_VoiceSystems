@@ -171,13 +171,10 @@ modded class SCR_VonDisplay
 		}
 		else
 		{
+			// The stock component carries the mode; the transmitting one is a tier (EC29_VoiceTiers.c).
 			PlayerController localPc = GetGame().GetPlayerController();
 			if (localPc)
-			{
-				IEntity controlled = localPc.GetControlledEntity();
-				if (controlled)
-					senderVon = SCR_VoNComponent.Cast(controlled.FindComponent(SCR_VoNComponent));
-			}
+				senderVon = EC29_VoiceTiers.StockVoN(localPc.GetControlledEntity());
 		}
 
 		if (!senderVon)
@@ -205,8 +202,8 @@ modded class SCR_VonDisplay
 	}
 
 	//------------------------------------------------------------------------------------------------
-	//! Hide the overlay entry when the speaker is below the listener's audibility
-	//! threshold. Mirrors the audio path exactly through the shared helper.
+	//! Hide the overlay entry when the speaker is outside the outer range of the tier they are
+	//! transmitting on - the same visual gate the nametag uses (EC29_VONSettingsComponent).
 	protected bool EC29_ShouldHideOutOfRange(int senderPlayerId)
 	{
 		EC29_VONSettingsComponent settings = EC29_VONSettingsComponent.GetInstance();

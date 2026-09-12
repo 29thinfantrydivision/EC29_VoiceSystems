@@ -1,7 +1,8 @@
 //------------------------------------------------------------------------------------------------
 //! Voice transmission range mode for direct VoN.
-//! Maps to a multiplier on the speaker's audio variable that the direct bus
-//! in von.acp reads to scale playback volume per-listener.
+//! Selects which transmit tier component the speaker captures through (EC29_VoiceTiers.c);
+//! the tier's ACP carries the range. Replicated on the stock SCR_VoNComponent for labels and
+//! the visual range gates.
 enum EC29_EVoiceRange
 {
 	WHISPER,
