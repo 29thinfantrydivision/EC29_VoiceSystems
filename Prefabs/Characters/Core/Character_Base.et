@@ -11,5 +11,14 @@ SCR_ChimeraCharacter {
     }
    }
   }
+  SCR_VoNComponent_EC29Whisper "{F7A406E3314354DC}" {
+   Filename "{2B1221C55BB515C7}Sounds/VON/EC29_VonWhisper.acp"
+  }
+  SCR_VoNComponent_EC29Normal "{97DB1EED98560FB5}" {
+   Filename "{451463DBCFB85305}Sounds/VON/EC29_VonNormal.acp"
+  }
+  SCR_VoNComponent_EC29Yell "{7E7A5D4B6452663B}" {
+   Filename "{86558FBD68BF466A}Sounds/VON/EC29_VonYell.acp"
+  }
  }
 }

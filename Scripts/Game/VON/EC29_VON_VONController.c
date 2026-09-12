@@ -23,6 +23,11 @@ modded class SCR_VONController
 
     protected const string EC29_ACTION_VOICE_RANGE_CYCLE = "EC29_VONVoiceRangeCycle";
 
+    //! A voice mode chosen while a push-to-talk was held. -1 = nothing pending. Applied by
+    //! DeactivateVON once the key is up, so a transmission keeps the range it started with
+    //! (Nathan, 2026-09-12: "for mid press keying I'm fine with keeping the first volume").
+    protected int m_iEC29_PendingTier = -1;
+
     //------------------------------------------------------------------------------------------------
     override protected void Init(IEntity owner)
     {
@@ -82,13 +87,15 @@ modded class SCR_VONController
         // replicated VoN state for nothing - pointless at best, confusing telemetry at worst.
         if (EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
             return;
-        if (!m_VONComp)
+        // The mode lives on the STOCK component, not on whichever tier is transmitting.
+        SCR_VoNComponent stock = EC29_LocalStockVoN();
+        if (!stock)
         {
             PrintFormat("[EC29_VON] Cycle pressed but no SCR_VoNComponent on controlled entity", level: LogLevel.WARNING);
             return;
         }
 
-        EC29_EVoiceRange current = m_VONComp.EC29_GetVoiceRange();
+        EC29_EVoiceRange current = stock.EC29_GetVoiceRange();
         EC29_EVoiceRange next;
         switch (current)
         {
@@ -100,15 +107,143 @@ modded class SCR_VONController
 
         if (EC29_Debug.VERBOSE)
             PrintFormat("[EC29-DBG][VONCtrl] Requesting voice range change: %1 -> %2", typename.EnumToString(EC29_EVoiceRange, current), typename.EnumToString(EC29_EVoiceRange, next));
-        m_VONComp.EC29_RequestSetVoiceRange(next);
+        stock.EC29_RequestSetVoiceRange(next);
+
+        // THE TRANSMIT TIER SWITCHES HERE, LOCALLY, before the request has even reached the
+        // server: the speaking range is a property of which component captures, decided on
+        // this machine. The replicated enum only feeds labels and icons.
+        EC29_ApplyVoiceTier(next);
 
         // Refresh the VoN overlay label immediately for the local outgoing transmission.
         // The RplProp callback handles remote receivers, but the authority does not always
         // fire its own onRplName for its own writes - this guarantees local UI snaps to the
         // new mode the same frame the input is pressed.
-        SCR_VonDisplay display = m_VONComp.GetDisplay();
+        SCR_VonDisplay display = stock.GetDisplay();
         if (display)
             display.EC29_ForceRefreshAllTransmissions();
+    }
+
+    //! ------------------------------------------------------------------------------------------
+    //! DIRECT-SPEECH TIERS (see EC29_VoiceTiers.c for the why).
+    //!
+    //! Every assignment of a transmit component funnels through SetVONComponent - vanilla's
+    //! controlled-entity change, AssignVONComponent, the editor manager handing the character
+    //! back on close, and EC29's own spectator service. Overriding it is the one choke point
+    //! that guarantees a character never transmits direct speech from its stock component: the
+    //! stock one is the ear, and its ACP carries the full 40 m hearing range.
+    //! ------------------------------------------------------------------------------------------
+
+    //! The stock (exact-type) VoN component of the locally controlled entity, or null.
+    protected SCR_VoNComponent EC29_LocalStockVoN()
+    {
+        PlayerController pc = GetGame().GetPlayerController();
+        if (!pc)
+            return null;
+
+        return EC29_VoiceTiers.StockVoN(pc.GetControlledEntity());
+    }
+
+    //! The controlled character's STOCK component becomes the tier for its current voice mode.
+    //! Anything else - a tier already, an editor manager's component, a spectator ear, some
+    //! other entity's component, null - passes through untouched, so every other system's
+    //! selection is exactly what it asked for. Engine components expose no owner to script, so
+    //! "the controlled character's stock component" is matched from the entity's side; that is
+    //! also the only entity a transmit tier is ever wanted for.
+    protected SCR_VoNComponent EC29_ResolveTransmitTier(SCR_VoNComponent comp)
+    {
+        if (!comp || comp.Type() != SCR_VoNComponent)
+            return comp;
+
+        PlayerController pc = PlayerController.Cast(GetOwner());
+        if (!pc)
+            return comp;
+
+        IEntity owner = pc.GetControlledEntity();
+        if (!ChimeraCharacter.Cast(owner) || EC29_VoiceTiers.StockVoN(owner) != comp)
+            return comp;
+
+        SCR_VoNComponent tier = EC29_VoiceTiers.FindTier(owner, comp.EC29_GetVoiceRange());
+        if (!tier)
+        {
+            // A character prefab outside EC29's Character_Base override: no tiers, so the stock
+            // component transmits at its own (full) range - the pre-tier behaviour, minus the
+            // gain variable. Logged once per such entity class would be nicer; VERBOSE will do.
+            if (EC29_Debug.VERBOSE)
+                PrintFormat("[EC29-DBG][VONCtrl] %1 carries no direct-speech tiers - transmitting from the stock component", owner.Type());
+            return comp;
+        }
+
+        return tier;
+    }
+
+    override void SetVONComponent(SCR_VoNComponent VONComp)
+    {
+        super.SetVONComponent(EC29_ResolveTransmitTier(VONComp));
+    }
+
+    //! Re-points transmission at the tier for a mode. Immediate when nothing is keyed, or when
+    //! direct-speech TOGGLE is on (EC29_SelectVonComponent stops the toggle's capture, swaps, and
+    //! re-arms it - a gap of one call, and the toggle can stay on for minutes so waiting is not an
+    //! option). Deferred to key-up during a HELD transmission of any kind, so the range a
+    //! sentence started with is the range it ends with.
+    void EC29_ApplyVoiceTier(EC29_EVoiceRange mode)
+    {
+        if (EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
+            return;
+
+        PlayerController pc = GetGame().GetPlayerController();
+        if (!pc)
+            return;
+
+        SCR_VoNComponent tier = EC29_VoiceTiers.FindTier(pc.GetControlledEntity(), mode);
+        if (!tier)
+            return;
+
+        if (m_bIsActive && !m_bIsToggledDirect)
+        {
+            m_iEC29_PendingTier = mode;
+            if (EC29_Debug.VERBOSE)
+                PrintFormat("[EC29-DBG][VONCtrl] tier %1 pending until key-up (transmission in progress keeps its range)", typename.EnumToString(EC29_EVoiceRange, mode));
+            return;
+        }
+
+        m_iEC29_PendingTier = -1;
+        if (!EC29_SelectVonComponent(tier))
+            PrintFormat("[EC29_VON] transmit tier %1 did not take - vanilla's protected VON members changed?", tier.Type(), level: LogLevel.WARNING);
+        else if (EC29_Debug.VERBOSE)
+            PrintFormat("[EC29-DBG][VONCtrl] transmit tier -> %1", tier.Type());
+    }
+
+    //! Applies a tier deferred by EC29_ApplyVoiceTier once the transmission that deferred it has
+    //! ended. Runs after vanilla's deactivation so m_bIsActive is already down - unless the direct
+    //! toggle re-armed capture inside super, in which case the swap happens through the toggle
+    //! path (EC29_SelectVonComponent re-arms it).
+    protected void EC29_ApplyPendingTier()
+    {
+        if (m_iEC29_PendingTier < 0)
+            return;
+
+        EC29_EVoiceRange mode = m_iEC29_PendingTier;
+        m_iEC29_PendingTier = -1;
+        EC29_ApplyVoiceTier(mode);
+    }
+
+    //! Vanilla re-resolves the transmit component here (through SetVONComponent, so the tier
+    //! substitution still applies); a tier deferred for the previous body is meaningless now.
+    //! After vanilla is done the tier is applied once more from the new body's mode: a no-op
+    //! when SetVONComponent already resolved it, and the correction if vanilla's
+    //! FindComponent(SCR_VoNComponent) ever hands back a tier instead of the stock component
+    //! (component order is by class name and the tiers sort after - see EC29_VoiceTiers.c - but
+    //! this does not have to trust that). Nothing is keyed right after a body change, so it
+    //! applies immediately; while spectating it defers to the service, which re-asserts.
+    override protected void OnControlledEntityChanged(IEntity from, IEntity to)
+    {
+        m_iEC29_PendingTier = -1;
+        super.OnControlledEntityChanged(from, to);
+
+        SCR_VoNComponent stock = EC29_VoiceTiers.StockVoN(to);
+        if (stock)
+            EC29_ApplyVoiceTier(stock.EC29_GetVoiceRange());
     }
 
     override void OnPostInit(IEntity owner)
@@ -272,6 +407,8 @@ modded class SCR_VONController
         }
 
         super.DeactivateVON(transmitType);
+
+        EC29_ApplyPendingTier();
     }
 
     //! Tell the server this client keyed a radio so receivers can squelch even
@@ -364,8 +501,14 @@ modded class SCR_VONController
     //! fire while the direct-speech lock is on. So the setter cannot be used to clear the latch -
     //! the field is written directly instead, which a modded class may do and outside script may
     //! not.
+    //!
+    //! A character's stock component handed in here resolves to its transmit tier first (same
+    //! rule as SetVONComponent), and the success check compares against that - so the spectator
+    //! service's "give the character its voice back" lands on the right tier and still reports
+    //! true.
     bool EC29_SelectVonComponent(SCR_VoNComponent comp)
     {
+        comp = EC29_ResolveTransmitTier(comp);
         if (!comp)
             return false;
 

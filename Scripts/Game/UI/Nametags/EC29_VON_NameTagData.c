@@ -6,10 +6,10 @@
 //! ENameTagEntityState.VON on the speaker's nametag - which makes the orange
 //! VON icon pop above their head.
 //!
-//! Without gating, an enemy whispering 30 m away (audio is silenced by our
-//! range check) would still show the icon, which leaks their position.
-//! We override OnReceivedVON to apply the same audibility check used by the
-//! audio path before letting the state activation through.
+//! Without gating, an enemy whispering 30 m away (inaudible - the whisper tier's ACP stops at
+//! 6 m) would still show the icon, which leaks their position. We override OnReceivedVON and
+//! only let the state activation through when the speaker is inside the outer range of the
+//! tier they transmit on (EC29_VONSettingsComponent.IsAudibleForListener).
 //!
 //! Radio transmissions (receiver != null) are never gated - radio reach is
 //! defined by the radio's own range, not by direct VoN distance rules.
@@ -45,9 +45,8 @@ modded class SCR_NameTagData
 	}
 
 	//------------------------------------------------------------------------------------------------
-	//! Returns true if the speaker is out of audible range for the local listener
-	//! according to current voice mode + EC29_VONSettingsComponent thresholds.
-	//! Uses the shared audibility helper so audio + UI + nametag stay in lockstep.
+	//! Returns true if the speaker is outside the outer range of their transmit tier as seen
+	//! from the local listener. Shared with the overlay so both visuals stop where the audio does.
 	protected bool EC29_ShouldGateNameTagVON(int senderPlayerId)
 	{
 		EC29_VONSettingsComponent settings = EC29_VONSettingsComponent.GetInstance();

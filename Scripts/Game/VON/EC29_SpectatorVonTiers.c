@@ -37,6 +37,14 @@
 //! a direct packet arrives at all from a speaker 60-80 m away - EC29's RX activity log line
 //! reports exactly that - so run it before touching these numbers again.
 //!
+//! GRAPH READING (2026-09-12): in von.acp "Shader Direct" (22546) takes AmplitudeClass 23571,
+//! which overrides NOTHING from the parent (curve 1/r, outerRange 40, slopeFactor 11); 200010
+//! (40/68) feeds only "Spectator Shader Direct" (200011), the path gated by
+//! EC29_SpectatorListening. So for a LIVING listener 23571's inherited 40 m is exactly the wall
+//! that was measured, and it is the node the direct-speech tiers (EC29_VoiceTiers.c) override
+//! per ACP. Whether a spectator's 40 m wall is the same node or engine delivery is still the
+//! open question above.
+//!
 //! What DOES work and is not in question: a spectator hears at full volume across the whole
 //! delivered range, whisper included, because EC29 holds its range gain at 1.0 for a spectating
 //! listener. That is the "louder than usual" half of the requirement and it is script-side.

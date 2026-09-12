@@ -1,19 +1,13 @@
-[ComponentEditorProps(category: "GameScripted/GameMode/Components", description: "Replicates EC29_VON voice range settings from the mission header to all clients.")]
+[ComponentEditorProps(category: "GameScripted/GameMode/Components", description: "Replicates EC29_VON overlay and nametag policy from the mission header to all clients.")]
 class EC29_VONSettingsComponentClass : SCR_BaseGameModeComponentClass {}
 
 //------------------------------------------------------------------------------------------------
+//! Overlay / nametag policy, mission-header seeded and replicated. The direct-speech RANGES are
+//! no longer here: since 2026-09-12 they are properties of the transmitting tier's ACP
+//! (EC29_VoiceTiers.c) and cannot be changed by a mission header. The visual gates below read
+//! the script-side mirrors of those ranges.
 class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 {
-	[RplProp()] protected float m_fWhisperRange  = 3.0;
-	[RplProp()] protected float m_fNormalRange   = 15.0;
-	[RplProp()] protected float m_fNormalFalloffEnd = 20.0;
-	[RplProp()] protected float m_fYellRange     = 50.0;
-	[RplProp()] protected float m_fFalloffPower  = 4.0;
-	[RplProp()] protected float m_fWhisperVolume = 1.0;
-	[RplProp()] protected float m_fNormalVolume  = 1.0;
-	[RplProp()] protected float m_fYellVolume    = 3.0;
-	[RplProp()] protected float m_fMinVolume     = 0.05;
-
 	[RplProp()] protected bool m_bAlwaysShowEnemyNames         = true;
 	[RplProp()] protected bool m_bEnableVonFactionNameColoring = true;
 	[RplProp()] protected bool m_bHideFriendlyDirectIncoming   = false;
@@ -31,48 +25,6 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 	}
 
 	//------------------------------------------------------------------------------------------------
-	float GetRangeForMode(EC29_EVoiceRange mode)
-	{
-		switch (mode)
-		{
-			case EC29_EVoiceRange.WHISPER: return m_fWhisperRange;
-			case EC29_EVoiceRange.YELL:    return m_fYellRange;
-		}
-
-		return m_fNormalRange;
-	}
-
-	//------------------------------------------------------------------------------------------------
-	float GetVolumeForMode(EC29_EVoiceRange mode)
-	{
-		switch (mode)
-		{
-			case EC29_EVoiceRange.WHISPER: return m_fWhisperVolume;
-			case EC29_EVoiceRange.YELL:    return m_fYellVolume;
-		}
-
-		return m_fNormalVolume;
-	}
-
-	//------------------------------------------------------------------------------------------------
-	float GetNormalFalloffEnd()
-	{
-		return m_fNormalFalloffEnd;
-	}
-
-	//------------------------------------------------------------------------------------------------
-	float GetFalloffPower()
-	{
-		return m_fFalloffPower;
-	}
-
-	//------------------------------------------------------------------------------------------------
-	float GetMinVolume()
-	{
-		return m_fMinVolume;
-	}
-
-	//------------------------------------------------------------------------------------------------
 	bool GetAlwaysShowEnemyNames()         { return m_bAlwaysShowEnemyNames; }
 	bool GetEnableVonFactionNameColoring() { return m_bEnableVonFactionNameColoring; }
 	bool GetHideFriendlyDirectIncoming()   { return m_bHideFriendlyDirectIncoming; }
@@ -82,72 +34,32 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 	bool GetShowVoiceModeInOverlay()       { return m_bShowVoiceModeInOverlay; }
 
 	//------------------------------------------------------------------------------------------------
-	//! Single source of truth for "what volume does this listener hear from this speaker
-	//! based on the speaker's current voice mode and distance to the listener?"
+	//! VISUAL gate only: is this speaker inside the outer range of the tier they transmit on, as
+	//! seen from the listener? Used by the over-head nametag (EC29_NameTagData) and the VoN
+	//! overlay (EC29_VonDisplay) so an icon never shows for a voice the engine is not playing.
+	//! Audio never consults this - the engine attenuates per source from the tier's ACP.
 	//!
-	//! Used by the audio path (EC29_VoNComponent.OnReceive), the VoN overlay (EC29_VonDisplay),
-	//! and the over-head nametag (EC29_NameTagData) to keep audio + UI in lockstep.
+	//! The answer depends on the speaker's replicated mode, which can lag their audio by one
+	//! round trip after an F3 press. There is no listener-side signal that says which tier a
+	//! packet came from, so a moment of icon lag after a mode change is the accepted cost.
 	//!
-	//! \param senderPlayerId  Speaker's player id (from OnReceive's playerId).
-	//! \param listener        Listener entity (typically the local player's controlled character).
-	//! \param applyFloor      true = clamp result up to m_fMinVolume (audio path - keeps the
-	//!                        audio source alive). false = return the raw computed value
-	//!                        (UI / audibility checks - lets us tell "below threshold" cases).
-	float ComputeListenerVolume(int senderPlayerId, IEntity listener, bool applyFloor)
+	//! Unresolvable speaker (no entity, no stock component): shown, not hidden - a packet did
+	//! arrive, and hiding it would make a real talker invisible.
+	bool IsAudibleForListener(int senderPlayerId, IEntity listener)
 	{
 		if (!listener)
-			return m_fNormalVolume;
+			return true;
 
 		SCR_VoNComponent senderVon = SCR_VoNComponent.EC29_GetVoNForPlayer(senderPlayerId);
 		if (!senderVon)
-			return m_fNormalVolume;
+			return true;
 
-		EC29_EVoiceRange mode = senderVon.EC29_GetVoiceRange();
-		float volume = GetVolumeForMode(mode);
+		IEntity sender = GetGame().GetPlayerManager().GetPlayerControlledEntity(senderPlayerId);
+		if (!sender)
+			return true;
 
-		IEntity sender;
-		PlayerManager playerManager = GetGame().GetPlayerManager();
-		if (playerManager)
-			sender = playerManager.GetPlayerControlledEntity(senderPlayerId);
-		if (sender)
-		{
-			float distSq = vector.DistanceSqXZ(sender.GetOrigin(), listener.GetOrigin());
-			float maxRange = GetRangeForMode(mode);
-
-			if (distSq > maxRange * maxRange)
-			{
-				float dist = Math.Sqrt(distSq);
-				if (mode == EC29_EVoiceRange.NORMAL)
-				{
-					// NORMAL: full volume inside range, straight-line fade to silence
-					// at the cutoff. Whisper and yell keep the inverse-power tail so a
-					// shout still carries past its range.
-					float fadeBand = m_fNormalFalloffEnd - maxRange;
-					if (fadeBand <= 0 || dist >= m_fNormalFalloffEnd)
-						volume = 0;
-					else
-						volume *= 1.0 - (dist - maxRange) / fadeBand;
-				}
-				else
-				{
-					volume *= Math.Pow(maxRange / dist, m_fFalloffPower);
-				}
-			}
-		}
-
-		if (applyFloor && volume < m_fMinVolume)
-			return m_fMinVolume;
-
-		return volume;
-	}
-
-	//------------------------------------------------------------------------------------------------
-	//! Returns true if the speaker is currently audible to the listener (computed volume
-	//! is above the minimum-volume floor before clamping). Used for UI / nametag gating
-	//! to suppress visual indicators when the audio is effectively silent.
-	bool IsAudibleForListener(int senderPlayerId, IEntity listener)
-	{
-		return ComputeListenerVolume(senderPlayerId, listener, false) >= m_fMinVolume;
+		float outer = EC29_VoiceTiers.OuterRange(senderVon.EC29_GetVoiceRange());
+		return vector.DistanceSq(sender.GetOrigin(), listener.GetOrigin()) <= outer * outer;
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -157,8 +69,8 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 
 		s_pInstance = this;
 		if (EC29_Debug.VERBOSE)
-			PrintFormat("[EC29-DBG][VONSettings] Component alive on game mode (GameMode_Base override applied). isServer=%1 whisper=%2m normal=%3m (silent at %4m) yell=%5m falloff=%6 yellVol=%7 minVol=%8",
-				Replication.IsServer(), m_fWhisperRange, m_fNormalRange, m_fNormalFalloffEnd, m_fYellRange, m_fFalloffPower, m_fYellVolume, m_fMinVolume);
+			PrintFormat("[EC29-DBG][VONSettings] Component alive on game mode (GameMode_Base override applied). isServer=%1 - direct ranges are per transmit tier (whisper %2m / normal %3m / yell %4m outer)",
+				Replication.IsServer(), EC29_VoiceTiers.WHISPER_OUTER_M, EC29_VoiceTiers.NORMAL_OUTER_M, EC29_VoiceTiers.YELL_OUTER_M);
 
 		if (!Replication.IsServer())
 			return;
@@ -171,15 +83,6 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 		}
 
 		EC29_VON_Settings src = header.m_EC29_VON_Settings;
-		m_fWhisperRange  = src.m_fWhisperRange;
-		m_fNormalRange   = src.m_fNormalRange;
-		m_fNormalFalloffEnd = src.m_fNormalFalloffEnd;
-		m_fYellRange     = src.m_fYellRange;
-		m_fFalloffPower  = src.m_fFalloffPower;
-		m_fWhisperVolume = src.m_fWhisperVolume;
-		m_fNormalVolume  = src.m_fNormalVolume;
-		m_fYellVolume    = src.m_fYellVolume;
-		m_fMinVolume     = src.m_fMinVolume;
 
 		m_bAlwaysShowEnemyNames        = src.m_bAlwaysShowEnemyNames;
 		m_bEnableVonFactionNameColoring = src.m_bEnableVonFactionNameColoring;
