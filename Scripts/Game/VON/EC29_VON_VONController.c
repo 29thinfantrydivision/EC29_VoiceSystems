@@ -565,6 +565,13 @@ modded class SCR_VONController
         if (EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
             return;
 
+        // The alternate-channel key is Left Ctrl + Caps Lock by default, and Caps Lock alone is
+        // vanilla's radio push-to-talk - so the combo also raises this action. Only the START is
+        // swallowed (the alternate poll in Update keys the alternate net instead); the release
+        // always reaches vanilla, which never refuses to stop a transmission.
+        if (reason != EActionTrigger.UP && EC29_IsAlternateKeyClaimed())
+            return;
+
         super.ActionVONBroadcast(value, reason);
     }
 
@@ -573,7 +580,27 @@ modded class SCR_VONController
         if (EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
             return;
 
+        // Vanilla binds the long-range toggle to the same Left Ctrl + Caps Lock. While a player
+        // has an alternate channel set, the combo belongs to alternate transmit; with none set it
+        // is vanilla's toggle exactly as before.
+        if (EC29_IsAlternateKeyClaimed())
+            return;
+
         super.ActionVONLongRangeToggle(value, reason);
+    }
+
+    //! True while the alternate-transmit input is held AND there is an alternate channel for it
+    //! to key. Derived from the action, not from raw keys, so it follows a player's rebind: move
+    //! alternate transmit off Ctrl+Caps in the keybind menu and vanilla gets both keys back.
+    protected bool EC29_IsAlternateKeyClaimed()
+    {
+        if (EC29_CoexistenceGuard.ShouldYieldRadio() || !m_InputManager)
+            return false;
+
+        if (m_InputManager.GetActionValue("EC29_AlternateChannel") <= 0)
+            return false;
+
+        return EC29_RadioState.GetInstance().EarSettings().GetAlternateFrequency() >= 0;
     }
 
     override protected void ActionVONProximity(float value, EActionTrigger reason = EActionTrigger.UP)
