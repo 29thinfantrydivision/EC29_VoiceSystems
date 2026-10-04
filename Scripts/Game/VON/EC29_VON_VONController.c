@@ -357,7 +357,8 @@ modded class SCR_VONController
     }
 
     //! One-time radio check on first spawn: confirms the voice systems are up
-    //! with a roger beep + chat line. The VON controller instance lives exactly one
+    //! with a client log line (a conflict notice still goes to chat). The VON
+    //! controller instance lives exactly one
     //! server session on the client, so the flag resets naturally on reconnect
     //! and never replays on respawn.
     protected void EC29_TryPlayRadioCheck()
