@@ -385,10 +385,9 @@ modded class SCR_VONController
             return;
         }
 
-        // Spawn-in confirmation is chat-only; the audible roger beep on every
-        // spawn was noise (removed by request).
-        if (chatComponent)
-            chatComponent.ShowMessage("***EC29 VOICE SYSTEMS INITIALIZED***");
+        // Spawn-in confirmation goes to the client log only - no chat line, no
+        // beep. Ungated by VERBOSE so every client RPT proves the mod loaded.
+        PrintFormat("[EC29] Voice systems initialized (client, player %1)", playerController.GetPlayerId());
     }
 
     override void DeactivateVON(EVONTransmitType transmitType = EVONTransmitType.NONE)

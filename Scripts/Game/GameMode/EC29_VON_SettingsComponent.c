@@ -75,6 +75,9 @@ class EC29_VONSettingsComponent : SCR_BaseGameModeComponent
 		if (!Replication.IsServer())
 			return;
 
+		// Server-side counterpart of the client's spawn-in log line.
+		Print("[EC29] Voice systems initialized (server)");
+
 		SCR_MissionHeader header = SCR_MissionHeader.Cast(GetGame().GetMissionHeader());
 		if (!header || !header.m_EC29_VON_Settings)
 		{
