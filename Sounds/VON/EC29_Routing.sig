@@ -1,42 +1,91 @@
 AudioSignalResClass {
  Inputs {
-  IOPItemInputClass {
+  IOPInputVariableClass {
    id 1
    name "EC29_EarRouting"
-   tl -253.584 -46.442
+   tl -320 96
    children {
-    20 21
+    3 6
    }
+   varName "EC29_EarRouting"
+   varResource "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf"
+  }
+  IOPInputValueClass {
+   id 2
+   name "Right Code"
+   tl -320 0
+   children {
+    3
+   }
+   value 1
+  }
+  IOPInputValueClass {
+   id 8
+   name "Ear Gain"
+   tl -96 192
+   children {
+    7
+   }
+   value 2
   }
  }
  Ops {
-  IOPItemOpConvertorClass {
-   id 20
-   name "LeftChannelVol"
-   tl 71.065 -185.632
+  IOPItemOpSubClass {
+   id 3
+   name "Offset From Right"
+   tl -128 32
    children {
-    22
+    4
    }
    inputs {
     ConnectionClass "1:0" {
      id 1
      port 0
     }
-   }
-   Default 2
-   Intervals {
-    IOPItemOpConvertorRange LeftChannel {
-     min 1
-     max 2
+    ConnectionClass "2:1" {
+     id 2
+     port 1
     }
    }
   }
-  IOPItemOpConvertorClass {
-   id 21
-   name "RightChannelVol"
-   tl 76.623 124.05
+  IOPItemOpAbsClass {
+   id 4
+   name "Distance From Right"
+   tl 32 32
    children {
-    2
+    7
+   }
+   inputs {
+    ConnectionClass "3:0" {
+     id 3
+     port 0
+    }
+   }
+  }
+  IOPItemOpMulClass {
+   id 7
+   name "Left Gain"
+   tl 192 64
+   children {
+    9
+   }
+   inputs {
+    ConnectionClass "4:0" {
+     id 4
+     port 0
+    }
+    ConnectionClass "8:0" {
+     id 8
+     port 0
+    }
+   }
+  }
+  IOPItemOpInterpolateClass {
+   id 6
+   name "Right Gain"
+   tl 64 256
+   children {
+    10
    }
    inputs {
     ConnectionClass "1:0" {
@@ -44,43 +93,24 @@ AudioSignalResClass {
      port 0
     }
    }
-   Default 2
-   Intervals {
-    IOPItemOpConvertorRange RightChannel {
-     min 2
-     max 3
-    }
-   }
+   "X min" 1
+   "X max" 2
+   "Y min" 2
+   "Y max" 0
   }
  }
  Outputs {
   IOPItemOutputClass {
-   id 2
-   name "RightVol"
-   tl 472.213 122.741
-   input 21
+   id 9
+   name "Left_G"
+   tl 384 64
+   input 7
   }
   IOPItemOutputClass {
-   id 22
-   name "LeftVol"
-   tl 465.55 -192.09
-   input 20
-  }
- }
- Input_Order {
-  ItemDetailListItemClass EarRouting {
-   Name "EC29_EarRouting"
-   Id 1
-  }
- }
- Output_Order {
-  ItemDetailListItemClass RightVol {
-   Name "RightVol"
-   Id 2
-  }
-  ItemDetailListItemClass LeftVol {
-   Name "LeftVol"
-   Id 22
+   id 10
+   name "Right_G"
+   tl 384 256
+   input 6
   }
  }
 }

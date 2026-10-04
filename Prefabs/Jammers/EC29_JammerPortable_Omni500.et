@@ -1,0 +1,13 @@
+GenericEntity : "{F0857FF9D851C8DA}Prefabs/Jammers/EC29_Jammer_Portable_Base.et" {
+ ID "E5DDB45F6746DBC6"
+ components {
+  SCR_EditableEntityComponent "{1A487ADD123A3E14}" {
+   m_UIInfo SCR_EditableEntityUIInfo "{5298E609432D192D}" {
+    Name "Portable Jammer (Omni, 500 m)"
+    Description "Field radio set rigged as a jammer. Jams in all directions out to 500 m. Can be switched on and off."
+   }
+  }
+  EC29_JammerComponent "{609696C27D5DA08C}" {
+  }
+ }
+}

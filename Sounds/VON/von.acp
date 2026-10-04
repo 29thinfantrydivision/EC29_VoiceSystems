@@ -3,29 +3,13 @@ AudioClass {
   SignalClass "30733" {
    id 30733
    name "Signal 1"
-   tl -776.622 -515.118
+   tl -768 -512
    res "{CF1F9C4B120DE5F8}Sounds/VON/EC29_Von.sig"
-   conns {
-    IOPConnectionClass "iop:1" {
-     port 1
-     conn {
-      ConnectionsClass connections {
-       id 26
-       links {
-        ConnectionClass "100382:65" {
-         id 100382
-         port 65
-        }
-       }
-      }
-     }
-    }
-   }
    inputsport {
     1
    }
    outputsport {
-    5 8 12 18 20 22
+    5 8 12 25 26 27 28
    }
    inputvalues {
     1
@@ -36,6 +20,7 @@ AudioClass {
    inputvaluesmax {
     1
    }
+   path "{CF1F9C4B120DE5F8}Sounds/VON/EC29_Von.sig"
   }
   SignalClass "66573" {
    id 66573
@@ -49,7 +34,7 @@ AudioClass {
     36
    }
    inputvalues {
-    0 0 0 16000
+    1 0 0 16000
    }
    inputvaluesmin {
     0 0 0 0
@@ -57,6 +42,7 @@ AudioClass {
    inputvaluesmax {
     1 1 1 10000
    }
+   path "{2DE6099BBD60C620}Sounds/_SharedData/Signals/Character/Character_Occlusion.sig"
   }
   SignalClass "77837" {
    id 77837
@@ -70,7 +56,7 @@ AudioClass {
     39 105 107 106 110
    }
    inputvalues {
-    100 0 16000
+    100 1 16000
    }
    inputvaluesmin {
     0 0 0
@@ -78,80 +64,29 @@ AudioClass {
    inputvaluesmax {
     100 1 16000
    }
+   path "{76CBB40EF7F227B6}Sounds/_SharedData/Signals/Reverb/Reverb_Base.sig"
   }
-  SignalClass "95245" {
-   id 95245
-   name "Routing Signal"
-   tl 122.001 -545.02
-   res "{4D6CC8A4D1FED38F}Sounds/VON/EC29_Routing.sig"
-   conns {
-    IOPConnectionClass "iop:1" {
-     port 1
-     conn {
-      ConnectionsClass connections {
-       id 26
-       links {
-        ConnectionClass "98334:65" {
-         id 98334
-         port 65
-        }
-       }
-      }
-     }
-    }
-   }
-   inputsport {
-    1
-   }
-   outputsport {
-    2 22
-   }
-   inputvalues {
-    1
-   }
-   inputvaluesmin {
-    0
-   }
-   inputvaluesmax {
-    1
-   }
-  }
-  SignalClass "105485" {
-   id 105485
-   name "Signal 103"
-   tl -780.6 -266.008
+  SignalClass "317453" {
+   id 317453
+   name "Signal RF Link Quality"
+   comment "EC29_SignalQuality (terrain propagation) -> clipper drive, radio LP cutoff, received level"
+   tl -768 -128
    res "{D59B06686BE2B58F}Sounds/VON/EC29_SignalQuality.sig"
-   conns {
-    IOPConnectionClass "iop:1" {
-     port 1
-     conn {
-      ConnectionsClass connections {
-       id 26
-       links {
-        ConnectionClass "104478:65" {
-         id 104478
-         port 65
-        }
-       }
-      }
-     }
-    }
-   }
-   inputsport {
-    1
-   }
    outputsport {
-    2 3 7
+    5 6 7
    }
-   inputvalues {
-    0.2
+   path "{D59B06686BE2B58F}Sounds/VON/EC29_SignalQuality.sig"
+  }
+  SignalClass "318477" {
+   id 318477
+   name "Signal Ear Select"
+   comment "EC29_EarRouting -> per-ear gains (0 centre, 1 right, 2 left)"
+   tl -256 -96
+   res "{4D6CC8A4D1FED38F}Sounds/VON/EC29_Routing.sig"
+   outputsport {
+    9 10
    }
-   inputvaluesmin {
-    0
-   }
-   inputvaluesmax {
-    1
-   }
+   path "{4D6CC8A4D1FED38F}Sounds/VON/EC29_Routing.sig"
   }
  }
  filters {
@@ -159,14 +94,14 @@ AudioClass {
    id 33814
    name "Filter Bitcrusher"
    version 5
-   tl -522.05 -645.606
+   tl -512 -592
    ins {
     ConnectionsClass "con:0" {
      id 0
      links {
-      ConnectionClass "30733:5" {
+      ConnectionClass "30733:25" {
        id 30733
-       port 5
+       port 25
       }
      }
     }
@@ -244,7 +179,7 @@ AudioClass {
    id 63510
    name "Filter HP"
    version 5
-   tl -520.392 -581.538
+   tl -512 -512
    pi {
     1 0
    }
@@ -259,20 +194,23 @@ AudioClass {
    id 64534
    name "Filter LP"
    version 5
-   tl -520.92 -420.633
+   tl -512 -352
    ins {
     ConnectionsClass "con:2" {
      id 2
      links {
-      ConnectionClass "105485:3" {
-       id 105485
-       port 3
+      ConnectionClass "317453:6" {
+       id 317453
+       port 6
       }
      }
     }
    }
    pi {
     5 0
+   }
+   pu {
+    4 0
    }
    volume_dB 2
    DSPObject BiquadDSPTypeClass dsp {
@@ -284,20 +222,23 @@ AudioClass {
    id 88086
    name "Filter Clipper"
    version 5
-   tl -518.05 -513.85
+   tl -512 -432
    ins {
     ConnectionsClass "con:2" {
      id 2
      links {
-      ConnectionClass "105485:2" {
-       id 105485
-       port 2
+      ConnectionClass "317453:5" {
+       id 317453
+       port 5
       }
      }
     }
    }
    pi {
     5 0
+   }
+   pu {
+    4 0
    }
    DSPObject DistortionDSPTypeClass dsp {
     distortionType HardClipper
@@ -311,7 +252,7 @@ AudioClass {
    name "FilterChain"
    comment "Dont use compressor here. Creates panorama movement when DIRECT and RADIO are mixed."
    version 5
-   tl -262.174 -580.984
+   tl -256 -416
    ctl 0 -21
    ins {
     ConnectionsClass "con:1" {
@@ -352,9 +293,9 @@ AudioClass {
     }
    }
    pi {
-    62 0
+    30 0
    }
-   ports 5
+   ports 4
   }
   FilterChainClass "53271" {
    id 53271
@@ -408,7 +349,8 @@ AudioClass {
  vars {
   VariableClass "87070" {
    id 87070
-   name "Variable EC29_VonRange"
+   name "Variable Direct Range"
+   comment "EC29_VonRange passed straight through (0..3). Script pins it to 1, so this bus is unity gain"
    version 5
    tl -256 -848
    varName "EC29_VonRange"
@@ -421,44 +363,6 @@ AudioClass {
      Y 3
     }
    }
-  }
-  VariableClass "98334" {
-   id 98334
-   name "Routing Selection"
-   comment "0 = Center, 1 = Right, 2 = Left"
-   version 5
-   tl -64 -528
-   ctl 0 -24
-   varName "EC29_EarRouting"
-   varResource "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf"
-  }
-  VariableClass "100382" {
-   id 100382
-   name "Jamming Strength"
-   comment "0 = highest level of jamming"
-   version 5
-   tl -1029.777 -511.682
-   ctl 0 -24
-   varName "EC29_JamStrength"
-   varResource "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf"
-  }
-  VariableClass "104478" {
-   id 104478
-   name "Signal Quality"
-   comment "RF PROPAGATION MODEL ONLY"
-   version 5
-   tl -1021.022 -267.922
-   ctl 0 -24
-   varName "EC29_SignalQuality"
-   varResource "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf"
-  }
-  VariableClass "108574" {
-   id 108574
-   name "EC29_ChannelVolume"
-   version 5
-   tl -64 -464
-   varName "EC29_ChannelVolume"
-   varResource "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf"
   }
   VariableClass "200001" {
    id 200001
@@ -496,19 +400,36 @@ AudioClass {
     }
    }
   }
+  VariableClass "322590" {
+   id 322590
+   name "Variable Channel Volume"
+   comment "EC29_ChannelVolume as a linear gain (script already applies the v^2.5 law)"
+   version 5
+   tl 128 -32
+   varName "EC29_ChannelVolume"
+   varResource "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf"
+   curve {
+    CurvePoint "1" {
+    }
+    CurvePoint "2" {
+     X 1
+     Y 1
+    }
+   }
+  }
  }
  sounds {
   SoundClass "27657" {
    id 27657
    name "VON_RADIO"
    version 5
-   tl 252.735 -263.01
+   tl 256 -256
    ins {
     ConnectionsClass "con:1" {
      id 1
      links {
-      ConnectionClass "105485:7" {
-       id 105485
+      ConnectionClass "317453:7" {
+       id 317453
        port 7
       }
      }
@@ -530,6 +451,9 @@ AudioClass {
    pi {
     2 0
    }
+   pu {
+    2 0
+   }
    varName "VON_Radio"
    varResource "{A60F08955792B575}Sounds/_SharedData/Variables/GlobalVariables.conf"
    outState 13323
@@ -539,7 +463,7 @@ AudioClass {
    id 45065
    name "SOUND_ROGER_BEEP"
    version 5
-   tl 256.658 0.572
+   tl 256 0
    ins {
     ConnectionsClass "con:64" {
      id 64
@@ -605,16 +529,17 @@ AudioClass {
  buses {
   BusClass "50183" {
    id 50183
-   name "Bus Jamming Noise Only"
+   name "Bus Radio Voice"
+   comment "Decoded voice through the radio filter chain; level follows the jammer (clean = 1, fully jammed = 0)"
    version 7
-   tl -247.452 -102.799
+   tl -256 -256
    ins {
     ConnectionsClass "con:0" {
      id 0
      links {
-      ConnectionClass "30733:12" {
+      ConnectionClass "30733:28" {
        id 30733
-       port 12
+       port 28
       }
      }
     }
@@ -630,12 +555,8 @@ AudioClass {
     ConnectionsClass "con:64" {
      id 64
      links {
-      ConnectionClass "36869:65" {
-       id 36869
-       port 65
-      }
-      ConnectionClass "103429:65" {
-       id 103429
+      ConnectionClass "52231:65" {
+       id 52231
        port 65
       }
      }
@@ -713,49 +634,51 @@ AudioClass {
     1 0
    }
   }
-  BusClass "94215" {
-   id 94215
-   name "Routing Bus"
+  BusClass "320519" {
+   id 320519
+   name "Bus Radio Noise Bed"
+   comment "Brownian + pink hiss through the radio filter chain; rises as the jammer bites"
    version 7
-   tl 2.675 -380.032
+   tl -256 -160
    ins {
-    ConnectionsClass "con:2" {
-     id 2
+    ConnectionsClass "con:0" {
+     id 0
      links {
-      ConnectionClass "95245:22" {
-       id 95245
-       port 22
+      ConnectionClass "30733:27" {
+       id 30733
+       port 27
       }
      }
     }
-    ConnectionsClass "con:3" {
-     id 3
+    ConnectionsClass "con:1" {
+     id 1
      links {
-      ConnectionClass "95245:2" {
-       id 95245
-       port 2
+      ConnectionClass "32791:65" {
+       id 32791
+       port 65
       }
      }
     }
     ConnectionsClass "con:64" {
      id 64
      links {
-      ConnectionClass "200003:65" {
-       id 200003
+      ConnectionClass "36869:65" {
+       id 36869
        port 65
       }
-      ConnectionClass "200004:65" {
-       id 200004
+      ConnectionClass "319493:65" {
+       id 319493
        port 65
       }
      }
     }
    }
    pi {
-    1020 0
+    3 0
    }
-   channels "2"
-   channelVolume 1
+   pu {
+    1 0
+   }
   }
   BusClass "200003" {
    id 200003
@@ -781,8 +704,8 @@ AudioClass {
        id 50183
        port 65
       }
-      ConnectionClass "101383:65" {
-       id 101383
+      ConnectionClass "320519:65" {
+       id 320519
        port 65
       }
      }
@@ -839,6 +762,63 @@ AudioClass {
    }
    volume 0.316
    volume_dB -10
+  }
+  BusClass "321543" {
+   id 321543
+   name "Bus Radio Ear + Channel Volume"
+   comment "Forced stereo. Per-ear gains from the ear-select signal, overall gain from EC29_ChannelVolume"
+   version 7
+   tl -96 -176
+   ins {
+    ConnectionsClass "con:0" {
+     id 0
+     links {
+      ConnectionClass "322590:65" {
+       id 322590
+       port 65
+      }
+     }
+    }
+    ConnectionsClass "con:2" {
+     id 2
+     links {
+      ConnectionClass "318477:9" {
+       id 318477
+       port 9
+      }
+     }
+    }
+    ConnectionsClass "con:3" {
+     id 3
+     links {
+      ConnectionClass "318477:10" {
+       id 318477
+       port 10
+      }
+     }
+    }
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "200003:65" {
+       id 200003
+       port 65
+      }
+      ConnectionClass "200004:65" {
+       id 200004
+       port 65
+      }
+     }
+    }
+   }
+   pi {
+    13 0
+   }
+   pu {
+    13 0
+   }
+   channels "2"
+   channelVolume 1
   }
   BusClass "200012" {
    id 200012
@@ -908,90 +888,20 @@ AudioClass {
     1 0
    }
   }
-  BusClass "101383" {
-   id 101383
-   name "Bus Voice Only"
-   version 7
-   tl -249.59 -233.825
-   ins {
-    ConnectionsClass "con:0" {
-     id 0
-     links {
-      ConnectionClass "30733:18" {
-       id 30733
-       port 18
-      }
-     }
-    }
-    ConnectionsClass "con:1" {
-     id 1
-     links {
-      ConnectionClass "32791:65" {
-       id 32791
-       port 65
-      }
-     }
-    }
-    ConnectionsClass "con:64" {
-     id 64
-     links {
-      ConnectionClass "52231:65" {
-       id 52231
-       port 65
-      }
-     }
-    }
-   }
-   pi {
-    3 0
-   }
-   pu {
-    1 0
-   }
-  }
-  BusClass "107527" {
-   id 107527
-   name "Channel Control Volume"
-   version 7
-   tl -2.57 -243.754
-   ins {
-    ConnectionsClass "con:0" {
-     id 0
-     links {
-      ConnectionClass "108574:65" {
-       id 108574
-       port 65
-      }
-     }
-    }
-    ConnectionsClass "con:64" {
-     id 64
-     links {
-      ConnectionClass "94215:65" {
-       id 94215
-       port 65
-      }
-     }
-    }
-   }
-   pi {
-    1 0
-   }
-  }
  }
  generators {
   GeneratorClass "36869" {
    id 36869
    name "Generator Noise"
    version 6
-   tl -511.271 -158.705
+   tl -512 -256
    ins {
     ConnectionsClass "con:1" {
      id 1
      links {
-      ConnectionClass "30733:8" {
+      ConnectionClass "30733:26" {
        id 30733
-       port 8
+       port 26
       }
      }
     }
@@ -1008,18 +918,18 @@ AudioClass {
    time 10
    infinite 1
   }
-  GeneratorClass "103429" {
-   id 103429
-   name "Generator Noise"
+  GeneratorClass "319493" {
+   id 319493
+   name "Generator Pink Noise"
    version 6
-   tl -513.496 -94.844
+   tl -512 -176
    ins {
     ConnectionsClass "con:1" {
      id 1
      links {
-      ConnectionClass "30733:8" {
+      ConnectionClass "30733:26" {
        id 30733
-       port 8
+       port 26
       }
      }
     }
@@ -1093,6 +1003,7 @@ AudioClass {
    pi {
     36864 24
    }
+   path "{B764D803219C775E}Sounds/FinalMix.afm"
    inputs {
     "WPN_Handling" "WPN_Shots" "WPN_Explosions" "WNP_BulletHits" "CHAR" "ENV_AMB_2D" "VEH_Animations" "Impacts" "Dialog" "ENV_Doors" "VEH_Engine" "VEH_Tires" "VON" "SFX" "SFX_Reverb_OBSOLETE" "VON_Reverb_Small" "Dialog_Reverb" "Impacts_EXT" "ENV_AMB_3D" "WPN_SonicCracks" "CHAR_Gear" "PA" "SFX_Reverb_Exterior" "ENV_AMB_3D_Reverb_Exterior" "SFX_Direct" "SFX_Reverb_Small" "SFX_Reverb_Medium" "SFX_Reverb_Large" "WPN_Shots_Player" "Dialog_Reverb_Small" "Dialog_Reverb_Medium" "Dialog_Reverb_Large" "WPN_TravelingProjectile" "Dialog_Delay_Exterior" "SFX_Reverb_InCabin" "VON_Reverb_Medium" "VON_Reverb_Large"
    }
@@ -1146,6 +1057,40 @@ AudioClass {
     7 0
    }
   }
+  ShaderClass "46098" {
+   id 46098
+   name "Shader Radio"
+   version 5
+   tl 0 -256
+   ins {
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "321543:65" {
+       id 321543
+       port 65
+      }
+     }
+    }
+   }
+  }
+  ShaderClass "57362" {
+   id 57362
+   name "Shader RAW"
+   version 5
+   tl 0 -1536
+   ins {
+    ConnectionsClass "con:64" {
+     id 64
+     links {
+      ConnectionClass "52231:65" {
+       id 52231
+       port 65
+      }
+     }
+    }
+   }
+  }
   ShaderClass "200011" {
    id 200011
    name "Spectator Shader Direct"
@@ -1193,44 +1138,6 @@ AudioClass {
    }
    pi {
     7 0
-   }
-  }
-  ShaderClass "46098" {
-   id 46098
-   name "Shader Radio"
-   version 5
-   tl -6.805 -117.658
-   ins {
-    ConnectionsClass "con:64" {
-     id 64
-     links {
-      ConnectionClass "107527:65" {
-       id 107527
-       port 65
-      }
-     }
-    }
-   }
-   pi {
-    8 0
-   }
-   Enable 1
-  }
-  ShaderClass "57362" {
-   id 57362
-   name "Shader RAW"
-   version 5
-   tl 0 -1536
-   ins {
-    ConnectionsClass "con:64" {
-     id 64
-     links {
-      ConnectionClass "52231:65" {
-       id 52231
-       port 65
-      }
-     }
-    }
    }
   }
  }
@@ -1283,7 +1190,7 @@ AudioClass {
    id 26641
    name "Stream 1"
    version 5
-   tl -765.217 -764.522
+   tl -768 -768
   }
  }
  banks_local {
@@ -1298,12 +1205,21 @@ AudioClass {
    Samples {
     AudioBankSampleClass "Radio_RogerBeep_A_1.wav" {
      Filename "{1DB01BC81F7F7038}Sounds/RadioProtocol/Samples/RogerBeep/Radio_RogerBeep_A_1.wav"
+     Probability 100
+     Index 0
+     SampleMetadata ""
     }
     AudioBankSampleClass "Radio_RogerBeep_A_2.wav" {
      Filename "{84AEA251029841A8}Sounds/RadioProtocol/Samples/RogerBeep/Radio_RogerBeep_A_2.wav"
+     Probability 100
+     Index 0
+     SampleMetadata ""
     }
     AudioBankSampleClass "Radio_RogerBeep_A_3.wav" {
      Filename "{F3A4CAD9F63AAED8}Sounds/RadioProtocol/Samples/RogerBeep/Radio_RogerBeep_A_3.wav"
+     Probability 100
+     Index 0
+     SampleMetadata ""
     }
    }
   }
@@ -1319,12 +1235,21 @@ AudioClass {
    Samples {
     AudioBankSampleClass "Radio_RogerBeep_B_1.wav" {
      Filename "{17154B85A96F83BF}Sounds/RadioProtocol/Samples/RogerBeep/Radio_RogerBeep_B_1.wav"
+     Probability 100
+     Index 0
+     SampleMetadata ""
     }
     AudioBankSampleClass "Radio_RogerBeep_B_2.wav" {
      Filename "{8E0BF21CB488B22F}Sounds/RadioProtocol/Samples/RogerBeep/Radio_RogerBeep_B_2.wav"
+     Probability 100
+     Index 0
+     SampleMetadata ""
     }
     AudioBankSampleClass "Radio_RogerBeep_B_3.wav" {
      Filename "{F9019A94402A5D5F}Sounds/RadioProtocol/Samples/RogerBeep/Radio_RogerBeep_B_3.wav"
+     Probability 100
+     Index 0
+     SampleMetadata ""
     }
    }
   }
@@ -1466,6 +1391,6 @@ AudioClass {
    OSPort 367623
   }
  }
- version 2
+ version 1
  listenerWindowModel "{9F3AF591CD6DFE1A}Assets/Characters/Basebody/Basebody_Male_01.xob"
 }

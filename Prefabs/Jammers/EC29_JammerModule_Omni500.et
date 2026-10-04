@@ -1,0 +1,20 @@
+GenericEntity : "{3FD499CE6B3AEF34}Prefabs/Jammers/EC29_Jammer_Base.et" {
+ ID "E5DDB45F6746DBC6"
+ components {
+  SCR_EditableEntityComponent "{1A487ADD123A3E14}" {
+   m_UIInfo SCR_EditableEntityUIInfo "{5298E609432D192D}" {
+    Name "Jammer Module (Omni, 500 m)"
+    Description "Invisible jamming source. Degrades radio reception in all directions out to 500 m. Cannot be switched off, only removed."
+    m_EntityBudgetCost {
+     SCR_EntityBudgetValue "{53BC130D14BA43F3}" {
+      m_BudgetType SYSTEMS
+      m_Value 5
+     }
+    }
+   }
+  }
+  EC29_JammerComponent "{609696C27D5DA08C}" {
+   m_fConeAngleConfig 180
+  }
+ }
+}

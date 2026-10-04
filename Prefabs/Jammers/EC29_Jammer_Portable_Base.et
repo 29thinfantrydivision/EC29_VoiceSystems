@@ -1,0 +1,67 @@
+GenericEntity : "{3FD499CE6B3AEF34}Prefabs/Jammers/EC29_Jammer_Base.et" {
+ ID "E5DDB45F6746DBC6"
+ components {
+  MeshObject "{8F6DEAFED82BA884}" {
+   Object "{1C690C170310109F}Assets/Props/Military/Radios/RadioStation_ANGRC160_01.xob"
+  }
+  RigidBody "{E9348FD3E0458A2C}" {
+   ModelGeometry 1
+   Static 1
+  }
+  SCR_EditableEntityComponent "{1A487ADD123A3E14}" {
+   m_UIInfo SCR_EditableEntityUIInfo "{5298E609432D192D}" {
+    m_Image "{434AB803877743B4}UI/Textures/EditorPreviews/Auto/Props/Military/Radios/E_RadioStation_ANGRC160_01.edds"
+    m_aAuthoredLabels {
+     ENTITYTYPE_COMPOSITION TRAIT_EFFECT_MODULE
+    }
+    m_EntityBudgetCost {
+     SCR_EntityBudgetValue "{F1D8DCDA04754547}" {
+     }
+    }
+   }
+  }
+  SCR_PreviewEntityComponent "{F637708699BA0F83}" : "{6CADA7A88A6265FD}Prefabs/Editor/Components/PreviewEntityComponentClass.ct" {
+   m_bRuntime 0
+   m_aEntries {
+    SCR_BasePreviewEntry "{9A4D0E6D809EADEE}" {
+     m_iParentID -1
+     m_Mesh "{1C690C170310109F}Assets/Props/Military/Radios/RadioStation_ANGRC160_01.xob"
+     m_Flags 0
+     m_Shape MESH
+     m_iPivotID ""
+     m_vScale 1 1 1
+     m_vPosition 0 0 0
+     m_vAngles 0 0 0
+    }
+   }
+  }
+  EC29_JammerComponent "{609696C27D5DA08C}" {
+   m_vEmitterOffset 0 0.2 0
+  }
+  ActionsManagerComponent "{91AAE5AA4CEF96CF}" {
+   ActionContexts {
+    UserActionContext "{F05EE2E3F56A3A07}" {
+     UIInfo UIInfo "{EE5D36956E0E9021}" {
+      Name "Radio Set"
+     }
+     ContextName "JammerControlPanel"
+     Position PointInfo "{72B7348F586DB556}" {
+      Offset 0 0.15 0.05
+     }
+     Radius 1.5
+    }
+   }
+   additionalActions {
+    EC29_JammerToggleUserAction "{D05201723A66B404}" {
+     ParentContextList {
+      "JammerControlPanel"
+     }
+     UIInfo UIInfo "{117F3941CC3B6E22}" {
+      Name "Toggle Jammer"
+     }
+    }
+   }
+  }
+ }
+ Flags 0x403 0
+}

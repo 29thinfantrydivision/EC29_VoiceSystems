@@ -1,24 +1,135 @@
 HorizontalLayoutWidgetClass {
+ Name "AudioSettings"
+ components {
+  SCR_AudioSettingsSubMenu "{54ACAC54C023E3D0}" {
+  }
+ }
  {
   ScrollLayoutWidgetClass "{000000009881A4C7}" {
-   Prefab "{000000009881A4C7}"
+   Name "ScrollLayout0"
+   Slot LayoutSlot "{54890CCF4EB5C47F}" {
+    Padding -2 72 2 0
+    SizeMode Fill
+    FillWeight 1.433
+   }
+   Color 0.761 0.392 0.078 1
+   style Small
    {
     VerticalLayoutWidgetClass "{00000000C099DEEF}" {
-     Prefab "{00000000C099DEEF}"
+     Name "Content"
+     Slot AlignableSlot "{54890CCE9D51A05E}" {
+      HorizontalAlign 3
+      VerticalAlign 3
+      Padding -4 0 10 0
+     }
      {
-      VerticalLayoutWidgetClass "{685354209F36EFEF}" : "{FEEEB639F2735BA1}UI/layouts/Menus/SettingsMenu/CustomWidgets/SettingsTitle.layout" {
-       Name "Title29th"
-       Slot LayoutSlot "{685354234AC6FBB8}" {
+      VerticalLayoutWidgetClass "{58B33058A20819AE}" : "{FEEEB639F2735BA1}UI/layouts/Menus/SettingsMenu/CustomWidgets/SettingsTitle.layout" {
+       Name "TitleVolume"
+       Slot LayoutSlot "{58B32278C99818F2}" {
        }
        components {
-        SCR_LabelComponent "{6853542375F01898}" {
+        SCR_LabelComponent "{58B30C1A8E56F0FF}" {
+         m_sLabel "#AR-Settings_Title_Volume"
+        }
+       }
+       {
+        TextWidgetClass "{58B30C1F77EC7B4E}" {
+         Prefab "{58B30C1F77EC7B4E}"
+         Slot LayoutSlot "{58B30C1F77EC7B76}" {
+         }
+        }
+       }
+      }
+      ButtonWidgetClass "{00000000B90344E3}" : "{4A41296C0E9A889F}UI/layouts/WidgetLibrary/WLib_Slider.layout" {
+       Name "Master"
+       Slot LayoutSlot "{54890CCF4EB5DBCD}" {
+        Padding 4 4 4 4
+       }
+       components {
+        SCR_SliderComponent "{548294960C7399D9}" {
+         m_sLabel "#AR-Settings_MasterVolume"
+         m_sLabelLayout "{F003823FF141983C}UI/layouts/Menus/SettingsMenu/CustomWidgets/SettingsLabel.layout"
+         m_sFormatText "%1%"
+         m_bRoundValue 1
+        }
+       }
+       {
+        SizeLayoutWidgetClass "{55387AC2CCC7E284}" {
+         Prefab "{55387AC2CCC7E284}"
+         Slot ButtonWidgetSlot "{55387AC2CCC7E2A4}" {
+         }
+        }
+       }
+      }
+      ButtonWidgetClass "{00000000B283877F}" : "{4A41296C0E9A889F}UI/layouts/WidgetLibrary/WLib_Slider.layout" {
+       Name "Music"
+       Slot LayoutSlot "{54890CCA633AAEF8}" {
+        Padding 4 4 4 4
+       }
+       components {
+        SCR_SliderComponent "{548294960C7399D9}" {
+         m_sLabel "#AR-Settings_MusicVolume"
+         m_sLabelLayout "{F003823FF141983C}UI/layouts/Menus/SettingsMenu/CustomWidgets/SettingsLabel.layout"
+         m_sFormatText "%1%"
+         m_bRoundValue 1
+        }
+       }
+      }
+      ButtonWidgetClass "{000000008C3706E7}" : "{4A41296C0E9A889F}UI/layouts/WidgetLibrary/WLib_Slider.layout" {
+       Name "SFX"
+       Slot LayoutSlot "{54890CCA631EACCB}" {
+        Padding 4 4 4 4
+       }
+       components {
+        SCR_SliderComponent "{548294960C7399D9}" {
+         m_sLabel "#AR-Settings_SFXVolume"
+         m_sLabelLayout "{F003823FF141983C}UI/layouts/Menus/SettingsMenu/CustomWidgets/SettingsLabel.layout"
+         m_sFormatText "%1%"
+         m_bRoundValue 1
+        }
+       }
+      }
+      ButtonWidgetClass "{00000000A6A61A5C}" : "{4A41296C0E9A889F}UI/layouts/WidgetLibrary/WLib_Slider.layout" {
+       Name "Dialogue"
+       Slot LayoutSlot "{54890CCA6363D70F}" {
+        Padding 4 4 4 4
+       }
+       components {
+        SCR_SliderComponent "{548294960C7399D9}" {
+         m_sLabel "#AR-Settings_DialogVolume"
+         m_sLabelLayout "{F003823FF141983C}UI/layouts/Menus/SettingsMenu/CustomWidgets/SettingsLabel.layout"
+         m_sFormatText "%1%"
+         m_bRoundValue 1
+        }
+       }
+      }
+      ButtonWidgetClass "{000000009A97A440}" : "{4A41296C0E9A889F}UI/layouts/WidgetLibrary/WLib_Slider.layout" {
+       Name "VOIP"
+       Slot LayoutSlot "{54890CCA635CDD0A}" {
+        Padding 4 4 4 4
+       }
+       components {
+        SCR_SliderComponent "{548294960C7399D9}" {
+         m_sLabel "#AR-Settings_VOIPVolume"
+         m_sLabelLayout "{F003823FF141983C}UI/layouts/Menus/SettingsMenu/CustomWidgets/SettingsLabel.layout"
+         m_sFormatText "%1%"
+         m_bRoundValue 1
+        }
+       }
+      }
+      VerticalLayoutWidgetClass "{7C950FF301297B87}" : "{FEEEB639F2735BA1}UI/layouts/Menus/SettingsMenu/CustomWidgets/SettingsTitle.layout" {
+       Name "Title29th"
+       Slot LayoutSlot "{D8F3554B8A470ABC}" {
+       }
+       components {
+        SCR_LabelComponent "{58B30C1A8E56F0FF}" {
          m_sLabel "#EC29-Settings_Title_29th"
         }
        }
       }
-      ButtonWidgetClass "{6853542330B1510E}" : "{4A41296C0E9A889F}UI/layouts/WidgetLibrary/WLib_Slider.layout" {
+      ButtonWidgetClass "{732E58C1A17DED5D}" : "{4A41296C0E9A889F}UI/layouts/WidgetLibrary/WLib_Slider.layout" {
        Name "Earplugs"
-       Slot LayoutSlot "{6853542312E8B319}" {
+       Slot LayoutSlot "{E943865E558ABA07}" {
         Padding 4 4 4 4
        }
        components {
@@ -30,22 +141,25 @@ HorizontalLayoutWidgetClass {
         }
        }
       }
-      ButtonWidgetClass "{684601EE00000201}" : "{5D5055E10FD00549}UI/layouts/WidgetLibrary/ToolBoxes/WLib_Checkbox.layout" {
+      ButtonWidgetClass "{F7151D00765DC5D5}" : "{5D5055E10FD00549}UI/layouts/WidgetLibrary/ToolBoxes/WLib_Checkbox.layout" {
        Name "RadioBeeps"
-       Slot LayoutSlot "{684601EE00000202}" {
+       Slot LayoutSlot "{EE8A4357EEE453B8}" {
         Padding 4 4 4 4
        }
        components {
-        SCR_CheckboxComponent "{684601EE00000203}" {
+        SCR_CheckboxComponent "{546A9B7B0A8AD927}" {
          m_sLabel "#EC29-Settings_RadioBeeps"
          m_sLabelLayout "{F003823FF141983C}UI/layouts/Menus/SettingsMenu/CustomWidgets/SettingsLabel.layout"
         }
        }
       }
-      VerticalLayoutWidgetClass "{58B33058AD55320C}" {
-       Prefab "{58B33058AD55320C}"
+      VerticalLayoutWidgetClass "{58B33058AD55320C}" : "{FEEEB639F2735BA1}UI/layouts/Menus/SettingsMenu/CustomWidgets/SettingsTitle.layout" {
+       Name "TitleGeneral"
+       Slot LayoutSlot "{58B32278C99818F2}" {
+       }
        components {
         SCR_LabelComponent "{58B30C1A8E56F0FF}" {
+         m_sLabel "#AR-Settings_Title_General"
          m_fPaddingTop 30
         }
        }
@@ -58,8 +172,118 @@ HorizontalLayoutWidgetClass {
         }
        }
       }
+      ButtonWidgetClass "{000000001FBE4211}" : "{C9DF0E6590F6C388}UI/layouts/WidgetLibrary/SpinBox/WLib_SpinBox.layout" {
+       Name "ProcessingMode"
+       Slot LayoutSlot "{54890CCF4EB5D924}" {
+        Padding 4 4 4 4
+       }
+       components {
+        SCR_SpinBoxComponent "{5472C6CBC0640458}" {
+         m_sLabel "#AR-Settings_StereoProcessingMode"
+         m_sLabelLayout "{F003823FF141983C}UI/layouts/Menus/SettingsMenu/CustomWidgets/SettingsLabel.layout"
+         m_aElementNames {
+          "#AR-Settings_Headphones" "#AR-Settings_Speakers"
+         }
+         m_bUseLightArrows 1
+         m_bCycleMode 1
+        }
+       }
+      }
+      ButtonWidgetClass "{5594BE5A725D55BA}" : "{4A41296C0E9A889F}UI/layouts/WidgetLibrary/WLib_Slider.layout" {
+       Name "DynamicRange"
+       Slot LayoutSlot "{54890CCA635CDD0A}" {
+        Padding 4 4 4 4
+       }
+       components {
+        SCR_SliderComponent "{548294960C7399D9}" {
+         m_sLabel "#AR-Settings_DynamicRange"
+         m_sLabelLayout "{F003823FF141983C}UI/layouts/Menus/SettingsMenu/CustomWidgets/SettingsLabel.layout"
+         m_fValue 50
+         m_fMaxValue 1
+         m_fStep 2
+         m_sFormatText "%1%"
+         m_bRoundValue 1
+        }
+       }
+      }
+      ButtonWidgetClass "{5E84AA61FC4BB8F8}" : "{C9DF0E6590F6C388}UI/layouts/WidgetLibrary/SpinBox/WLib_SpinBox.layout" {
+       Name "EnableTinnitus"
+       Slot LayoutSlot "{54890CCD61050681}" {
+        Padding 4 4 4 4
+       }
+       components {
+        SCR_SpinBoxComponent "{5472C6CBC0640458}" {
+         m_sLabel "#AR-Settings_EnableTinnitus"
+         m_sLabelLayout "{F003823FF141983C}UI/layouts/Menus/SettingsMenu/CustomWidgets/SettingsLabel.layout"
+         m_aElementNames {
+          "#AR-UI_No" "#AR-UI_Yes"
+         }
+         m_iSelectedItem 1
+         m_bUseLightArrows 1
+         m_bCycleMode 1
+        }
+       }
+      }
+      ButtonWidgetClass "{65088E35298584A7}" : "{C9DF0E6590F6C388}UI/layouts/WidgetLibrary/SpinBox/WLib_SpinBox.layout" {
+       Name "DualsenseSpeakerEnabled"
+       Slot LayoutSlot "{54890CCD61050681}" {
+        Padding 4 4 4 4
+       }
+       components {
+        SCR_SpinBoxComponent "{5472C6CBC0640458}" {
+         m_sLabel "#AR-Settings_DualsenseSpeakerEnabled"
+         m_sLabelLayout "{F003823FF141983C}UI/layouts/Menus/SettingsMenu/CustomWidgets/SettingsLabel.layout"
+         m_aElementNames {
+          "#AR-UI_No" "#AR-UI_Yes"
+         }
+         m_bUseLightArrows 1
+         m_bCycleMode 1
+        }
+       }
+      }
+      VerticalLayoutWidgetClass "{65EABDF2EBA54CFF}" : "{FEEEB639F2735BA1}UI/layouts/Menus/SettingsMenu/CustomWidgets/SettingsTitle.layout" {
+       Name "TitleGameRelated"
+       Slot LayoutSlot "{58B32278C99818F2}" {
+       }
+       components {
+        SCR_LabelComponent "{58B30C1A8E56F0FF}" {
+         m_sLabel "#AR-Settings_Audio_GameRelated"
+        }
+       }
+       {
+        TextWidgetClass "{58B30C1F77EC7B4E}" {
+         Prefab "{58B30C1F77EC7B4E}"
+         Slot LayoutSlot "{58B30C1F77EC7B76}" {
+         }
+        }
+       }
+      }
+      ButtonWidgetClass "{65EABDF121A5585B}" : "{C9DF0E6590F6C388}UI/layouts/WidgetLibrary/SpinBox/WLib_SpinBox.layout" {
+       Name "HQAnnouncer"
+       Slot LayoutSlot "{54890CCD61050681}" {
+        Padding 4 4 4 4
+       }
+       components {
+        SCR_SpinBoxComponent "{5472C6CBC0640458}" {
+         m_sLabel "#AR-Settings_Audio_HQAnnouncer"
+         m_sLabelLayout "{F003823FF141983C}UI/layouts/Menus/SettingsMenu/CustomWidgets/SettingsLabel.layout"
+         m_aElementNames {
+          "#AR-UI_No" "#AR-UI_Yes"
+         }
+         m_iSelectedItem 1
+         m_bUseLightArrows 1
+         m_bCycleMode 1
+        }
+       }
+      }
      }
     }
+   }
+  }
+  VerticalLayoutWidgetClass "{00000000AD5D4DAC}" {
+   Name "Description"
+   Slot LayoutSlot "{54890CCA1EA23AC0}" {
+    SizeMode Fill
    }
   }
  }

@@ -1,0 +1,67 @@
+GenericEntity : "{3FD499CE6B3AEF34}Prefabs/Jammers/EC29_Jammer_Base.et" {
+ ID "E5DDB45F6746DBC6"
+ components {
+  MeshObject "{F25BD10FCE06C305}" {
+   Object "{1415A07550CD8ECD}Assets/Props/Military/Antennas/Antenna_RC292_01/Antenna_RC292_01.xob"
+  }
+  RigidBody "{DAFEE8AB3121A3E4}" {
+   ModelGeometry 1
+   Static 1
+  }
+  SCR_EditableEntityComponent "{1A487ADD123A3E14}" {
+   m_UIInfo SCR_EditableEntityUIInfo "{5298E609432D192D}" {
+    m_Image "{4FF55A9E9D3CCA13}UI/Textures/EditorPreviews/Auto/Props/Military/Antennas/E_Antenna_RC292_01.edds"
+    m_aAuthoredLabels {
+     ENTITYTYPE_COMPOSITION TRAIT_EFFECT_MODULE
+    }
+    m_EntityBudgetCost {
+     SCR_EntityBudgetValue "{9C2B11B1BA89D0A8}" {
+     }
+    }
+   }
+  }
+  SCR_PreviewEntityComponent "{F668123591469F45}" : "{6CADA7A88A6265FD}Prefabs/Editor/Components/PreviewEntityComponentClass.ct" {
+   m_bRuntime 0
+   m_aEntries {
+    SCR_BasePreviewEntry "{8A105BC6934CA51A}" {
+     m_iParentID -1
+     m_Mesh "{1415A07550CD8ECD}Assets/Props/Military/Antennas/Antenna_RC292_01/Antenna_RC292_01.xob"
+     m_Flags 0
+     m_Shape MESH
+     m_iPivotID ""
+     m_vScale 1 1 1
+     m_vPosition 0 0 0
+     m_vAngles 0 0 0
+    }
+   }
+  }
+  EC29_JammerComponent "{609696C27D5DA08C}" {
+   m_vEmitterOffset 0 19.5 0
+  }
+  ActionsManagerComponent "{39C6DACC78CD6E01}" {
+   ActionContexts {
+    UserActionContext "{CE6387BF34E61BE7}" {
+     UIInfo UIInfo "{7B2C0FEEA11D11BE}" {
+      Name "Mast Controls"
+     }
+     ContextName "JammerControlPanel"
+     Position PointInfo "{DCDDE7AD2BEAE9B5}" {
+      Offset 0 1.2 0
+     }
+     Radius 2.5
+    }
+   }
+   additionalActions {
+    EC29_JammerToggleUserAction "{B656121A21CDF526}" {
+     ParentContextList {
+      "JammerControlPanel"
+     }
+     UIInfo UIInfo "{5C166659338DE183}" {
+      Name "Toggle Jammer"
+     }
+    }
+   }
+  }
+ }
+ Flags 0x403 0
+}
