@@ -56,7 +56,7 @@ modded class SCR_VoNComponent
 	}
 
 	//! Spawn default is WHISPER (issue #11): noise discipline out of the gate, F3
-	//! cycles up when needed. The HUD seed in EC29_VON_VoiceRangeDisplay.c must
+	//! cycles up when needed. The HUD seed in VoiceRange/EC29_VoiceRangeHud.c must
 	//! match this initializer or the icon lies until the first F3 press.
 	//!
 	//! LIVES ON THE STOCK COMPONENT ONLY. The three tier components on a character are the same

@@ -1,9 +1,9 @@
 SCR_BaseGameMode {
  ID "56B2B479C6B96951"
  components {
-  EC29_VONSettingsComponent "{6933A1B7C5E4E001}" {
+  EC29_VONSettingsComponent "{1B22E0DABA7D1419}" {
   }
-  EC29_RFPropagationNetworkComponent "{684601EE43B5AC59}" {
+  EC29_RFPropagationNetworkComponent "{891DF2D41479F269}" {
   }
  }
 }
