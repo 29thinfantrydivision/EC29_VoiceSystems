@@ -1,0 +1,15 @@
+GenericEntity : "{92298FD5B81B8A64}Prefabs/Jammers/EC29_Jammer_Mast_Base.et" {
+ ID "E5DDB45F6746DBC6"
+ components {
+  SCR_EditableEntityComponent "{1A487ADD123A3E14}" {
+   m_UIInfo SCR_EditableEntityUIInfo "{5298E609432D192D}" {
+    Name "Jammer Mast (Directional, 2000 m)"
+    Description "Antenna mast jammer. 90 degree cone along its front from the mast top, 2000 m. Switched on and off at the mast base."
+   }
+  }
+  EC29_JammerComponent "{609696C27D5DA08C}" {
+   m_fRangeConfig 2000
+   m_fConeAngleConfig 90
+  }
+ }
+}

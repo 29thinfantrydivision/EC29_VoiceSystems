@@ -1,21 +1,23 @@
 AudioSignalResClass {
  Inputs {
-  IOPItemInputClass {
+  IOPInputVariableClass {
    id 1
-   name "Signal Quality"
-   tl -200 -1
+   name "EC29_SignalQuality"
+   tl -256 160
    children {
-    5 6 8
+    2 3 4
    }
+   varName "EC29_SignalQuality"
+   varResource "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf"
   }
  }
  Ops {
   IOPItemOpInterpolateClass {
-   id 5
-   name "Clipper"
-   tl 118 -154
+   id 2
+   name "Drive From Quality"
+   tl 32 0
    children {
-    2
+    5
    }
    inputs {
     ConnectionClass "1:0" {
@@ -27,11 +29,11 @@ AudioSignalResClass {
    "Y max" 20
   }
   IOPItemOpInterpolateClass {
-   id 6
-   name "Low Pass FC"
-   tl 124 236
+   id 3
+   name "Cutoff From Quality"
+   tl 32 160
    children {
-    3
+    6
    }
    inputs {
     ConnectionClass "1:0" {
@@ -43,9 +45,9 @@ AudioSignalResClass {
    "Y max" 3600
   }
   IOPItemOpInterpolateClass {
-   id 8
-   name "Radio Volume"
-   tl 141.121 525.399
+   id 4
+   name "Level From Quality"
+   tl 32 320
    children {
     7
    }
@@ -56,46 +58,28 @@ AudioSignalResClass {
     }
    }
    "X max" 0.3
+   "Y min" 0
+   "Y max" 1
   }
  }
  Outputs {
   IOPItemOutputClass {
-   id 2
-   name "Clipper Drive"
-   tl 476 -155
-   input 5
+   id 5
+   name "Clip_Drive"
+   tl 256 0
+   input 2
   }
   IOPItemOutputClass {
-   id 3
-   name "Low Pass FC"
-   tl 477 243
-   input 6
+   id 6
+   name "LP_Fc"
+   tl 256 160
+   input 3
   }
   IOPItemOutputClass {
    id 7
-   name "Overall Volume"
-   tl 506.121 556.399
-   input 8
-  }
- }
- Input_Order {
-  ItemDetailListItemClass "Signal Quality" {
-   Name "Signal Quality"
-   Id 1
-  }
- }
- Output_Order {
-  ItemDetailListItemClass "Clipper Drive" {
-   Name "Clipper Drive"
-   Id 2
-  }
-  ItemDetailListItemClass "Low Pass FC" {
-   Name "Low Pass FC"
-   Id 3
-  }
-  ItemDetailListItemClass "Overall Volume" {
-   Name "Overall Volume"
-   Id 7
+   name "Rx_V"
+   tl 256 320
+   input 4
   }
  }
 }

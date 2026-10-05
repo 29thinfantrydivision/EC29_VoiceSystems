@@ -110,8 +110,8 @@ class EC29_RadioState
 	}
 
 	//------------------------------------------------------------------------------------------------
-	//! RF propagation quality between two points, 0..1. Returns 1.0 when the
-	//! propagation simulation is disabled server-side.
+	//! RF propagation quality between two points, 0..1. Does NOT check whether the
+	//! simulation is enabled - callers gate on the replicated RF setting first.
 	//! Uncached - prefer GetSignalQualityCached on any per-packet path.
 	float GetSignalQuality(vector transmitterPos, vector receiverPos, float frequencyKHz = 0)
 	{

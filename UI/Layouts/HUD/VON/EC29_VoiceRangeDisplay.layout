@@ -1,9 +1,58 @@
-FrameWidgetClass "{1A5B43EF83D7B6D0}" {
+FrameWidgetClass {
  Name "EC29_VoiceRangeRoot"
+ Slot FrameWidgetSlot "{8F7F0BFE7F127712}" {
+  Anchor 0 0 1 1
+  PositionX 0
+  OffsetLeft 0
+  PositionY 0
+  OffsetTop 0
+  SizeX 0
+  OffsetRight 0
+  SizeY 0
+  OffsetBottom 0
+ }
+ "Ignore Cursor" 1
  {
-  ImageWidgetClass "{1A5B43EF83D7B6D1}" {
+  ImageWidgetClass "{2B65CC010D33EC7F}" {
    Name "VoiceRangeIcon"
+   Slot FrameWidgetSlot "{4250714D2EC69F8A}" {
+    Anchor 0 1 0 1
+    PositionX 18
+    OffsetLeft 18
+    PositionY -360
+    OffsetTop -360
+    SizeX 48
+    OffsetRight -66
+    SizeY 48
+    OffsetBottom 312
+   }
+   "Ignore Cursor" 1
    Color 1 1 1 1
+   Texture "{3262679C50EF4F01}UI/Textures/Icons/icons_wrapperUI.imageset"
+   Image "speak"
+   Size 48 48
+  }
+  TextWidgetClass "{1F83169ED27F5187}" {
+   Name "VoiceRangeLabel"
+   Slot FrameWidgetSlot "{27D380BD089A06A6}" {
+    Anchor 0 1 0 1
+    PositionX 72
+    OffsetLeft 72
+    PositionY -336
+    OffsetTop -336
+    Alignment 0 0.5
+    SizeToContent 1
+   }
+   "Ignore Cursor" 1
+   Color 1 1 1 1
+   Text "#EC29-VON_Mode_Whisper"
+   "Font Size" 16
+   "Min Font Size" 16
+   FontProperties FontProperties "{C767D9E2DF9F6CEE}" {
+    Font "{EABA4FE9D014CCEF}UI/Fonts/RobotoCondensed/RobotoCondensed_Bold.fnt"
+    ShadowSize 8
+    ShadowColor 0 0 0 0.7
+   }
   }
  }
 }

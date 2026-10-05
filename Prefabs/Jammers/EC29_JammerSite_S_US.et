@@ -1,0 +1,51 @@
+GenericEntity : "{8B4B8BF44162B24E}Prefabs/Compositions/Slotted/SlotFlatSmall/Antenna_S_US_01.et" {
+ ID "5282DCB5DFC8538F"
+ components {
+  SCR_EditableEntityComponent "{548C26F6ED22CCAB}" : "{B35795373E565FE7}Prefabs/Editor/Components/SlotFlatSmall_SCR_EditableEntityComponent.ct" {
+   m_UIInfo SCR_EditableEntityUIInfo "{5298E609432D192D}" {
+    Name "Jammer Site (Small, US)"
+    Description "Small US antenna site rigged to jam instead of relay: degrades radio reception in all directions out to 500 m. Always on."
+    Icon "{3F3D80879DDD074D}UI/Textures/Editor/ContentBrowser/ContentBrowser_Trait_Radio.edds"
+    m_Image "{2330CBD4D459D88A}UI/Textures/EditorPreviews/Auto/Compositions/Slotted/SlotFlatSmall/E_Antenna_S_US_01.edds"
+    m_sFaction "US"
+    m_aAuthoredLabels +{
+     ENTITYTYPE_COMPOSITION TRAIT_RADIO
+    }
+    m_EntityBudgetCost {
+     SCR_EntityBudgetValue "{75A24952F7A7880A}" {
+      m_BudgetType CAMPAIGN
+      m_Value 250
+     }
+    }
+    m_EntityChildrenBudgetCost {
+     SCR_EntityBudgetValue "{218528BD99DEA654}" {
+      m_BudgetType SYSTEMS
+      m_Value 5
+     }
+     SCR_EntityBudgetValue "{F1733C5225D46ED1}" {
+      m_BudgetType PROPS
+      m_Value 8
+     }
+    }
+   }
+  }
+  EC29_JammerComponent "{C2C08CA5CDB1DC8F}" {
+  }
+  ActionsManagerComponent "{5D66ED1096104FD8}" {
+   Enabled 0
+  }
+ }
+ {
+  GenericEntity {
+   ID "5D371AC87254ED3A"
+   components {
+    SCR_AntennaServicePointComponent "{5CB8818C79A7B643}" {
+     Enabled 0
+    }
+    ScriptedRadioComponent "{5CB8818C71F12C73}" {
+     Enabled 0
+    }
+   }
+  }
+ }
+}

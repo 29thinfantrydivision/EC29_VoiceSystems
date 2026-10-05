@@ -1,25 +1,36 @@
 modded class SCR_VONController
 {
+    //! Plain (non-event) UI sounds. The resource paths are asset contracts.
     const string EC29_SOUND_CYCLE = "{19696BC8C5ECE170}Sounds/VON/EC29_FX/RadioCycle.wav";
-    const string EC29_SOUND_LOCAL_OFF = "{AFA775D58D24308A}Sounds/VON/EC29_FX/RadioLocalOff.wav";
     const string EC29_SOUND_LOCAL_ON = "{E21F58D501028C63}Sounds/VON/EC29_FX/RadioLocalOn.wav";
+    const string EC29_SOUND_LOCAL_OFF = "{AFA775D58D24308A}Sounds/VON/EC29_FX/RadioLocalOff.wav";
     const string EC29_SOUND_ERROR = "{7065D8DD8ADFA3DE}Sounds/EC29_Sound/errorbeep.wav";
 
-    //! Key-up rate limit: a token bucket sized for normal PTT traffic; an empty
-    //! bucket refuses transmission and answers with the deny tone - like a
-    //! trunked system rejecting the channel until it drains.
-    protected static const float EC29_KEY_BUCKET_CAPACITY = 4;
-    protected static const float EC29_KEY_BUCKET_WINDOW_MS = 4000;
+    //! Radio key-up limiter. A burst of four key-ups is always available; the bucket refills
+    //! over four seconds, so steady traffic gets one key-up per second. An empty bucket turns
+    //! the key-up away with the deny tone and never reaches vanilla.
+    protected static const float EC29_KEY_BURST = 4;
+    protected static const float EC29_KEY_REFILL_WINDOW_MS = 4000;
+    protected ref EC29_TokenBucket m_EC29_KeyLimiter = new EC29_TokenBucket(EC29_KEY_BURST, EC29_KEY_REFILL_WINDOW_MS);
 
-    protected AudioHandle m_AudioHandleCycle;
-    protected AudioHandle m_AudioHandleLocalOn;
-    protected AudioHandle m_AudioHandleLocalOff;
-    protected bool m_bAlternatePTTActive = false;
-    protected SCR_VONEntry m_SavedPrimaryEntry;
-    protected int m_iEC29_KeyedFrequency = -1;
-    protected ref EC29_TokenBucket m_EC29_KeyBucket = new EC29_TokenBucket(EC29_KEY_BUCKET_CAPACITY, EC29_KEY_BUCKET_WINDOW_MS);
-    protected AudioHandle m_AudioHandleError;
-    protected bool m_bEC29_RadioCheckPlayed = false;
+    //! One handle per UI sound so each one restarts itself instead of stacking.
+    protected AudioHandle m_hEC29_CycleSound = AudioHandle.Invalid;
+    protected AudioHandle m_hEC29_LocalOnSound = AudioHandle.Invalid;
+    protected AudioHandle m_hEC29_LocalOffSound = AudioHandle.Invalid;
+    protected AudioHandle m_hEC29_DenySound = AudioHandle.Invalid;
+
+    //! Alternate push-to-talk state: the edge latch, and the entry to hand back on release.
+    protected bool m_bEC29_AltHeld;
+    protected SCR_VONEntry m_EC29_PrimaryBeforeAlt;
+
+    //! Frequency the server was last told is keyed by us; -1 = nothing keyed.
+    protected int m_iEC29_KeyedFreq = -1;
+
+    //! First-spawn check runs once per controller instance (one server session on a client).
+    protected bool m_bEC29_SpawnCheckDone;
+
+    //! Set only while ActivateVON is keying a radio - see SetActiveTransmit for why.
+    protected bool m_bEC29_KeyingRadio;
 
     protected const string EC29_ACTION_VOICE_RANGE_CYCLE = "EC29_VONVoiceRangeCycle";
 
@@ -246,21 +257,25 @@ modded class SCR_VONController
             EC29_ApplyVoiceTier(stock.EC29_GetVoiceRange());
     }
 
+    //------------------------------------------------------------------------------------------------
+    //! After vanilla init: warm the beep ACP so the first event plays without a load hitch, and
+    //! create the RF propagation settings singleton early.
     override void OnPostInit(IEntity owner)
     {
         super.OnPostInit(owner);
+
         AudioSystem.PlayEventInitialize(EC29_RadioBeepHelper.BEEP_CONFIG);
         EC29_RFPropagationSettings.GetInstance();
     }
 
-    protected void PlayBeepStart(BaseTransceiver transceiver)
+    //------------------------------------------------------------------------------------------------
+    //! Stops the previous instance of a UI sound if it is still audible, then plays a fresh one.
+    protected AudioHandle EC29_RestartSound(AudioHandle previous, string resource)
     {
-        EC29_RadioBeepHelper.PlayTxStart(transceiver);
-    }
+        if (AudioSystem.IsSoundPlayed(previous))
+            AudioSystem.TerminateSound(previous);
 
-    protected void PlayBeepEnd(BaseTransceiver transceiver)
-    {
-        EC29_RadioBeepHelper.PlayTxEnd(transceiver);
+        return AudioSystem.PlaySound(resource);
     }
 
     //! Vanilla's transmit gate silently reroutes to direct speech when the
@@ -299,109 +314,117 @@ modded class SCR_VONController
         super.SetVONBroadcast(activate, transmitType);
     }
 
+    //------------------------------------------------------------------------------------------------
+    //! The one place a radio key-up actually starts. The rate limit lives here, before vanilla,
+    //! so a refused key-up returns false with capture untouched - refusing inside
+    //! SetActiveTransmit still let vanilla open the mic afterwards.
+    override protected bool ActivateVON(notnull SCR_VONEntry entry, EVONTransmitType transmitType = EVONTransmitType.NONE)
+    {
+        bool radioKey = SCR_VONEntryRadio.Cast(entry) && transmitType != EVONTransmitType.DIRECT && !EC29_CoexistenceGuard.ShouldYieldRadio();
+        if (radioKey && EC29_IsKeySpamLocked())
+        {
+            EC29_PlayErrorBeep();
+            if (EC29_Debug.VERBOSE)
+                Print("[EC29-DBG][RadioKey] Key-up refused - key bucket empty", LogLevel.NORMAL);
+            return false;
+        }
+
+        m_bEC29_KeyingRadio = radioKey;
+        bool activated = super.ActivateVON(entry, transmitType);
+        m_bEC29_KeyingRadio = false;
+        return activated;
+    }
+
+    //------------------------------------------------------------------------------------------------
+    //! Vanilla calls this for TWO jobs: keying a radio (from ActivateVON) and merely selecting
+    //! one (SetVONLongRange, on Ctrl+Caps or whenever the active radio swaps between a short- and
+    //! a long-range set). Only the first is a key-up: clear the voice capture (1.8 per-player
+    //! capture wedge self-heal), TX beep and key-state notification, then vanilla. Treating a
+    //! selection as a key sent a key-start with no stop, leaving a phantom dead key open on the
+    //! net. The flag is consumed on first use so a nested vanilla re-entry can never key twice.
     override void SetActiveTransmit(notnull SCR_VONEntry entry)
     {
         SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(entry);
-        if (radioEntry && !EC29_CoexistenceGuard.ShouldYieldRadio())
+        if (!radioEntry || !m_bEC29_KeyingRadio)
         {
-            // Denied key-ups never reach super, so no transmission starts, no
-            // TX beep plays and no key RPC is sent - just the deny tone.
-            if (EC29_IsKeySpamLocked())
-            {
-                EC29_PlayErrorBeep();
-                return;
-            }
+            super.SetActiveTransmit(entry);
+            return;
+        }
 
-            // 1.8 can wedge the player's voice capture so every radio transmit
-            // is silently dead until it clears - per-player, survives switching
-            // radios (community-documented; the Exilados fix mod carries the
-            // same guard). Clearing before keying makes a wedged state
-            // self-heal on the next PTT press.
-            if (m_VONComp)
-                m_VONComp.SetCapture(false);
+        m_bEC29_KeyingRadio = false;
 
-            BaseTransceiver transceiver = radioEntry.GetTransceiver();
-            if (transceiver)
-            {
-                PlayBeepStart(transceiver);
-                EC29_NotifyKeyStart(transceiver);
-            }
+        if (m_VONComp)
+            m_VONComp.SetCapture(false);
+
+        BaseTransceiver transceiver = radioEntry.GetTransceiver();
+        if (transceiver)
+        {
+            EC29_RadioBeepHelper.PlayTxStart(transceiver);
+            EC29_NotifyKeyStart(transceiver);
         }
 
         super.SetActiveTransmit(entry);
     }
 
-    //! Consumes one key-up token; an empty bucket means the lockout is engaged.
+    //------------------------------------------------------------------------------------------------
+    //! True when this key-up must be refused. Takes a token from the key bucket, clocked by world
+    //! time; with no world there is no clock and the key-up is allowed.
     protected bool EC29_IsKeySpamLocked()
     {
         BaseWorld world = GetGame().GetWorld();
         if (!world)
             return false;
 
-        float nowMs = world.GetWorldTime();
-
-        if (m_EC29_KeyBucket.TryConsume(nowMs))
-            return false;
-
-        if (EC29_Debug.VERBOSE)
-            Print("[EC29-DBG][RadioKey] Key-up denied - rate bucket empty", LogLevel.NORMAL);
-        return true;
+        return !m_EC29_KeyLimiter.TryConsume(world.GetWorldTime());
     }
 
-    protected void EC29_PlayErrorBeep()
+    //------------------------------------------------------------------------------------------------
+    //! The deny tone. Public so the frequency dialog can reuse it for rejected input.
+    void EC29_PlayErrorBeep()
     {
-        if (m_AudioHandleError != 0 && AudioSystem.IsSoundPlayed(m_AudioHandleError))
-            AudioSystem.TerminateSound(m_AudioHandleError);
-
-        m_AudioHandleError = AudioSystem.PlaySound(EC29_SOUND_ERROR);
+        m_hEC29_DenySound = EC29_RestartSound(m_hEC29_DenySound, EC29_SOUND_ERROR);
     }
 
-    //! One-time radio check on first spawn: confirms the voice systems are up
-    //! with a roger beep + chat line. The VON controller instance lives exactly one
-    //! server session on the client, so the flag resets naturally on reconnect
-    //! and never replays on respawn.
+    //------------------------------------------------------------------------------------------------
+    //! Runs from Update until a local player controls a character, then never again for this
+    //! controller. No sound, no chat banner: a coexistence conflict goes to chat, otherwise one
+    //! always-on log line proves the mod loaded on this client (grepped in client RPTs).
     protected void EC29_TryPlayRadioCheck()
     {
+        if (m_bEC29_SpawnCheckDone)
+            return;
+
         PlayerController playerController = GetGame().GetPlayerController();
         if (!playerController)
             return;
 
-        IEntity controlledEntity = playerController.GetControlledEntity();
-        if (!controlledEntity)
+        if (!ChimeraCharacter.Cast(playerController.GetControlledEntity()))
             return;
 
-        if (!SCR_ChimeraCharacter.Cast(controlledEntity))
-            return;
+        m_bEC29_SpawnCheckDone = true;
 
-        m_bEC29_RadioCheckPlayed = true;
-
-        SCR_ChatComponent chatComponent = SCR_ChatComponent.Cast(playerController.FindComponent(SCR_ChatComponent));
-
-        string conflictNotice = EC29_CoexistenceGuard.GetConflictNotice();
-        if (!conflictNotice.IsEmpty())
+        string conflict = EC29_CoexistenceGuard.GetConflictNotice();
+        if (!conflict.IsEmpty())
         {
-            if (chatComponent)
-                chatComponent.ShowMessage(conflictNotice);
+            SCR_ChatComponent chat = SCR_ChatComponent.Cast(playerController.FindComponent(SCR_ChatComponent));
+            if (chat)
+                chat.ShowMessage(conflict);
             return;
         }
 
-        // Spawn-in confirmation is chat-only; the audible roger beep on every
-        // spawn was noise (removed by request).
-        if (chatComponent)
-            chatComponent.ShowMessage("***EC29 VOICE SYSTEMS INITIALIZED***");
+        PrintFormat("[EC29] Voice systems initialized (client, player %1)", playerController.GetPlayerId());
     }
 
+    //------------------------------------------------------------------------------------------------
+    //! Release. The TX end beep and key-stop run BEFORE vanilla, while the active entry is still
+    //! the one that was keyed; the deferred voice tier is applied AFTER vanilla.
     override void DeactivateVON(EVONTransmitType transmitType = EVONTransmitType.NONE)
     {
         if (m_bIsActive && transmitType != EVONTransmitType.DIRECT && !EC29_CoexistenceGuard.ShouldYieldRadio())
         {
-            SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(m_ActiveEntry);
-            if (radioEntry)
-            {
-                BaseTransceiver transceiver = radioEntry.GetTransceiver();
-                if (transceiver)
-                    PlayBeepEnd(transceiver);
-            }
+            SCR_VONEntryRadio keyedEntry = SCR_VONEntryRadio.Cast(m_ActiveEntry);
+            if (keyedEntry && keyedEntry.GetTransceiver())
+                EC29_RadioBeepHelper.PlayTxEnd(keyedEntry.GetTransceiver());
 
             EC29_NotifyKeyStop();
         }
@@ -411,47 +434,73 @@ modded class SCR_VONController
         EC29_ApplyPendingTier();
     }
 
-    //! Tell the server this client keyed a radio so receivers can squelch even
-    //! when no voice packets flow (dead key). Tracks the keyed frequency
-    //! locally so start/stop RPCs always pair up, including active-entry swaps
-    //! mid-key (alternate channel PTT).
+    //------------------------------------------------------------------------------------------------
+    //! Tells the server this player keyed a frequency, so receivers can squelch on a dead key
+    //! even when no voice packets flow. Starts and stops stay paired per frequency: an entry
+    //! swap mid-key (alternate PTT) closes the old frequency before opening the new one.
     protected void EC29_NotifyKeyStart(BaseTransceiver transceiver)
     {
-        int frequency = transceiver.GetFrequency();
-        if (m_iEC29_KeyedFrequency == frequency)
+        if (!transceiver)
             return;
 
-        if (m_iEC29_KeyedFrequency >= 0)
-            Rpc(RpcAsk_EC29_KeyState, m_iEC29_KeyedFrequency, 0.0, false);
+        int frequency = transceiver.GetFrequency();
+        if (frequency == m_iEC29_KeyedFreq)
+            return;
 
-        m_iEC29_KeyedFrequency = frequency;
+        if (m_iEC29_KeyedFreq >= 0)
+            Rpc(RpcAsk_EC29_KeyState, m_iEC29_KeyedFreq, 0.0, false);
+
+        m_iEC29_KeyedFreq = frequency;
         Rpc(RpcAsk_EC29_KeyState, frequency, transceiver.GetRange(), true);
     }
 
+    //------------------------------------------------------------------------------------------------
     protected void EC29_NotifyKeyStop()
     {
-        if (m_iEC29_KeyedFrequency < 0)
+        if (m_iEC29_KeyedFreq < 0)
             return;
 
-        Rpc(RpcAsk_EC29_KeyState, m_iEC29_KeyedFrequency, 0.0, false);
-        m_iEC29_KeyedFrequency = -1;
+        Rpc(RpcAsk_EC29_KeyState, m_iEC29_KeyedFreq, 0.0, false);
+        m_iEC29_KeyedFreq = -1;
     }
 
+    //------------------------------------------------------------------------------------------------
+    //! Server side of the key-state notification: stamp the sender's player id and hand it to
+    //! the RF relay.
     [RplRpc(RplChannel.Reliable, RplRcver.Server)]
     protected void RpcAsk_EC29_KeyState(int frequency, float range, bool keyed)
     {
-        PlayerController playerController = PlayerController.Cast(GetOwner());
-        if (!playerController)
+        PlayerController sender = PlayerController.Cast(GetOwner());
+        if (!sender)
             return;
 
-        EC29_RFPropagationNetworkComponent net = EC29_RFPropagationNetworkComponent.GetInstance();
-        if (net)
-            net.EC29_RelayKeyState(playerController.GetPlayerId(), frequency, range, keyed);
+        EC29_RFPropagationNetworkComponent relay = EC29_RFPropagationNetworkComponent.GetInstance();
+        if (!relay)
+            return;
+
+        relay.EC29_RelayKeyState(sender.GetPlayerId(), frequency, range, keyed);
     }
 
+    //------------------------------------------------------------------------------------------------
+    //! First radio entry whose transceiver is currently tuned to the given frequency, or null.
+    //! Used by alternate PTT and by the RX squelch tracker.
     SCR_VONEntryRadio EC29_FindRadioEntryByFrequency(int frequency)
     {
-        return FindEntryByFrequency(frequency);
+        if (frequency < 0)
+            return null;
+
+        foreach (SCR_VONEntry entry : m_aEntries)
+        {
+            SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(entry);
+            if (!radioEntry)
+                continue;
+
+            BaseTransceiver transceiver = radioEntry.GetTransceiver();
+            if (transceiver && transceiver.GetFrequency() == frequency)
+                return radioEntry;
+        }
+
+        return null;
     }
 
     //! ------------------------------------------------------------------------------------------
@@ -611,322 +660,282 @@ modded class SCR_VONController
         super.ActionVONProximity(value, reason);
     }
 
+    //------------------------------------------------------------------------------------------------
+    //! Direct-speech toggle with an audible on/off cue. A spectator-blocked press makes no sound.
+    //! With no VoN component there is nothing to cue, but vanilla still runs so the rest of the
+    //! modded chain does.
     override protected void ActionVONProximityToggle(float value, EActionTrigger reason = EActionTrigger.UP)
     {
-        // Spectator block first - before the toggle beeps below, so a blocked press makes no
-        // sound at all instead of beeping over a refused action.
         if (EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
             return;
 
-        // Chain hygiene: still forward to super when we have nothing to do, so a
-        // third mod's override further down the modded chain keeps running.
         if (!m_VONComp)
         {
             super.ActionVONProximityToggle(value, reason);
             return;
         }
 
-        bool wasToggled = m_bIsToggledDirect;
-
+        bool toggledBefore = m_bIsToggledDirect;
         super.ActionVONProximityToggle(value, reason);
 
         if (EC29_CoexistenceGuard.ShouldYieldRadio())
             return;
 
-        if (m_bIsToggledDirect && !wasToggled)
-        {
-            if (m_AudioHandleLocalOn != 0 && AudioSystem.IsSoundPlayed(m_AudioHandleLocalOn))
-                AudioSystem.TerminateSound(m_AudioHandleLocalOn);
-
-            m_AudioHandleLocalOn = AudioSystem.PlaySound(EC29_SOUND_LOCAL_ON);
-        }
-        else if (!m_bIsToggledDirect && wasToggled)
-        {
-            if (m_AudioHandleLocalOff != 0 && AudioSystem.IsSoundPlayed(m_AudioHandleLocalOff))
-                AudioSystem.TerminateSound(m_AudioHandleLocalOff);
-
-            m_AudioHandleLocalOff = AudioSystem.PlaySound(EC29_SOUND_LOCAL_OFF);
-        }
+        if (!toggledBefore && m_bIsToggledDirect)
+            m_hEC29_LocalOnSound = EC29_RestartSound(m_hEC29_LocalOnSound, EC29_SOUND_LOCAL_ON);
+        else if (toggledBefore && !m_bIsToggledDirect)
+            m_hEC29_LocalOffSound = EC29_RestartSound(m_hEC29_LocalOffSound, EC29_SOUND_LOCAL_OFF);
     }
 
+    //------------------------------------------------------------------------------------------------
+    //! Transceiver cycle with a click on the press. A spectator-blocked press makes no sound.
     override protected void ActionVONTransceiverCycle(float value, EActionTrigger reason = EActionTrigger.UP)
     {
-        // Spectator block first - before the cycle sound, so a blocked press does not play
-        // feedback for an action that will not happen.
         if (EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
             return;
 
         if (reason == EActionTrigger.DOWN && !EC29_CoexistenceGuard.ShouldYieldRadio())
-        {
-            if (m_AudioHandleCycle != 0 && AudioSystem.IsSoundPlayed(m_AudioHandleCycle))
-                AudioSystem.TerminateSound(m_AudioHandleCycle);
-
-            m_AudioHandleCycle = AudioSystem.PlaySound(EC29_SOUND_CYCLE);
-        }
+            m_hEC29_CycleSound = EC29_RestartSound(m_hEC29_CycleSound, EC29_SOUND_CYCLE);
 
         super.ActionVONTransceiverCycle(value, reason);
     }
 
+    //------------------------------------------------------------------------------------------------
+    //! Radio input is POLLED here every frame, never listener-driven: PTT by action value, the
+    //! radial-menu actions by triggered-this-frame and only while the VON radial menu is open.
+    //! Listeners pulled EC29's contexts into the engine's key arbitration (shadowed and
+    //! double-fired vanilla T/F/K, PTT live far outside the VON situation - 940c076 reverted
+    //! cba68ed). Do not convert.
+    //!
+    //! Gate order is load-bearing. The spectator gate is derived per frame and can flip on
+    //! mid-hold (dying into spectate with the alternate key down), so it gates only the START
+    //! edge; the release edge always runs, or the latch, the saved primary entry and the HUD's
+    //! transmitting-on-alternate state would be stranded for the whole spectate.
     override void Update(float timeSlice)
     {
         super.Update(timeSlice);
 
-        if (!m_bEC29_RadioCheckPlayed)
-            EC29_TryPlayRadioCheck();
+        EC29_TryPlayRadioCheck();
 
-        // Coexistence: a known conflicting VON mod polls the same default keys; ours yields.
         if (EC29_CoexistenceGuard.ShouldYieldRadio())
             return;
 
-        // Original bind behavior: radio actions are frame-polled exactly as the
-        // absorbed implementation did - PTT by action value, menu actions only
-        // while the radial menu is open. Polling keeps these keys inert in every
-        // other input situation, which is what keeps them conflict-free against
-        // vanilla uses of the same physical keys.
-        // Uses the member vanilla Init already resolved instead of re-fetching
-        // the manager from the game every frame.
-        InputManager inputMgr = m_InputManager;
-        if (!inputMgr)
+        // Vanilla resolved this at Init; no per-frame refetch.
+        if (!m_InputManager)
             return;
 
-        // Spectator block placement is asymmetric ON PURPOSE. The alternate-PTT poll is an edge
-        // detector over a latched state (m_bAlternatePTTActive), not a stateless action - and the
-        // spectator gate, unlike the session-constant coexistence yield above, is derived per
-        // frame and can flip TRUE mid-hold when a player enters spectate with the key down.
-        // A whole-tail early-return here would strand the latch: the release edge would never be
-        // seen, the saved primary entry never restored, and the transmitting-on-alternate flag
-        // (and its CYAN HUD state) stuck for the entire spectate. So only the START edge is
-        // gated - closing the documented action-block bypass - while the END edge always runs,
-        // which is exactly the pre-absorption behavior (the poll ran through death and cleaned
-        // the latch on release).
-        float altValue = inputMgr.GetActionValue("EC29_AlternateChannel");
-        if (altValue > 0 && !m_bAlternatePTTActive)
+        bool spectatorBlocked = EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions();
+
+        bool altKeyDown = m_InputManager.GetActionValue("EC29_AlternateChannel") > 0;
+        if (altKeyDown && !m_bEC29_AltHeld)
         {
-            if (!EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
+            if (!spectatorBlocked)
                 OnAlternatePTTStart();
         }
-        else if (altValue <= 0 && m_bAlternatePTTActive)
+        else if (!altKeyDown && m_bEC29_AltHeld)
         {
             OnAlternatePTTEnd();
         }
 
-        // The radial-menu actions are stateless per-press handlers, so the blanket gate is safe
-        // here - and while spectating they are all meaningless at best.
-        if (EC29_SpectatorVonService.EC29_ShouldBlockVanillaVonActions())
+        if (spectatorBlocked)
             return;
 
-        if (m_VONMenu && m_VONMenu.GetRadialMenu() && m_VONMenu.GetRadialMenu().IsOpened())
-        {
-            if (inputMgr.GetActionTriggered("EC29_VONRoutingAction"))
-                OnEarRoutingToggle();
+        if (!m_VONMenu)
+            return;
 
-            if (inputMgr.GetActionTriggered("EC29_SetFrequencyAction"))
-                OnSetFrequencyPressed();
+        SCR_RadialMenu radial = m_VONMenu.GetRadialMenu();
+        if (!radial || !radial.IsOpened())
+            return;
 
-            if (inputMgr.GetActionTriggered("EC29_VONBeepTypeAction"))
-                OnBeepTypeToggle();
+        if (m_InputManager.GetActionTriggered("EC29_VONRoutingAction"))
+            OnEarRoutingToggle();
 
-            if (inputMgr.GetActionTriggered("EC29_VolumeUp"))
-                OnVolumeAdjust(1);
+        if (m_InputManager.GetActionTriggered("EC29_SetFrequencyAction"))
+            OnSetFrequencyPressed();
 
-            if (inputMgr.GetActionTriggered("EC29_VolumeDown"))
-                OnVolumeAdjust(-1);
+        if (m_InputManager.GetActionTriggered("EC29_VONBeepTypeAction"))
+            OnBeepTypeToggle();
 
-            if (inputMgr.GetActionTriggered("EC29_AlternateChannelAction"))
-                OnAlternateChannelToggle();
-        }
+        if (m_InputManager.GetActionTriggered("EC29_VolumeUp"))
+            OnVolumeAdjust(1);
+
+        if (m_InputManager.GetActionTriggered("EC29_VolumeDown"))
+            OnVolumeAdjust(-1);
+
+        if (m_InputManager.GetActionTriggered("EC29_AlternateChannelAction"))
+            OnAlternateChannelToggle();
     }
 
+    //------------------------------------------------------------------------------------------------
+    //! The radio entry hovered in the open VON radial menu, provided it has a transceiver.
+    protected SCR_VONEntryRadio EC29_HoveredRadioEntry()
+    {
+        if (!m_VONMenu)
+            return null;
+
+        SCR_RadialMenu radial = m_VONMenu.GetRadialMenu();
+        if (!radial)
+            return null;
+
+        SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(radial.GetSelectionEntry());
+        if (!radioEntry || !radioEntry.GetTransceiver())
+            return null;
+
+        return radioEntry;
+    }
+
+    //------------------------------------------------------------------------------------------------
+    //! Repaint the radial menu so the entry labels pick up a change straight away.
+    protected void EC29_RefreshRadial()
+    {
+        if (!m_VONMenu)
+            return;
+
+        SCR_RadialMenu radial = m_VONMenu.GetRadialMenu();
+        if (radial)
+            radial.UpdateEntries();
+    }
+
+    //------------------------------------------------------------------------------------------------
+    //! T: cycle the hovered radio's ear routing.
     protected void OnEarRoutingToggle()
     {
-        SCR_RadialMenu radialMenu = m_VONMenu.GetRadialMenu();
-        if (!radialMenu)
-            return;
-
-        SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(radialMenu.GetSelectionEntry());
+        SCR_VONEntryRadio radioEntry = EC29_HoveredRadioEntry();
         if (!radioEntry)
             return;
 
-        BaseTransceiver transceiver = radioEntry.GetTransceiver();
-        if (!transceiver)
-            return;
-
-        EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
-        settings.CycleRouting(transceiver);
-
-        radialMenu.UpdateEntries();
+        EC29_RadioState.GetInstance().EarSettings().CycleRouting(radioEntry.GetTransceiver());
+        EC29_RefreshRadial();
     }
 
+    //------------------------------------------------------------------------------------------------
+    //! K: cycle the hovered radio's beep style and preview it. The preview ignores the master
+    //! switch; when the switch is off a popup explains why live beeps stay silent.
     protected void OnBeepTypeToggle()
     {
-        SCR_RadialMenu radialMenu = m_VONMenu.GetRadialMenu();
-        if (!radialMenu)
-            return;
-
-        SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(radialMenu.GetSelectionEntry());
+        SCR_VONEntryRadio radioEntry = EC29_HoveredRadioEntry();
         if (!radioEntry)
             return;
 
         BaseTransceiver transceiver = radioEntry.GetTransceiver();
-        if (!transceiver)
-            return;
-
         EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
-        EC29_EBeepType next = settings.CycleBeepType(transceiver);
+        EC29_EBeepType style = settings.CycleBeepType(transceiver);
 
-        // With the master switch ON, the preview tone plus the radial label are
-        // the confirmation - no popup. Master OFF previews as silence, so the
-        // popup carries the state and points at the switch (the original
-        // "K does nothing" fail-safe, now only where it is still needed).
         EC29_RadioBeepHelper.PlayPreview(transceiver);
 
         if (!EC29_RadioBeepHelper.EC29_AreBeepsEnabled())
         {
-            string styleText = settings.GetBeepTypeDisplayText(next);
-            SCR_PopUpNotification.GetInstance().PopupMsg("Radio beep style: " + styleText, 4, "Radio beeps are OFF - enable them in Settings > Audio > 29th ID");
+            SCR_PopUpNotification popup = SCR_PopUpNotification.GetInstance();
+            if (popup)
+                popup.PopupMsg("Radio beep style: " + settings.GetBeepStyleLongText(style), 4, "Radio beeps are OFF - enable them in Settings > Audio > 29th ID");
         }
 
-        radialMenu.UpdateEntries();
+        EC29_RefreshRadial();
     }
 
+    //------------------------------------------------------------------------------------------------
+    //! F: open the frequency dialog for the hovered radio. Special nets are never retuned.
     protected void OnSetFrequencyPressed()
     {
-        SCR_RadialMenu radialMenu = m_VONMenu.GetRadialMenu();
-        if (!radialMenu)
-            return;
-
-        SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(radialMenu.GetSelectionEntry());
+        SCR_VONEntryRadio radioEntry = EC29_HoveredRadioEntry();
         if (!radioEntry)
             return;
 
         BaseTransceiver transceiver = radioEntry.GetTransceiver();
-        if (!transceiver)
-            return;
-
-        // Never retune another system's net (the spectator net, an admin-only net) - a changed
-        // frequency breaks that system until its owner rebuilds it.
         if (EC29_CoexistenceGuard.EC29_IsSpecialNet(transceiver))
+        {
+            if (EC29_Debug.VERBOSE)
+                PrintFormat("[EC29-DBG][RadioFreq] Refused: %1 kHz is a special net", transceiver.GetFrequency());
             return;
+        }
 
-        EC29_FrequencyDialog.OpenFor(transceiver, radioEntry);
+        EC29_FrequencyDialog.OpenForTransceiver(transceiver, radioEntry);
     }
 
+    //------------------------------------------------------------------------------------------------
+    //! ] / [: one 10% step on the hovered radio's channel volume.
     protected void OnVolumeAdjust(float value)
     {
-        SCR_RadialMenu radialMenu = m_VONMenu.GetRadialMenu();
-        if (!radialMenu)
-            return;
-
-        SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(radialMenu.GetSelectionEntry());
+        SCR_VONEntryRadio radioEntry = EC29_HoveredRadioEntry();
         if (!radioEntry)
             return;
 
-        BaseTransceiver transceiver = radioEntry.GetTransceiver();
-        if (!transceiver)
-            return;
-
-        EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
-
-        float delta;
+        float step = -0.1;
         if (value > 0)
-            delta = 0.1;
-        else
-            delta = -0.1;
+            step = 0.1;
 
-        settings.AdjustVolume(transceiver, delta);
-        radialMenu.UpdateEntries();
+        EC29_RadioState.GetInstance().EarSettings().AdjustVolume(radioEntry.GetTransceiver(), step);
+        EC29_RefreshRadial();
     }
 
+    //------------------------------------------------------------------------------------------------
+    //! LCtrl+F: mark or unmark the hovered radio as the alternate channel. Special nets are
+    //! refused - marking one would hand alternate PTT a transmit route around other mods'
+    //! action blocks.
     protected void OnAlternateChannelToggle()
     {
-        SCR_RadialMenu radialMenu = m_VONMenu.GetRadialMenu();
-        if (!radialMenu)
-            return;
-
-        SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(radialMenu.GetSelectionEntry());
+        SCR_VONEntryRadio radioEntry = EC29_HoveredRadioEntry();
         if (!radioEntry)
             return;
 
         BaseTransceiver transceiver = radioEntry.GetTransceiver();
-        if (!transceiver)
-            return;
-
-        // The alternate-PTT poll bypasses other mods' action-level transmit
-        // blocks, so marking a special net as alternate would hand spectators
-        // a transmit route their own mod deliberately removed.
         if (EC29_CoexistenceGuard.EC29_IsSpecialNet(transceiver))
+        {
+            if (EC29_Debug.VERBOSE)
+                PrintFormat("[EC29-DBG][RadioAlt] Refused: %1 kHz is a special net", transceiver.GetFrequency());
             return;
+        }
 
-        EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
-        settings.ToggleAlternate(transceiver);
-        radialMenu.UpdateEntries();
+        EC29_RadioState.GetInstance().EarSettings().ToggleAlternate(transceiver);
+        EC29_RefreshRadial();
     }
 
+    //------------------------------------------------------------------------------------------------
+    //! Alternate PTT pressed: swap the alternate entry in and key it through vanilla. Vanilla's
+    //! activation runs SetActiveTransmit, so the rate limit, TX beep and key RPC apply without
+    //! being called here.
     protected void OnAlternatePTTStart()
     {
         EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
-        int altFrequency = settings.GetAlternateFrequency();
-
-        if (altFrequency < 0)
+        int frequency = settings.GetAlternateFrequency();
+        if (frequency < 0)
             return;
 
-        SCR_VONEntryRadio altEntry = FindEntryByFrequency(altFrequency);
+        SCR_VONEntryRadio altEntry = EC29_FindRadioEntryByFrequency(frequency);
         if (!altEntry)
             return;
 
-        // Belt-and-braces with the toggle-side gate: never key a special net.
+        // The toggle already refuses special nets; this covers a net that became special after.
         if (EC29_CoexistenceGuard.EC29_IsSpecialNet(altEntry.GetTransceiver()))
             return;
 
-        m_bAlternatePTTActive = true;
+        m_bEC29_AltHeld = true;
         settings.SetTransmittingOnAlternate(true);
-        if (EC29_Debug.VERBOSE)
-            PrintFormat("[EC29-DBG][RadioAlt] Alternate PTT START on freq %1 (primary entry saved)", altFrequency);
 
-        m_SavedPrimaryEntry = m_ActiveEntry;
-        m_ActiveEntry = altEntry;
+        m_EC29_PrimaryBeforeAlt = m_ActiveEntry;
+        SetEntryActive(altEntry);
         ActivateVON(EVONTransmitType.CHANNEL);
+
+        if (EC29_Debug.VERBOSE)
+            PrintFormat("[EC29-DBG][RadioAlt] Alternate PTT start on %1 kHz", frequency);
     }
 
+    //------------------------------------------------------------------------------------------------
+    //! Alternate PTT released. Never gated: always unkeys and hands the primary entry back.
     protected void OnAlternatePTTEnd()
     {
-        if (!m_bAlternatePTTActive)
-            return;
-
-        EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
-        settings.SetTransmittingOnAlternate(false);
-        m_bAlternatePTTActive = false;
-        if (EC29_Debug.VERBOSE)
-            Print("[EC29-DBG][RadioAlt] Alternate PTT END (primary entry restored)");
+        EC29_RadioState.GetInstance().EarSettings().SetTransmittingOnAlternate(false);
+        m_bEC29_AltHeld = false;
 
         DeactivateVON(EVONTransmitType.CHANNEL);
 
-        if (m_SavedPrimaryEntry)
-        {
-            m_ActiveEntry = m_SavedPrimaryEntry;
-            m_SavedPrimaryEntry = null;
-        }
-    }
+        // The primary may have been removed while the alternate was held (radio dropped).
+        if (m_EC29_PrimaryBeforeAlt && m_aEntries.Find(m_EC29_PrimaryBeforeAlt) >= 0)
+            SetEntryActive(m_EC29_PrimaryBeforeAlt);
 
-    protected SCR_VONEntryRadio FindEntryByFrequency(int frequency)
-    {
-        if (frequency < 0)
-            return null;
+        m_EC29_PrimaryBeforeAlt = null;
 
-        array<ref SCR_VONEntry> entries = {};
-        GetVONEntries(entries);
-
-        foreach (SCR_VONEntry entry : entries)
-        {
-            SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(entry);
-            if (radioEntry)
-            {
-                BaseTransceiver transceiver = radioEntry.GetTransceiver();
-                if (transceiver && transceiver.GetFrequency() == frequency)
-                    return radioEntry;
-            }
-        }
-
-        return null;
+        if (EC29_Debug.VERBOSE)
+            Print("[EC29-DBG][RadioAlt] Alternate PTT end", LogLevel.NORMAL);
     }
 }

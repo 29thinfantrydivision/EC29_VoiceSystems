@@ -3,16 +3,26 @@ AudioSignalResClass {
   IOPItemInputClass {
    id 1
    name "TransmissionQuality"
-   tl -403.039 93.931
+   tl -352 176
    children {
-    6 7 14 19 21 23
+    6 7 14
    }
    value 1
   }
+  IOPInputVariableClass {
+   id 20
+   name "EC29_JamStrength"
+   tl -352 800
+   children {
+    21 22 23 24
+   }
+   varName "EC29_JamStrength"
+   varResource "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf"
+  }
   IOPInputValueClass {
    id 9
-   name "Vol Min [dB]"
-   tl -347.234 378.182
+   name "Noise Floor [dB]"
+   tl -352 400
    children {
     10
    }
@@ -20,8 +30,8 @@ AudioSignalResClass {
   }
   IOPInputValueClass {
    id 16
-   name "Vol Min [dB]"
-   tl -345.795 550
+   name "Noise Bed Min [dB]"
+   tl -352 560
    children {
     17
    }
@@ -31,8 +41,8 @@ AudioSignalResClass {
  Ops {
   IOPItemOpInterpolateClass {
    id 6
-   name "Interpolate 1"
-   tl 36 95
+   name "TQ Crush Wet"
+   tl 64 96
    children {
     5
    }
@@ -47,8 +57,8 @@ AudioSignalResClass {
   }
   IOPItemOpInterpolateClass {
    id 7
-   name "Interpolate 1"
-   tl 39.111 282
+   name "TQ Noise Level"
+   tl 64 272
    children {
     8
    }
@@ -69,10 +79,10 @@ AudioSignalResClass {
   }
   SignalOpDb2GainClass {
    id 10
-   name "Db2Gain 10"
-   tl -157.273 378.182
+   name "Noise Floor Gain"
+   tl -160 400
    children {
-    7
+    7 23
    }
    inputs {
     ConnectionClass "9:0" {
@@ -83,8 +93,8 @@ AudioSignalResClass {
   }
   IOPItemOpInterpolateClass {
    id 14
-   name "Interpolate 14"
-   tl 41.528 477.639
+   name "TQ Noise Bed Gain"
+   tl 64 480
    children {
     12
    }
@@ -98,14 +108,13 @@ AudioSignalResClass {
      port 0
     }
    }
-   "Y min" 1
   }
   SignalOpDb2GainClass {
    id 17
-   name "Db2Gain 10"
-   tl -155.593 548.75
+   name "Noise Bed Min Gain"
+   tl -160 560
    children {
-    14
+    14 24
    }
    inputs {
     ConnectionClass "16:0" {
@@ -115,188 +124,120 @@ AudioSignalResClass {
    }
   }
   IOPItemOpInterpolateClass {
-   id 19
-   name "Interpolate 14"
-   tl 32.581 748.374
+   id 21
+   name "Jam Crush Wet"
+   tl 64 720
    children {
-    18
+    25
    }
    inputs {
-    ConnectionClass "1:0" {
-     id 1
+    ConnectionClass "20:0" {
+     id 20
      port 0
     }
    }
+   "Y min" 1
+   "Y max" 0.2
   }
   IOPItemOpInterpolateClass {
-   id 21
-   name "Interpolate 1"
-   tl 42.662 -149.72
+   id 22
+   name "Jam Voice Level"
+   tl 64 880
    children {
-    20
+    28
    }
    inputs {
-    ConnectionClass "1:0" {
-     id 1
+    ConnectionClass "20:0" {
+     id 20
      port 0
     }
    }
-   "Y min" 1000
-   "Y max" 3600
+   "Y min" 0
+   "Y max" 1
   }
   IOPItemOpInterpolateClass {
    id 23
-   name "Interpolate 1"
-   tl 43.812 -379.72
+   name "Jam Noise Level"
+   tl 64 1040
    children {
-    22
+    26
    }
    inputs {
-    ConnectionClass "1:0" {
-     id 1
+    ConnectionClass "10:4" {
+     id 10
+     port 4
+    }
+    ConnectionClass "20:0" {
+     id 20
      port 0
     }
    }
-   "Y min" 3400
-   "Y max" 1200
+   "X max" 0.8
+   "Y min" 1.8
+   "Fade In Type" "Power of 1/3"
+   "Fade Out Type" "Power of 1/3"
+  }
+  IOPItemOpInterpolateClass {
+   id 24
+   name "Jam Noise Bed Gain"
+   tl 64 1200
+   children {
+    27
+   }
+   inputs {
+    ConnectionClass "17:3" {
+     id 17
+     port 3
+    }
+    ConnectionClass "20:0" {
+     id 20
+     port 0
+    }
+   }
   }
  }
  Outputs {
   IOPItemOutputClass {
    id 5
    name "Quality_W"
-   tl 227 95
+   tl 288 96
    input 6
   }
   IOPItemOutputClass {
    id 8
    name "Noise_V"
-   tl 227.658 281
+   tl 288 272
    input 7
   }
   IOPItemOutputClass {
    id 12
    name "Radio_V"
-   tl 227 477.287
+   tl 288 480
    input 14
   }
   IOPItemOutputClass {
-   id 18
-   name "Voice_V"
-   tl 247.953 749.243
-   input 19
-  }
-  IOPItemOutputClass {
-   id 20
-   name "LP_Cutoff"
-   tl 233.662 -149.72
+   id 25
+   name "Jam_Quality_W"
+   tl 288 720
    input 21
   }
   IOPItemOutputClass {
-   id 22
-   name "HP_Cutoff"
-   tl 234.812 -380.87
+   id 26
+   name "Jam_Noise_V"
+   tl 288 1040
    input 23
   }
- }
- compiled IOPCompiledClass "{672F7881628506F1}" {
-  visited {
-   261 519 133 263 5 391 262 135 134 7 6
+  IOPItemOutputClass {
+   id 27
+   name "Jam_Radio_V"
+   tl 288 1200
+   input 24
   }
-  ins {
-   IOPCompiledIn "{672F7881628506EB}" {
-    data {
-     3 3 65539 196611
-    }
-   }
-   IOPCompiledIn "{672F7881628506D5}" {
-    data {
-     1 131075
-    }
-   }
-   IOPCompiledIn "{672F7881628506DB}" {
-    data {
-     1 262147
-    }
-   }
-  }
-  ops {
-   IOPCompiledOp "{672F7881628506CB}" {
-    data {
-     1 2 2 0 0
-    }
-   }
-   IOPCompiledOp "{672F788162850638}" {
-    data {
-     1 65538 4 131073 4 0 0
-    }
-   }
-   IOPCompiledOp "{672F788162850620}" {
-    data {
-     1 65539 2 65536 0
-    }
-   }
-   IOPCompiledOp "{672F788162850629}" {
-    data {
-     1 131074 4 262145 3 0 0
-    }
-   }
-   IOPCompiledOp "{672F78816285062D}" {
-    data {
-     1 196611 2 131072 0
-    }
-   }
-  }
-  outs {
-   IOPCompiledOut "{672F78816285061A}" {
-    data {
-     0
-    }
-   }
-   IOPCompiledOut "{672F788162850600}" {
-    data {
-     0
-    }
-   }
-   IOPCompiledOut "{672F788162850602}" {
-    data {
-     0
-    }
-   }
-  }
-  processed 11
-  version 2
- }
- Input_Order {
-  ItemDetailListItemClass TransmissionQuality {
-   Name "TransmissionQuality"
-   Id 1
-  }
- }
- Output_Order {
-  ItemDetailListItemClass Quality_W {
-   Name "Quality_W"
-   Id 5
-  }
-  ItemDetailListItemClass Noise_V {
-   Name "Noise_V"
-   Id 8
-  }
-  ItemDetailListItemClass Radio_V {
-   Name "Radio_V"
-   Id 12
-  }
-  ItemDetailListItemClass Voice_V {
-   Name "Voice_V"
-   Id 18
-  }
-  ItemDetailListItemClass LP_Cutoff {
-   Name "LP_Cutoff"
-   Id 20
-  }
-  ItemDetailListItemClass HP_Cutoff {
-   Name "HP_Cutoff"
-   Id 22
+  IOPItemOutputClass {
+   id 28
+   name "Jam_Voice_V"
+   tl 288 880
+   input 22
   }
  }
 }

@@ -1,201 +1,190 @@
-//! Shared beep playback for radio transmissions, per-channel style aware.
-//! TX beeps are the local key-up/release confirmation heard by the operator
-//! (sidetone / talk-permit). RX beeps are the squelch open/close effects heard
-//! when receiving someone else's transmission (squelch tail / roger beep).
-//! RX is deliberately asymmetric: subtle click on open, prominent sound on close.
+//! Radio beeps. TX beeps confirm the operator's own key-up and release; RX beeps mark squelch
+//! opening and closing on someone else's transmission - deliberately lopsided, a subtle tail on
+//! open and the prominent tone on close. The style comes from the radio's own setting.
+//!
+//! Live beeps are opt-in: they play only while the persisted RadioBeepsEnabled switch (Audio
+//! tab) is on. The K-press preview ignores that switch on purpose - it is the feedback for a
+//! deliberate press and doubles as a speaker test of the beep path.
+//!
+//! Every beep is routed like radio voice: the ear-routing and channel-volume audio variables are
+//! written for that radio first, then the event fires as a 2D sound. Those variables are global
+//! and the voice path rewrites them per packet as well; that is the existing design.
 class EC29_RadioBeepHelper
 {
-    static const string BEEP_CONFIG = "{63926E92E2606681}Sounds/VON/EC29_beep.acp";
-    static const string EAR_ROUTING_CONFIG = "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf";
+	static const string BEEP_CONFIG = "{63926E92E2606681}Sounds/VON/EC29_beep.acp";
+	static const string EAR_ROUTING_VARS = "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf";
 
-    static const string EVENT_BEEP_HIGH = "EC29_BEEP_HIGH";
-    static const string EVENT_BEEP_LOW = "EC29_BEEP_LOW";
-    static const string EVENT_CLICK_OFF = "EC29_CLICK_OFF";
-    static const string EVENT_CLASSIC_START = "EC29_CLASSIC_START";
-    static const string EVENT_CLASSIC_END = "EC29_CLASSIC_END";
-    //! Sound node must exist with this exact name in EC29_beep.acp
-    static const string EVENT_SQUELCH_TAIL = "EC29_SQUELCH_TAIL";
+	//! Event names inside EC29_beep.acp. Asset contract.
+	protected static const string EVT_BEEP_HIGH = "EC29_BEEP_HIGH";
+	protected static const string EVT_BEEP_LOW = "EC29_BEEP_LOW";
+	protected static const string EVT_CLICK_OFF = "EC29_CLICK_OFF";
+	protected static const string EVT_CLASSIC_START = "EC29_CLASSIC_START";
+	protected static const string EVT_CLASSIC_END = "EC29_CLASSIC_END";
+	protected static const string EVT_SQUELCH_TAIL = "EC29_SQUELCH_TAIL";
 
-    static void PlayTxStart(BaseTransceiver transceiver)
-    {
-        if (!transceiver)
-            return;
+	//! Persisted switch, owned by the Audio-tab settings module. Read by name only.
+	protected static const string SETTINGS_MODULE = "EC29_RadioSettings";
+	protected static const string SETTINGS_FIELD = "RadioBeepsEnabled";
 
-        if (EC29_Debug.VERBOSE)
-            Print("[EC29-DBG][RadioBeep] TX start beep requested");
+	//! The moments a beep can mark.
+	protected static const int MOMENT_TX_START = 0;
+	protected static const int MOMENT_TX_END = 1;
+	protected static const int MOMENT_RX_OPEN = 2;
+	protected static const int MOMENT_RX_CLOSE = 3;
+	protected static const int MOMENT_PREVIEW = 4;
 
-        EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
-        EC29_EBeepType beepType = settings.GetBeepType(transceiver);
+	//! The only static state in the radio layer, intentionally: warn once per game run when the
+	//! settings module is missing rather than once per squelch event.
+	protected static bool s_bWarnedModuleMissing;
 
-        string eventName;
-        switch (beepType)
-        {
-            case EC29_EBeepType.HIGH: eventName = EVENT_BEEP_HIGH; break;
-            case EC29_EBeepType.LOW: eventName = EVENT_BEEP_LOW; break;
-            case EC29_EBeepType.CLASSIC: eventName = EVENT_CLASSIC_START; break;
-            default: return;
-        }
+	//------------------------------------------------------------------------------------------------
+	//! The persisted master switch. A missing settings module counts as OFF, with one WARNING per
+	//! run - otherwise the Audio-tab checkbox would silently do nothing.
+	static bool EC29_AreBeepsEnabled()
+	{
+		BaseContainer module = null;
+		UserSettings userSettings = GetGame().GetGameUserSettings();
+		if (userSettings)
+			module = userSettings.GetModule(SETTINGS_MODULE);
 
-        PlayRouted(eventName, transceiver);
-    }
+		if (!module)
+		{
+			if (!s_bWarnedModuleMissing)
+			{
+				s_bWarnedModuleMissing = true;
+				Print("[EC29] EC29_RadioSettings module not found in game user settings - radio beeps forced OFF and the Audio-tab checkbox will not work", LogLevel.WARNING);
+			}
+			return false;
+		}
 
-    static void PlayTxEnd(BaseTransceiver transceiver)
-    {
-        if (!transceiver)
-            return;
+		bool enabled = false;
+		module.Get(SETTINGS_FIELD, enabled);
+		return enabled;
+	}
 
-        if (EC29_Debug.VERBOSE)
-            Print("[EC29-DBG][RadioBeep] TX end beep requested");
+	//------------------------------------------------------------------------------------------------
+	//! Key-up confirmation (controller, after the rate limit passed).
+	static void PlayTxStart(BaseTransceiver transceiver)
+	{
+		if (!transceiver)
+			return;
 
-        EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
-        EC29_EBeepType beepType = settings.GetBeepType(transceiver);
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][RadioBeep] TX start beep requested (%1 kHz)", transceiver.GetFrequency());
 
-        string eventName;
-        switch (beepType)
-        {
-            case EC29_EBeepType.HIGH:
-            case EC29_EBeepType.LOW:
-                eventName = EVENT_CLICK_OFF;
-                break;
-            case EC29_EBeepType.CLASSIC:
-                eventName = EVENT_CLASSIC_END;
-                break;
-            default:
-                return;
-        }
+		PlayIfEnabled(transceiver, MOMENT_TX_START);
+	}
 
-        PlayRouted(eventName, transceiver);
-    }
+	//------------------------------------------------------------------------------------------------
+	//! Release confirmation (controller, before vanilla deactivation).
+	static void PlayTxEnd(BaseTransceiver transceiver)
+	{
+		if (!transceiver)
+			return;
 
-    static void PlayRxOpen(BaseTransceiver transceiver)
-    {
-        if (!transceiver)
-            return;
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][RadioBeep] TX end beep requested (%1 kHz)", transceiver.GetFrequency());
 
-        EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
-        EC29_EBeepType beepType = settings.GetBeepType(transceiver);
+		PlayIfEnabled(transceiver, MOMENT_TX_END);
+	}
 
-        string eventName;
-        switch (beepType)
-        {
-            case EC29_EBeepType.HIGH:
-            case EC29_EBeepType.LOW:
-                eventName = EVENT_SQUELCH_TAIL;
-                break;
-            case EC29_EBeepType.CLASSIC:
-                eventName = EVENT_CLASSIC_START;
-                break;
-            default:
-                return;
-        }
+	//------------------------------------------------------------------------------------------------
+	//! Squelch opened on an incoming transmission (EC29_RadioRxSquelch).
+	static void PlayRxOpen(BaseTransceiver transceiver)
+	{
+		PlayIfEnabled(transceiver, MOMENT_RX_OPEN);
+	}
 
-        PlayRouted(eventName, transceiver);
-    }
+	//------------------------------------------------------------------------------------------------
+	//! Squelch closed after an incoming transmission (EC29_RadioRxSquelch).
+	static void PlayRxClose(BaseTransceiver transceiver)
+	{
+		PlayIfEnabled(transceiver, MOMENT_RX_CLOSE);
+	}
 
-    static void PlayRxClose(BaseTransceiver transceiver)
-    {
-        if (!transceiver)
-            return;
+	//------------------------------------------------------------------------------------------------
+	//! Sample of the radio's current style after a K press. Bypasses the master switch; OFF
+	//! previews as silence, which is the right answer for OFF.
+	static void PlayPreview(BaseTransceiver transceiver)
+	{
+		if (!transceiver)
+			return;
 
-        EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
-        EC29_EBeepType beepType = settings.GetBeepType(transceiver);
+		PlayRouted(transceiver, EventFor(StyleOf(transceiver), MOMENT_PREVIEW));
+	}
 
-        string eventName;
-        switch (beepType)
-        {
-            case EC29_EBeepType.HIGH: eventName = EVENT_BEEP_HIGH; break;
-            case EC29_EBeepType.LOW: eventName = EVENT_BEEP_LOW; break;
-            case EC29_EBeepType.CLASSIC: eventName = EVENT_CLASSIC_END; break;
-            default: return;
-        }
+	//------------------------------------------------------------------------------------------------
+	protected static void PlayIfEnabled(BaseTransceiver transceiver, int moment)
+	{
+		if (!transceiver)
+			return;
 
-        PlayRouted(eventName, transceiver);
-    }
+		// The common path with default settings, and it runs per squelch event: silent outside
+		// VERBOSE.
+		if (!EC29_AreBeepsEnabled())
+		{
+			if (EC29_Debug.VERBOSE)
+				PrintFormat("[EC29-DBG][RadioBeep] Beep suppressed - master switch off (moment %1, %2 kHz)", moment, transceiver.GetFrequency());
+			return;
+		}
 
-    //! Plays the current style's key-up sound for this radio, BYPASSING the
-    //! master switch. Only for deliberate user actions (cycling the style with
-    //! K in the radial menu) - it is the audible feedback that the cycle did
-    //! something, and it doubles as a speaker test for the beep audio path.
-    //! Style OFF previews as silence, which is the correct feedback for OFF.
-    static void PlayPreview(BaseTransceiver transceiver)
-    {
-        if (!transceiver)
-            return;
+		PlayRouted(transceiver, EventFor(StyleOf(transceiver), moment));
+	}
 
-        EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
-        EC29_EBeepType beepType = settings.GetBeepType(transceiver);
+	//------------------------------------------------------------------------------------------------
+	protected static EC29_EBeepType StyleOf(BaseTransceiver transceiver)
+	{
+		return EC29_RadioState.GetInstance().EarSettings().GetBeepStyle(transceiver);
+	}
 
-        string eventName;
-        switch (beepType)
-        {
-            case EC29_EBeepType.HIGH: eventName = EVENT_BEEP_HIGH; break;
-            case EC29_EBeepType.LOW: eventName = EVENT_BEEP_LOW; break;
-            case EC29_EBeepType.CLASSIC: eventName = EVENT_CLASSIC_START; break;
-            default: return;
-        }
+	//------------------------------------------------------------------------------------------------
+	//! Style x moment -> event. Empty = play nothing (OFF, or an unknown style).
+	//!
+	//!               HIGH            LOW             CLASSIC
+	//!   TX start    BEEP_HIGH       BEEP_LOW        CLASSIC_START
+	//!   TX end      CLICK_OFF       CLICK_OFF       CLASSIC_END
+	//!   RX open     SQUELCH_TAIL    SQUELCH_TAIL    CLASSIC_START
+	//!   RX close    BEEP_HIGH       BEEP_LOW        CLASSIC_END
+	//!   preview     BEEP_HIGH       BEEP_LOW        CLASSIC_START
+	protected static string EventFor(EC29_EBeepType style, int moment)
+	{
+		if (style == EC29_EBeepType.CLASSIC)
+		{
+			if (moment == MOMENT_TX_END || moment == MOMENT_RX_CLOSE)
+				return EVT_CLASSIC_END;
 
-        PlayEventRouted(eventName, transceiver);
-    }
+			return EVT_CLASSIC_START;
+		}
 
-    //! Master switch, persisted in game settings (Audio tab, 29th ID section).
-    //! Default OFF - beeps are opt-in. The per-radio beep type (K in the radial
-    //! menu) still selects the style once enabled.
-    static bool EC29_AreBeepsEnabled()
-    {
-        BaseContainer radioSettings;
-        UserSettings userSettings = GetGame().GetGameUserSettings();
-        if (userSettings)
-            radioSettings = userSettings.GetModule("EC29_RadioSettings");
-        if (!radioSettings)
-        {
-            // Not VERBOSE-gated on purpose: if the settings module fails to
-            // register, the Audio-tab checkbox is inert and beeps are stuck
-            // off with no other symptom. Warn once per game run.
-            if (!s_bModuleMissingWarned)
-            {
-                s_bModuleMissingWarned = true;
-                Print("[EC29] EC29_RadioSettings module not found in game user settings - radio beeps forced OFF and the Audio-tab checkbox will not work", LogLevel.WARNING);
-            }
-            return false;
-        }
+		if (style != EC29_EBeepType.HIGH && style != EC29_EBeepType.LOW)
+			return string.Empty;
 
-        bool enabled;
-        radioSettings.Get("RadioBeepsEnabled", enabled);
-        return enabled;
-    }
+		if (moment == MOMENT_TX_END)
+			return EVT_CLICK_OFF;
 
-    protected static bool s_bModuleMissingWarned;
+		if (moment == MOMENT_RX_OPEN)
+			return EVT_SQUELCH_TAIL;
 
-    protected static void PlayRouted(string eventName, BaseTransceiver transceiver)
-    {
-        // Beeps default OFF, so this is the common exit - it must stay silent
-        // or the default config logs a line per squelch event.
-        if (!EC29_AreBeepsEnabled())
-        {
-            if (EC29_Debug.VERBOSE)
-                Print("[EC29-DBG][RadioBeep] Beep suppressed - RadioBeepsEnabled setting is off");
-            return;
-        }
+		// Key-up, squelch close and preview all carry the style's own tone.
+		if (style == EC29_EBeepType.LOW)
+			return EVT_BEEP_LOW;
 
-        PlayEventRouted(eventName, transceiver);
-    }
+		return EVT_BEEP_HIGH;
+	}
 
-    protected static void PlayEventRouted(string eventName, BaseTransceiver transceiver)
-    {
-        EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
-        EC29_EEarRouting routing = settings.GetRouting(transceiver);
+	//------------------------------------------------------------------------------------------------
+	//! Writes the radio's routing and channel gain, then fires the event non-positionally.
+	protected static void PlayRouted(notnull BaseTransceiver transceiver, string eventName)
+	{
+		if (eventName.IsEmpty())
+			return;
 
-        AudioSystem.SetVariableByName("EC29_EarRouting", routing, EAR_ROUTING_CONFIG);
+		EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
+		AudioSystem.SetVariableByName("EC29_EarRouting", settings.GetRouting(transceiver), EAR_ROUTING_VARS);
+		AudioSystem.SetVariableByName("EC29_ChannelVolume", settings.GetVolumeGain(transceiver), EAR_ROUTING_VARS);
 
-        // EC29_beep.acp only consumes EarRouting today; ChannelVolume is set so
-        // beeps scale with per-channel volume once the variable is wired into the
-        // audio project in Workbench.
-        float volume = Math.Pow(settings.GetVolume(transceiver), 2.5);
-        AudioSystem.SetVariableByName("EC29_ChannelVolume", volume, EAR_ROUTING_CONFIG);
-
-        vector mat[4];
-        Math3D.MatrixIdentity4(mat);
-
-        AudioSystem.PlayEvent(BEEP_CONFIG, eventName, mat);
-    }
+		vector transform[4];
+		Math3D.MatrixIdentity4(transform);
+		AudioSystem.PlayEvent(BEEP_CONFIG, eventName, transform);
+	}
 }

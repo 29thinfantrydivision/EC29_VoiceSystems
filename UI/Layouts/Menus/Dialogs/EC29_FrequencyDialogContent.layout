@@ -1,8 +1,11 @@
 VerticalLayoutWidgetClass {
+ Name "EC29_FrequencyContentRoot"
+ Slot LayoutSlot "{23FFD7E084658D53}" {
+ }
  {
-  ButtonWidgetClass "{684601EE00000305}" : "{0022F0B45ADBC5AC}UI/layouts/WidgetLibrary/EditBox/WLib_EditBox.layout" {
+  ButtonWidgetClass "{0A9281745DADEA68}" : "{0022F0B45ADBC5AC}UI/layouts/WidgetLibrary/EditBox/WLib_EditBox.layout" {
    Name "EditBox"
-   Slot LayoutSlot "{684601EE00000306}" {
+   Slot LayoutSlot "{2A7DB5A239824827}" {
     Padding 8 8 8 8
    }
   }

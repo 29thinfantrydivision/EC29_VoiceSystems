@@ -1,0 +1,22 @@
+GenericEntity {
+ ID "E5DDB45F6746DBC6"
+ components {
+  SCR_EditableEntityComponent "{1A487ADD123A3E14}" : "{996046FE206C699A}Prefabs/Editor/Components/Default_SCR_EditableEntityComponent.ct" {
+   m_EntityType SYSTEM
+   m_UIInfo SCR_EditableEntityUIInfo "{5298E609432D192D}" {
+    Name "EC29 Radio Jammer"
+    Description "Degrades radio reception for anyone inside its jamming radius."
+    Icon "{3F3D80879DDD074D}UI/Textures/Editor/ContentBrowser/ContentBrowser_Trait_Radio.edds"
+    m_aAuthoredLabels {
+     ENTITYTYPE_SYSTEM TRAIT_EFFECT_MODULE
+    }
+   }
+  }
+  EC29_JammerComponent "{609696C27D5DA08C}" {
+  }
+  Hierarchy "{36F6D37F9A5156FE}" {
+  }
+  RplComponent "{6FFDFDCFAF6F8872}" : "{B193E926C1935A4C}Prefabs/Editor/Components/Default_RplComponent.ct" {
+  }
+ }
+}

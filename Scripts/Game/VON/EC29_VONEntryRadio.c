@@ -1,50 +1,79 @@
+//! Radial-menu radio entry: the frequency label carries this radio's EC29 settings, and the
+//! alternate channel shows in cyan.
+//!
+//! Label shape: "<frequency> <routing>|<beep>|<volume>", e.g. "45.0 MHz L|BH|100".
 modded class SCR_VONEntryRadio
 {
-    void SetEntryFrequency(int freqKHz)
-    {
-        m_iFrequency = freqKHz;
+	//! True while this entry's frequency text carries the alternate cyan, so the colour can be
+	//! handed back the moment the radio stops being the alternate.
+	protected bool m_bEC29_ShowsAlternate;
 
-        float fFrequency = Math.Round(m_iFrequency * 0.1) * 0.01;
-        m_sText = fFrequency.ToString(3, 1) + " " + LABEL_FREQUENCY_UNITS;
-    }
+	//------------------------------------------------------------------------------------------------
+	//! Retune the entry's own view of its frequency and rebuild the base label the way vanilla
+	//! formats it (0.01 MHz rounding, one decimal shown). The frequency dialog calls this after a
+	//! retune so the label is right before the transceiver getter catches up.
+	void SetEntryFrequency(int freqKHz)
+	{
+		m_iFrequency = freqKHz;
 
-    override void Update()
-    {
-        // 1.8 renders through m_sFrequencyTextOverwrite when set; feeding our
-        // composite label into that field BEFORE super lets the vanilla Update
-        // draw it natively instead of us stomping the widget afterwards (which
-        // would also hide anything vanilla legitimately routes through the
-        // overwrite mechanism).
-        if (m_RadioTransceiver)
-        {
-            EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
-            EC29_EEarRouting routing = settings.GetRouting(m_RadioTransceiver);
-            EC29_EBeepType beepType = settings.GetBeepType(m_RadioTransceiver);
-            int volume = settings.GetVolumePercent(m_RadioTransceiver);
+		float megahertz = Math.Round(freqKHz * 0.1) * 0.01;
+		m_sText = megahertz.ToString(3, 1) + " " + LABEL_FREQUENCY_UNITS;
+	}
 
-            string routingText = settings.GetRoutingDisplayText(routing);
+	//------------------------------------------------------------------------------------------------
+	//! The composite label goes into vanilla's 1.8 frequency-text overwrite BEFORE vanilla's
+	//! update, so vanilla renders it natively and its own wheel tuning flows into it. Writing the
+	//! text widget after vanilla instead would stomp anything vanilla routes through the overwrite.
+	//! The alternate colour is the only post-vanilla touch.
+	override void Update()
+	{
+		if (m_RadioTransceiver)
+			m_sFrequencyTextOverwrite = EC29_ComposeLabel();
 
-            string beepText;
-            switch (beepType)
-            {
-                case EC29_EBeepType.OFF: beepText = "-"; break;
-                case EC29_EBeepType.HIGH: beepText = "BH"; break;
-                case EC29_EBeepType.LOW: beepText = "BL"; break;
-                case EC29_EBeepType.CLASSIC: beepText = "CLS"; break;
-                default: beepText = "BH";
-            }
+		super.Update();
 
-            m_sFrequencyTextOverwrite = m_sText + " " + routingText + "|" + beepText + "|" + volume.ToString();
-        }
+		SCR_VONEntryComponent entryComp = SCR_VONEntryComponent.Cast(m_EntryComponent);
+		if (!entryComp || !m_RadioTransceiver)
+			return;
 
-        super.Update();
+		if (EC29_RadioState.GetInstance().EarSettings().IsAlternate(m_RadioTransceiver))
+		{
+			entryComp.SetFrequencyColor(Color.FromInt(Color.CYAN));
+			m_bEC29_ShowsAlternate = true;
+			return;
+		}
 
-        SCR_VONEntryComponent entryComp = SCR_VONEntryComponent.Cast(m_EntryComponent);
-        if (!entryComp || !m_RadioTransceiver)
-            return;
+		// No longer the alternate: put back the colour vanilla paints for this entry's state.
+		if (m_bEC29_ShowsAlternate)
+		{
+			m_bEC29_ShowsAlternate = false;
+			entryComp.SetFrequencyColor(EC29_VanillaFrequencyColor());
+		}
+	}
 
-        EC29_RadioEarSettings earSettings = EC29_RadioState.GetInstance().EarSettings();
-        if (earSettings.IsAlternate(m_RadioTransceiver))
-            entryComp.SetFrequencyColor(Color.FromInt(Color.CYAN));
-    }
+	//------------------------------------------------------------------------------------------------
+	protected string EC29_ComposeLabel()
+	{
+		EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
+
+		string routing = settings.GetRoutingLetter(settings.GetRouting(m_RadioTransceiver));
+		string beep = settings.GetBeepStyleShortCode(settings.GetBeepStyle(m_RadioTransceiver));
+		int volume = settings.GetVolumePercent(m_RadioTransceiver);
+
+		return string.Format("%1 %2|%3|%4", m_sText, routing, beep, volume);
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Mirrors vanilla's frequency colour rule: hovered = bright orange, active = orange,
+	//! otherwise white.
+	protected Color EC29_VanillaFrequencyColor()
+	{
+		if (m_bIsSelected)
+			return Color.FromInt(GUIColors.ORANGE_BRIGHT.PackToInt());
+
+		if (m_bIsActive)
+			return Color.FromInt(GUIColors.ORANGE.PackToInt());
+
+		return Color.FromInt(Color.WHITE);
+	}
 }
