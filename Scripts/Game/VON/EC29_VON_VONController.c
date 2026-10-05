@@ -29,6 +29,9 @@ modded class SCR_VONController
     //! First-spawn check runs once per controller instance (one server session on a client).
     protected bool m_bEC29_SpawnCheckDone;
 
+    //! Set only while ActivateVON is keying a radio - see SetActiveTransmit for why.
+    protected bool m_bEC29_KeyingRadio;
+
     protected const string EC29_ACTION_VOICE_RANGE_CYCLE = "EC29_VONVoiceRangeCycle";
 
     //! A voice mode chosen while a push-to-talk was held. -1 = nothing pending. Applied by
@@ -312,26 +315,43 @@ modded class SCR_VONController
     }
 
     //------------------------------------------------------------------------------------------------
-    //! Radio key-up. In order: rate limit (a refusal ends here, vanilla never sees it), clear
-    //! the voice capture (1.8 per-player capture wedge self-heal), TX beep and key-state
-    //! notification, then vanilla. Non-radio entries and a yielding coexistence guard go
-    //! straight to vanilla.
+    //! The one place a radio key-up actually starts. The rate limit lives here, before vanilla,
+    //! so a refused key-up returns false with capture untouched - refusing inside
+    //! SetActiveTransmit still let vanilla open the mic afterwards.
+    override protected bool ActivateVON(notnull SCR_VONEntry entry, EVONTransmitType transmitType = EVONTransmitType.NONE)
+    {
+        bool radioKey = SCR_VONEntryRadio.Cast(entry) && transmitType != EVONTransmitType.DIRECT && !EC29_CoexistenceGuard.ShouldYieldRadio();
+        if (radioKey && EC29_IsKeySpamLocked())
+        {
+            EC29_PlayErrorBeep();
+            if (EC29_Debug.VERBOSE)
+                Print("[EC29-DBG][RadioKey] Key-up refused - key bucket empty", LogLevel.NORMAL);
+            return false;
+        }
+
+        m_bEC29_KeyingRadio = radioKey;
+        bool activated = super.ActivateVON(entry, transmitType);
+        m_bEC29_KeyingRadio = false;
+        return activated;
+    }
+
+    //------------------------------------------------------------------------------------------------
+    //! Vanilla calls this for TWO jobs: keying a radio (from ActivateVON) and merely selecting
+    //! one (SetVONLongRange, on Ctrl+Caps or whenever the active radio swaps between a short- and
+    //! a long-range set). Only the first is a key-up: clear the voice capture (1.8 per-player
+    //! capture wedge self-heal), TX beep and key-state notification, then vanilla. Treating a
+    //! selection as a key sent a key-start with no stop, leaving a phantom dead key open on the
+    //! net. The flag is consumed on first use so a nested vanilla re-entry can never key twice.
     override void SetActiveTransmit(notnull SCR_VONEntry entry)
     {
         SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(entry);
-        if (!radioEntry || EC29_CoexistenceGuard.ShouldYieldRadio())
+        if (!radioEntry || !m_bEC29_KeyingRadio)
         {
             super.SetActiveTransmit(entry);
             return;
         }
 
-        if (EC29_IsKeySpamLocked())
-        {
-            EC29_PlayErrorBeep();
-            if (EC29_Debug.VERBOSE)
-                Print("[EC29-DBG][RadioKey] Key-up refused - key bucket empty", LogLevel.NORMAL);
-            return;
-        }
+        m_bEC29_KeyingRadio = false;
 
         if (m_VONComp)
             m_VONComp.SetCapture(false);
