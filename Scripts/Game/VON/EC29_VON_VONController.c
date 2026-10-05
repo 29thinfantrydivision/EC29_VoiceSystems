@@ -20,6 +20,8 @@ modded class SCR_VONController
     protected ref EC29_TokenBucket m_EC29_KeyBucket = new EC29_TokenBucket(EC29_KEY_BUCKET_CAPACITY, EC29_KEY_BUCKET_WINDOW_MS);
     protected AudioHandle m_AudioHandleError;
     protected bool m_bEC29_RadioCheckPlayed = false;
+    //! Set only while ActivateVON is keying a radio - see SetActiveTransmit for why.
+    protected bool m_bEC29_KeyingRadio = false;
 
     protected const string EC29_ACTION_VOICE_RANGE_CYCLE = "EC29_VONVoiceRangeCycle";
 
@@ -299,18 +301,37 @@ modded class SCR_VONController
         super.SetVONBroadcast(activate, transmitType);
     }
 
+    //! The one place a radio key-up actually starts. The rate limit lives here, before vanilla,
+    //! so a denied key-up returns false with capture untouched - refusing inside
+    //! SetActiveTransmit (the old spot) still let vanilla open the mic afterwards.
+    override protected bool ActivateVON(notnull SCR_VONEntry entry, EVONTransmitType transmitType = EVONTransmitType.NONE)
+    {
+        bool radioKey = SCR_VONEntryRadio.Cast(entry) && transmitType != EVONTransmitType.DIRECT && !EC29_CoexistenceGuard.ShouldYieldRadio();
+        if (radioKey && EC29_IsKeySpamLocked())
+        {
+            EC29_PlayErrorBeep();
+            return false;
+        }
+
+        m_bEC29_KeyingRadio = radioKey;
+        bool activated = super.ActivateVON(entry, transmitType);
+        m_bEC29_KeyingRadio = false;
+        return activated;
+    }
+
+    //! Vanilla calls this for TWO jobs: keying a radio (from ActivateVON) and merely selecting
+    //! one (SetVONLongRange, on Ctrl+Caps or whenever the active radio swaps between a short- and
+    //! a long-range set). Only the first is a key-up. Treating both as one sent a key-start with
+    //! no matching stop on every swap, so a leader carrying two powered radios left a phantom
+    //! dead key open on the net for every receiver (up to the 120 s squelch failsafe), plus a
+    //! stray TX beep and a spent rate token. The flag is consumed on first use so a nested
+    //! vanilla re-entry can never key twice.
     override void SetActiveTransmit(notnull SCR_VONEntry entry)
     {
         SCR_VONEntryRadio radioEntry = SCR_VONEntryRadio.Cast(entry);
-        if (radioEntry && !EC29_CoexistenceGuard.ShouldYieldRadio())
+        if (radioEntry && m_bEC29_KeyingRadio)
         {
-            // Denied key-ups never reach super, so no transmission starts, no
-            // TX beep plays and no key RPC is sent - just the deny tone.
-            if (EC29_IsKeySpamLocked())
-            {
-                EC29_PlayErrorBeep();
-                return;
-            }
+            m_bEC29_KeyingRadio = false;
 
             // 1.8 can wedge the player's voice capture so every radio transmit
             // is silently dead until it clears - per-player, survives switching
