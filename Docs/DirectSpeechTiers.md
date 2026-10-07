@@ -61,3 +61,23 @@ the mirror constants in `EC29_VoiceTiers`, together.
    class ...`). Per-packet bookkeeping is deduplicated either way.
 4. **Mouth animation while talking through a tier.** The `VONAmplitude` signal is expected to
    come from any VoN component on the entity; confirm lips move on a whisperer.
+
+## How the engine actually uses the tier ACPs (static analysis, 2026-10-07)
+Found in the game executable, see `Docs/EngineCrossCheck.md` on the in-house branch for the
+function-level detail.
+
+- **Range is decided by the SENDER, on the server.** When a component loads its ACP the engine
+  stores the LARGEST amplitude range of any shader wired to any sound in that ACP. The server
+  forwards a direct voice packet only to players inside that radius of the speaker. So each
+  tier's reach = the biggest `outerRange` in its ACP, not just the one on Shader Direct.
+- **Sound is decided by the LISTENER.** Packets are played through the first VoN component on
+  the listener's own character (the stock `SCR_VoNComponent`, `von.acp`). The tier ACPs never
+  play anything for a listener, so their volume settings (yell `volume_dB 6`) have no effect.
+- **The bug this fixes:** every tier ACP still carried the spectator amplitude 200010 at 40/68 m,
+  so whisper and normal were relayed to 68 m, and the listener's `von.acp` (inherited 40 m curve)
+  made everyone audible to ~40 m. Tiers barely differed.
+- **Now:** 200010 in each tier ACP equals that tier's range (whisper 2/6, normal 15/20,
+  yell 50/80), so the relay radius is the tier's range. `von.acp` 23571 is 15/80: full volume to
+  15 m, fading to 80 m, so a yell is audible to its 80 m relay edge. Within its radius every tier
+  sounds the same; the tiers differ by how far they carry, with a hard edge at whisper 6 m and
+  normal 20 m.
