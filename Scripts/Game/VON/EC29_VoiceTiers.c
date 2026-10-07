@@ -9,21 +9,24 @@
 //! gain in this engine - the receive callback names the speaker but hands over no handle to their
 //! stream - so no amount of listener-side bookkeeping could make that reliable.
 //!
-//! What the engine DOES do per source, with no script in the loop, is spatial attenuation from
-//! the transmitting component's ACP (the amplitude node's inner/outer range). The spectator quiet
-//! tier is that mechanism and the field confirmed it: a component whose ACP ranges are 0 / 0.0001
-//! is inaudible to everyone. So each mode is its own component with its own ACP, the speaker's
-//! machine picks which one transmits BEFORE the first packet leaves, and every listener hears the
-//! right range by construction. Nothing races, nothing is shared between streams, nothing
-//! depends on the listener resolving the sender.
+//! What the engine DOES do per source (static analysis, see Docs/DirectSpeechTiers.md): when a
+//! VoN component loads its ACP it stores the LARGEST amplitude range of any shader wired to any
+//! sound in that graph, and the server forwards a direct packet only to players inside that radius
+//! of the speaker. Playback then happens on the LISTENER's first VoN component (stock von.acp).
+//! The spectator quiet tier is that mechanism: an ACP whose ranges are 0 / 0.0001 is relayed to
+//! nobody. So each mode is its own component with its own ACP, the speaker's machine picks which
+//! one transmits BEFORE the first packet leaves, and every listener gets the right reach by
+//! construction. Nothing races, nothing is shared between streams.
 //!
-//! THE THREE ACPs are byte-for-byte the stock EC29 von.acp graph except:
-//!   - AmplitudeClass 23571 (the node "Shader Direct" actually feeds - see EC29_SpectatorVonTiers.c
-//!     for why 200010 is not it) gets innerRange / outerRange per tier,
-//!   - the yell ACP adds volume_dB on the VON_DIRECT sound so a shout is louder, not just longer.
-//! Everything else in the graph (radio chain, ear routing, spectator gate) is identical, so a
-//! radio keyed from any tier sounds exactly as before. The ranges here are MIRRORS of the ACP
-//! values for the UI gates (nametag icon, overlay entry); the ACP is the truth. Change both.
+//! THE THREE ACPs are byte-for-byte the stock EC29 von.acp graph except that BOTH amplitude nodes
+//! on the VON_DIRECT sound - 23571 ("Shader Direct") and 200010 ("Spectator Shader Direct") - get
+//! the tier's innerRange / outerRange. Both count toward the relay radius; until 2026-10-07 200010
+//! was left at 68 m, which relayed whisper and normal to 68 m. The tier ACPs never PLAY audio, so
+//! loudness cannot differ per tier (the yell ACP's volume_dB is inert); listeners hear every tier
+//! through von.acp's 23571 curve (15 m full, fading to 80 m). Everything else in the graph is
+//! identical, so a radio keyed from any tier behaves exactly as before. The ranges here are
+//! MIRRORS of the ACP values for the UI gates (nametag icon, overlay entry); the ACP is the truth.
+//! Change both.
 //!
 //! CLASS NAMES ARE LOAD-BEARING. An entity orders its components by class name and the engine
 //! plays incoming streams through the FIRST VoN component (field-measured on the editor manager,
@@ -80,7 +83,7 @@ class EC29_VoiceTiers
 	//! Outer (silent) range per tier, metres - MIRRORS of the ACP amplitude nodes:
 	//!   EC29_VonWhisper.acp  innerRange 2  / outerRange 6
 	//!   EC29_VonNormal.acp   innerRange 15 / outerRange 20
-	//!   EC29_VonYell.acp     innerRange 50 / outerRange 80  (+6 dB on VON_DIRECT)
+	//!   EC29_VonYell.acp     innerRange 50 / outerRange 80
 	//! Used only to gate visuals (nametag icon, overlay entry) so they stop where the audio
 	//! stops. Audio itself never reads these.
 	static const float WHISPER_OUTER_M = 6.0;
