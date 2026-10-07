@@ -1148,6 +1148,8 @@ AudioClass {
    tl 0 -1072
    ctl 0 -21
    parent "{299E65568A14273A}Sounds/_SharedData/Configs/Amplitude/_SharedData/Amplitude_-45LUFS_to_-30LUFS_Character.conf"
+   innerRange 15
+   outerRange 80
   }
   AmplitudeClass "200010" : "{299E65568A14273A}Sounds/_SharedData/Configs/Amplitude/_SharedData/Amplitude_-45LUFS_to_-30LUFS_Character.conf" {
    id 200010

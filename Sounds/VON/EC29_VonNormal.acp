@@ -1157,8 +1157,8 @@ AudioClass {
    tl 0 -1000
    ctl 0 -21
    parent "{299E65568A14273A}Sounds/_SharedData/Configs/Amplitude/_SharedData/Amplitude_-45LUFS_to_-30LUFS_Character.conf"
-   innerRange 40
-   outerRange 68
+   innerRange 15
+   outerRange 20
   }
  }
  frequency {
