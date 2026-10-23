@@ -1,0 +1,14 @@
+### 29th ID Voice Systems (VON Range + Earplugs + Radio)
+- **Folder:** `EC29_VoiceSystems`
+
+Test:
+- **Project ID:** `EC29_VoiceSystems`
+- **GUID:** `481849A4E0D88BEA`
+
+Production:
+- **Project ID:** `29th ID Voice Systems (VON Range + Earplugs + Radio)`
+- **GUID:** `6A8729056F081E31` 
+
+| Dependency | GUID |
+|---|---|
+| Arma Reforger (base game) | `58D0FB3206B6F859` |
