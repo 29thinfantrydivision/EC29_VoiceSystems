@@ -30,6 +30,13 @@ modded class SCR_VoNComponent
 	// below runs once per (speaker, world-time) whichever it is. Vanilla's super still runs on
 	// each call - its display update is idempotent.
 	protected static ref map<int, float> s_mEC29LastPacketMs = new map<int, float>();
+	//! Overlap fallback: last radio packet time and ear per speaker. EC29_EarRouting is one global
+	//! value, so with two nets on different ears talking at once it would flip per packet; while
+	//! that happens we play both ears instead of the wrong one.
+	protected static ref map<int, float> s_mEC29EarPacketMs = new map<int, float>();
+	protected static ref map<int, float> s_mEC29EarBySpeaker = new map<int, float>();
+	protected static bool s_bEC29EarOverlap;
+	protected static const float EC29_EAR_OVERLAP_MS = 400;
 	protected static bool s_bEC29ReceiverTypeLogged;
 
 	// World-lifecycle guard for the static caches above: playerIds and component
@@ -50,6 +57,9 @@ modded class SCR_VoNComponent
 		s_mEC29PlayerVon.Clear();
 		s_mEC29PlayerVonEntity.Clear();
 		s_mEC29LastPacketMs.Clear();
+		s_mEC29EarPacketMs.Clear();
+		s_mEC29EarBySpeaker.Clear();
+		s_bEC29EarOverlap = false;
 		s_bEC29VarChecked = false;
 		s_bEC29RadioVarsChecked = false;
 		s_bEC29ReceiverTypeLogged = false;
@@ -375,6 +385,47 @@ modded class SCR_VoNComponent
 	}
 
 	//------------------------------------------------------------------------------------------------
+	//------------------------------------------------------------------------------------------------
+	//! Records this speaker's ear and returns the ear to apply: their own, or CENTER while another
+	//! speaker on a different ear sent a radio packet within EC29_EAR_OVERLAP_MS.
+	protected float EC29_ResolveOverlapEar(int playerId, float ear)
+	{
+		BaseWorld world = GetGame().GetWorld();
+		if (!world)
+			return ear;
+
+		float nowMs = world.GetWorldTime();
+		s_mEC29EarPacketMs.Set(playerId, nowMs);
+		s_mEC29EarBySpeaker.Set(playerId, ear);
+
+		bool overlap = false;
+		foreach (int otherId, float otherMs : s_mEC29EarPacketMs)
+		{
+			if (otherId == playerId || nowMs - otherMs > EC29_EAR_OVERLAP_MS)
+				continue;
+
+			float otherEar;
+			if (s_mEC29EarBySpeaker.Find(otherId, otherEar) && otherEar != ear)
+			{
+				overlap = true;
+				break;
+			}
+		}
+
+		if (overlap != s_bEC29EarOverlap)
+		{
+			s_bEC29EarOverlap = overlap;
+			if (EC29_Debug.VERBOSE)
+				PrintFormat("[EC29-DBG][EarOverlap] %1 (speaker %2 ear=%3)", overlap, playerId, ear);
+		}
+
+		if (overlap)
+			return EC29_EEarRouting.CENTER;
+
+		return ear;
+	}
+
+	//------------------------------------------------------------------------------------------------
 	//! Radio-path audio variables: ear routing, RF signal
 	//! quality, jammer strength, per-channel volume. All are global external variables
 	//! consumed by the merged von.acp graph; they must be refreshed per incoming packet.
@@ -399,7 +450,7 @@ modded class SCR_VoNComponent
 
 		if (s_bEC29_EEarRoutingValid)
 		{
-			float earRouting = EC29_GetEarRoutingForTransceiver(receiver);
+			float earRouting = EC29_ResolveOverlapEar(playerId, EC29_GetEarRoutingForTransceiver(receiver));
 			AudioSystem.SetVariableByName("EC29_EarRouting", earRouting, EC29_EAR_ROUTING_CONFIG);
 		}
 
