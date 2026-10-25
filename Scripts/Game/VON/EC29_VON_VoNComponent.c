@@ -199,6 +199,10 @@ modded class SCR_VoNComponent
 			return;
 		}
 
+		// ACTUAL-hearer trace (VERBOSE only, once per speaker per second) - see EC29_RadioTrace.
+		if (EC29_Debug.VERBOSE)
+			EC29_RadioTrace.LogReception(playerId, isSenderEditor, receiver, frequency, quality);
+
 		// Feed the VON activity service BEFORE every policy gate below: a packet that arrived is
 		// a player talking, no matter what faction filters, range gating or mute policy do with
 		// the audio. The service itself is spectator-scoped and one flag read when it is not -
@@ -277,6 +281,12 @@ modded class SCR_VoNComponent
 
 		if (!EC29_Debug.VERBOSE)
 			return;
+
+		// EXPECTED-hearer trace: transmission start detection + direct-speech hearer list
+		// (radio key-ups are reported from the key-state path). Server only - the engine raises
+		// OnVoNUsed on the authority.
+		if (Replication.IsServer())
+			EC29_RadioTrace.LogServerVonUsed(senderId);
 
 		BaseWorld world = GetGame().GetWorld();
 		if (!world)
@@ -397,9 +407,16 @@ modded class SCR_VoNComponent
 					s_bEC29_EEarRoutingValid, s_bEC29SignalQualityValid, s_bEC29JamStrengthValid, s_bEC29ChannelVolumeValid);
 		}
 
+		// Values written this packet, for the VERBOSE audio-variable trace at the end. -1 = that
+		// variable was not written (its conf lookup failed at the probe above).
+		float earRouting = -1;
+		float signalQuality = -1;
+		float jamStrength = -1;
+		float channelVolume = -1;
+
 		if (s_bEC29_EEarRoutingValid)
 		{
-			float earRouting = EC29_GetEarRoutingForTransceiver(receiver);
+			earRouting = EC29_GetEarRoutingForTransceiver(receiver);
 			AudioSystem.SetVariableByName("EC29_EarRouting", earRouting, EC29_EAR_ROUTING_CONFIG);
 		}
 
@@ -429,7 +446,7 @@ modded class SCR_VoNComponent
 
 		if (s_bEC29SignalQualityValid)
 		{
-			float signalQuality = 1.0;
+			signalQuality = 1.0;
 			if (hasReceiverPos && !specialNet)
 				signalQuality = EC29_GetSignalQuality(playerId, frequency, receiverPos);
 			AudioSystem.SetVariableByName("EC29_SignalQuality", signalQuality, EC29_EAR_ROUTING_CONFIG);
@@ -437,7 +454,7 @@ modded class SCR_VoNComponent
 
 		if (s_bEC29JamStrengthValid)
 		{
-			float jamStrength = 1.0;
+			jamStrength = 1.0;
 			if (hasReceiverPos && !specialNet)
 				jamStrength = EC29_GetJamStrength(receiverPos);
 			AudioSystem.SetVariableByName("EC29_JamStrength", jamStrength, EC29_EAR_ROUTING_CONFIG);
@@ -445,9 +462,12 @@ modded class SCR_VoNComponent
 
 		if (s_bEC29ChannelVolumeValid)
 		{
-			float channelVolume = EC29_GetChannelVolumeForTransceiver(receiver);
+			channelVolume = EC29_GetChannelVolumeForTransceiver(receiver);
 			AudioSystem.SetVariableByName("EC29_ChannelVolume", channelVolume, EC29_EAR_ROUTING_CONFIG);
 		}
+
+		if (EC29_Debug.VERBOSE)
+			EC29_RadioTrace.LogAudioVars(playerId, receiver, earRouting, signalQuality, jamStrength, channelVolume);
 	}
 
 	//------------------------------------------------------------------------------------------------

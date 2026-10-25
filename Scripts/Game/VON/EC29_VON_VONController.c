@@ -64,6 +64,24 @@ modded class SCR_VONController
             return;
 
         EC29_RadioState.GetInstance().ReceiverGuard().OnRadioEntryAdded(transceiver);
+
+        // Radio trace: a VON entry registering is the moment a radio becomes usable here.
+        if (EC29_Debug.VERBOSE && GetGame().GetPlayerController() == PlayerController.Cast(GetOwner()))
+        {
+            BaseRadioComponent radio = transceiver.GetRadio();
+            PrintFormat("%1 VON entry registered: freq=%2 tsv=%3 host=%4 radio=%5 usable=%6", EC29_RadioTrace.TAG, transceiver.GetFrequency(),
+                EC29_RadioTrace.TransceiverIndex(radio, transceiver), EC29_RadioTrace.RadioHostLabel(radio), EC29_RadioTrace.PrefabName(EC29_RadioOwner(radio)), radioEntry.IsUsable());
+        }
+    }
+
+    //------------------------------------------------------------------------------------------------
+    //! Owner entity of a radio, null-safe (trace helper).
+    protected IEntity EC29_RadioOwner(BaseRadioComponent radio)
+    {
+        if (!radio)
+            return null;
+
+        return radio.GetOwner();
     }
 
     //------------------------------------------------------------------------------------------------
@@ -246,6 +264,21 @@ modded class SCR_VONController
         SCR_VoNComponent stock = EC29_VoiceTiers.StockVoN(to);
         if (stock)
             EC29_ApplyVoiceTier(stock.EC29_GetVoiceRange());
+
+        // Radio trace: one-shot local state on spawn / respawn / GM possess. Immediately for the
+        // entity itself, and again after the gadget manager has had a moment to register the
+        // new body's radios (the inventory lands a few frames after the controlled-entity swap).
+        if (EC29_Debug.VERBOSE && GetGame().GetPlayerController() == PlayerController.Cast(GetOwner()))
+        {
+            EC29_RadioTrace.DumpLocalRadios(string.Format("controlled entity changed -> %1", EC29_RadioTrace.PrefabName(to)));
+            GetGame().GetCallqueue().CallLater(EC29_TraceDeferredSpawnDump, 2000, false);
+        }
+    }
+
+    //------------------------------------------------------------------------------------------------
+    protected void EC29_TraceDeferredSpawnDump()
+    {
+        EC29_RadioTrace.DumpLocalRadios("controlled entity changed +2s");
     }
 
     override void OnPostInit(IEntity owner)
@@ -316,7 +349,29 @@ modded class SCR_VONController
         m_bEC29_KeyingRadio = radioKey;
         bool activated = super.ActivateVON(entry, transmitType);
         m_bEC29_KeyingRadio = false;
+
+        // Radio trace: TX line (+ engine view and quiet-net dump for radio), then capture health
+        // now and again in ~1 s - vanilla's IsTransmiting flags only turn on once the first
+        // captured frame reaches OnCapture, so the deferred check is the real verdict.
+        if (activated && EC29_Debug.VERBOSE)
+        {
+            EC29_EVoiceRange tier = EC29_EVoiceRange.NORMAL;
+            SCR_VoNComponent stock = EC29_LocalStockVoN();
+            if (stock)
+                tier = stock.EC29_GetVoiceRange();
+
+            EC29_RadioTrace.LogTransmit(entry, tier, m_eVONType);
+            EC29_RadioTrace.LogCaptureHealth("at key-up", m_VONComp, m_bIsActive, m_eVONType, m_iEC29_KeyedFrequency);
+            GetGame().GetCallqueue().CallLater(EC29_TraceCaptureHealthLater, 1000, false);
+        }
+
         return activated;
+    }
+
+    //------------------------------------------------------------------------------------------------
+    protected void EC29_TraceCaptureHealthLater()
+    {
+        EC29_RadioTrace.LogCaptureHealth("+1s", m_VONComp, m_bIsActive, m_eVONType, m_iEC29_KeyedFrequency);
     }
 
     //! Vanilla calls this for TWO jobs: keying a radio (from ActivateVON) and merely selecting

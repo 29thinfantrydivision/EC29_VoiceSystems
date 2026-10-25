@@ -182,6 +182,22 @@ class EC29_RadioRxSquelch
     }
 
     //------------------------------------------------------------------------------------------------
+    //! Diagnostics (EC29_RadioTrace): squelch state of a frequency as "open"/"closed", or
+    //! "no channel" when nothing has ever opened it on this client. Read-only; never creates
+    //! channel state.
+    string EC29_GetChannelStateLabel(int frequency)
+    {
+        EC29_RxChannelState state;
+        if (!m_mChannels.Find(frequency, state))
+            return "no channel";
+
+        if (state.m_bOpen)
+            return string.Format("open(keyedSenders=%1 voiceActive=%2)", state.m_mKeyedSenders.Count(), state.m_bVoiceActive);
+
+        return "closed";
+    }
+
+    //------------------------------------------------------------------------------------------------
     //! Drop records whose radio was deleted (handles null) so the map cannot
     //! grow for the world lifetime. Rebuilds instead of removing in place -
     //! several deleted radios all read back as the same null key.

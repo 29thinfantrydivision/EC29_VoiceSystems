@@ -136,6 +136,10 @@ class EC29_RFPropagationNetworkComponent : SCR_BaseGameModeComponent
 
 			m_mEC29_KeyedFreqByPlayer.Set(senderPlayerId, frequency);
 			EC29_BroadcastKeyState(senderPlayerId, frequency, range, true);
+
+			// Radio trace: who the server expects to hear this key-up.
+			if (EC29_Debug.VERBOSE)
+				EC29_RadioTrace.LogServerExpectedRadioHearers(senderPlayerId, frequency, range);
 		}
 		else
 		{
@@ -145,6 +149,18 @@ class EC29_RFPropagationNetworkComponent : SCR_BaseGameModeComponent
 			m_mEC29_PendingStops.Set(senderPlayerId, pending);
 			GetGame().GetCallqueue().CallLater(EC29_FlushPendingStop, EC29_KEY_STOP_DEBOUNCE_MS, false, senderPlayerId);
 		}
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Diagnostics (EC29_RadioTrace, server): the frequency a player currently holds keyed, or
+	//! -1 when no key is open for them.
+	int EC29_GetKeyedFrequency(int playerId)
+	{
+		int frequency;
+		if (m_mEC29_KeyedFreqByPlayer.Find(playerId, frequency))
+			return frequency;
+
+		return -1;
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -216,6 +232,10 @@ class EC29_RFPropagationNetworkComponent : SCR_BaseGameModeComponent
 		// Coexistence: a known conflicting VON mod runs its own key-state/squelch system.
 		if (EC29_CoexistenceGuard.ShouldYieldRadio())
 			return;
+
+		// Radio trace: remember the transmitter's range/position for the RX range check.
+		if (EC29_Debug.VERBOSE)
+			EC29_RadioTrace.OnRemoteKeyState(senderPlayerId, frequency, range, keyed, senderPos);
 
 		EC29_RadioState.GetInstance().Squelch().OnRemoteKeyState(senderPlayerId, frequency, range, keyed, senderPos);
 

@@ -70,7 +70,13 @@ modded class SCR_BaseGameMode
         if (world.GetRadioManager())
         {
             if (EC29_Debug.VERBOSE)
+            {
                 Print("[EC29-DBG][RadioGuard] RadioManagerEntity already present in world", LogLevel.NORMAL);
+                // The getter cannot distinguish a real manager from the native stub (see header);
+                // the trace says so explicitly, and locates the real entity by world query only
+                // when a radio key-up needs it (EC29_RadioTrace.LogEngineView).
+                Print("[EC29-DBG][RadioTrace] radio manager: GetRadioManager() non-null at world init (real entity or native stub - unverifiable here; engine view resolves it by world query on first radio key-up)", LogLevel.NORMAL);
+            }
             return;
         }
 
@@ -89,6 +95,8 @@ modded class SCR_BaseGameMode
         }
 
         Print("[EC29-DBG][RadioGuard] World had no RadioManagerEntity (radio VON prerequisite, absent from GM/custom worlds) - spawned vanilla prefab", LogLevel.WARNING);
+        if (EC29_Debug.VERBOSE)
+            PrintFormat("[EC29-DBG][RadioTrace] radio manager: SPAWNED by EC29 at world init - prefab=%1 pos=%2", EC29_RADIO_MANAGER_PREFAB, manager.GetOrigin());
     }
 }
 
