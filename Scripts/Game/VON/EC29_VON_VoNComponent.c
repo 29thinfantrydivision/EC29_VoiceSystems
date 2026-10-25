@@ -49,6 +49,7 @@ modded class SCR_VoNComponent
 	protected static ref map<int, IEntity> s_mEC29SpeakerSignalsEntity = new map<int, IEntity>();
 	protected static ref map<int, int> s_mEC29SpeakerSignalIdx = new map<int, int>();
 	protected static ref map<int, float> s_mEC29SpeakerSignalLast = new map<int, float>();
+	protected static ref map<int, float> s_mEC29StreamLogTime = new map<int, float>();
 
 	// World-lifecycle guard for the static caches above: playerIds and component
 	// pointers are world-scoped, statics are not. Weak member nulls with its world;
@@ -72,6 +73,7 @@ modded class SCR_VoNComponent
 		s_mEC29SpeakerSignalsEntity.Clear();
 		s_mEC29SpeakerSignalIdx.Clear();
 		s_mEC29SpeakerSignalLast.Clear();
+		s_mEC29StreamLogTime.Clear();
 		s_bEC29VarChecked = false;
 		s_bEC29RadioVarsChecked = false;
 		s_bEC29ReceiverTypeLogged = false;
@@ -243,7 +245,10 @@ modded class SCR_VoNComponent
 		else
 		{
 			EC29_ApplyRadioAudioVars(playerId, receiver, frequency);
-			EC29_WriteStreamSignal(playerId, EC29_EncodeStreamSignal(receiver));
+			float streamValue = EC29_EncodeStreamSignal(receiver);
+			if (EC29_Debug.VERBOSE)
+				EC29_LogStreamPacket(playerId, frequency, streamValue);
+			EC29_WriteStreamSignal(playerId, streamValue);
 			EC29_TrackIncomingTransmission(receiver, frequency, playerId);
 		}
 
@@ -493,6 +498,18 @@ modded class SCR_VoNComponent
 
 	//! Encodes which ear and how loud THIS listener wants the given receiving transceiver, as the
 	//! value the speaker's "RoomSize" stream signal carries (layout in the header comment).
+	//! VERBOSE only, once per second per speaker: which net drove this speaker's routing value.
+	protected void EC29_LogStreamPacket(int playerId, int frequency, float value)
+	{
+		float now = GetGame().GetWorld().GetWorldTime();
+		float lastLog;
+		if (s_mEC29StreamLogTime.Find(playerId, lastLog) && now - lastLog < 1000)
+			return;
+
+		s_mEC29StreamLogTime.Set(playerId, now);
+		PrintFormat("[EC29-DBG][StreamSig] RX radio speaker %1 freq=%2 kHz encoded=%3", playerId, frequency, value);
+	}
+
 	protected float EC29_EncodeStreamSignal(BaseTransceiver receiver)
 	{
 		EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
@@ -554,15 +571,40 @@ modded class SCR_VoNComponent
 		}
 
 		float last;
-		if (s_mEC29SpeakerSignalLast.Find(playerId, last) && last == value)
+		bool hasLast = s_mEC29SpeakerSignalLast.Find(playerId, last);
+
+		// Clobber check: whatever is on the proxy now should still be what we last wrote. If not,
+		// something else (engine or another script) rewrote the signal between packets.
+		if (EC29_Debug.VERBOSE && hasLast)
+		{
+			float current = signals.GetSignalValue(idx);
+			if (current != last)
+				PrintFormat("[EC29-DBG][StreamSig] CLOBBERED speaker %1 '%2' expected %3 found %4",
+					playerId, EC29_STREAM_SIGNAL_NAME, last, current);
+		}
+
+		if (hasLast && last == value)
 			return;
 
 		signals.SetSignalValue(idx, value);
 		s_mEC29SpeakerSignalLast.Set(playerId, value);
 
 		if (EC29_Debug.VERBOSE)
-			PrintFormat("[EC29-DBG][StreamSig] speaker %1 '%2' <- %3 (readback %4)",
-				playerId, EC29_STREAM_SIGNAL_NAME, value, signals.GetSignalValue(idx));
+		{
+			// Decode back the way EC29_StreamRouting.sig does: tens = ear, remainder / 9 = volume.
+			int ear = Math.Floor(value / 10);
+			float volume = (value - ear * 10) / 9;
+			string earName = "direct";
+			if (ear == 1)
+				earName = "both";
+			else if (ear == 2)
+				earName = "right";
+			else if (ear == 3)
+				earName = "left";
+
+			PrintFormat("[EC29-DBG][StreamSig] speaker %1 '%2' <- %3 ear=%4 vol=%5 (readback %6)",
+				playerId, EC29_STREAM_SIGNAL_NAME, value, earName, volume, signals.GetSignalValue(idx));
+		}
 	}
 
 	protected float EC29_GetEarRoutingForTransceiver(BaseTransceiver transceiver)
