@@ -34,7 +34,7 @@ AudioSignalResClass {
      port 0
     }
    }
-   Default 1
+   Default 0
    Intervals {
     IOPItemOpConvertorRange Both {
      min 10
