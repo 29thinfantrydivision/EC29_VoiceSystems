@@ -32,6 +32,24 @@ modded class SCR_VoNComponent
 	protected static ref map<int, float> s_mEC29LastPacketMs = new map<int, float>();
 	protected static bool s_bEC29ReceiverTypeLogged;
 
+	// Per-stream ear routing + channel volume (research prototype, see Docs/PerStreamEarRouting.md).
+	//
+	// The engine gives every incoming VonStream six per-stream graph inputs; four of them
+	// (Interior, RoomSize, UnderPlayerControl, IsInPlayerVehicle) are copied, per packet, from the
+	// SPEAKER's SignalsManagerComponent on this machine. "RoomSize" is the one with no native
+	// writer on a remote proxy and whose vanilla consumers treat any value below 100 exactly like
+	// 0, so this machine writes an encoded routing/volume value into the speaker's RoomSize signal
+	// and Sounds/VON/EC29_StreamRouting.sig decodes it inside the radio chain. Value layout:
+	//   0            = nothing encoded (direct speech, or never written)
+	//   10 * ear + 9 * volume   ear: 1 = both, 2 = right, 3 = left; volume 0..1
+	// so the written value always sits in [10, 39] - below the 100 m3 "Small Start" and never
+	// equal to GRoomSize (0..1), which is what keeps the vanilla occlusion/reverb graphs blind to it.
+	protected static const string EC29_STREAM_SIGNAL_NAME = "RoomSize";
+	protected static ref map<int, SignalsManagerComponent> s_mEC29SpeakerSignals = new map<int, SignalsManagerComponent>();
+	protected static ref map<int, IEntity> s_mEC29SpeakerSignalsEntity = new map<int, IEntity>();
+	protected static ref map<int, int> s_mEC29SpeakerSignalIdx = new map<int, int>();
+	protected static ref map<int, float> s_mEC29SpeakerSignalLast = new map<int, float>();
+
 	// World-lifecycle guard for the static caches above: playerIds and component
 	// pointers are world-scoped, statics are not. Weak member nulls with its world;
 	// a mismatch clears the caches and re-arms the one-shot audio-variable probes.
@@ -50,6 +68,10 @@ modded class SCR_VoNComponent
 		s_mEC29PlayerVon.Clear();
 		s_mEC29PlayerVonEntity.Clear();
 		s_mEC29LastPacketMs.Clear();
+		s_mEC29SpeakerSignals.Clear();
+		s_mEC29SpeakerSignalsEntity.Clear();
+		s_mEC29SpeakerSignalIdx.Clear();
+		s_mEC29SpeakerSignalLast.Clear();
 		s_bEC29VarChecked = false;
 		s_bEC29RadioVarsChecked = false;
 		s_bEC29ReceiverTypeLogged = false;
@@ -216,10 +238,12 @@ modded class SCR_VoNComponent
 		if (!receiver)
 		{
 			EC29_EnsureUnityRangeGain();
+			EC29_WriteStreamSignal(playerId, 0);
 		}
 		else
 		{
 			EC29_ApplyRadioAudioVars(playerId, receiver, frequency);
+			EC29_WriteStreamSignal(playerId, EC29_EncodeStreamSignal(receiver));
 			EC29_TrackIncomingTransmission(receiver, frequency, playerId);
 		}
 
@@ -465,6 +489,80 @@ modded class SCR_VoNComponent
 
 		EC29_RadioState.GetInstance().Squelch().OnVoicePacket(frequency, receiver);
 		EC29_RadioState.GetInstance().Squelch().EnsureTicking();
+	}
+
+	//! Encodes which ear and how loud THIS listener wants the given receiving transceiver, as the
+	//! value the speaker's "RoomSize" stream signal carries (layout in the header comment).
+	protected float EC29_EncodeStreamSignal(BaseTransceiver receiver)
+	{
+		EC29_RadioEarSettings settings = EC29_RadioState.GetInstance().EarSettings();
+		EC29_EEarRouting routing = settings.GetRouting(receiver);
+		float ear = 1;
+		if (routing == EC29_EEarRouting.RIGHT)
+			ear = 2;
+		else if (routing == EC29_EEarRouting.LEFT)
+			ear = 3;
+
+		float volume = Math.Clamp(settings.GetVolume(receiver), 0, 1);
+		return 10 * ear + 9 * volume;
+	}
+
+	//! Writes the encoded value into the SPEAKER's local SignalsManagerComponent so the engine's
+	//! per-packet copy (native VonStream update) hands it to that speaker's stream only.
+	//!
+	//! Timing: the engine copies the entity signals into the stream BEFORE it raises OnReceive for
+	//! the same packet, so a value written here is heard from the NEXT packet of this speaker
+	//! (one packet, ~20-60 ms). The value then persists on the proxy between transmissions.
+	//!
+	//! Cost: one map lookup per packet; FindComponent/AddOrFindSignal only when the speaker's
+	//! entity changes. Writes are skipped when the value is unchanged.
+	protected void EC29_WriteStreamSignal(int playerId, float value)
+	{
+		IEntity speaker = GetGame().GetPlayerManager().GetPlayerControlledEntity(playerId);
+		if (!speaker)
+		{
+			s_mEC29SpeakerSignals.Remove(playerId);
+			s_mEC29SpeakerSignalsEntity.Remove(playerId);
+			s_mEC29SpeakerSignalIdx.Remove(playerId);
+			s_mEC29SpeakerSignalLast.Remove(playerId);
+			return;
+		}
+
+		SignalsManagerComponent signals;
+		IEntity cachedEnt;
+		int idx = -1;
+		if (!(s_mEC29SpeakerSignals.Find(playerId, signals) && signals
+			&& s_mEC29SpeakerSignalsEntity.Find(playerId, cachedEnt) && cachedEnt == speaker
+			&& s_mEC29SpeakerSignalIdx.Find(playerId, idx)))
+		{
+			signals = SignalsManagerComponent.Cast(speaker.FindComponent(SignalsManagerComponent));
+			if (!signals)
+				return;
+
+			idx = signals.AddOrFindSignal(EC29_STREAM_SIGNAL_NAME, 0);
+			if (idx == -1)
+				return;
+
+			s_mEC29SpeakerSignals.Set(playerId, signals);
+			s_mEC29SpeakerSignalsEntity.Set(playerId, speaker);
+			s_mEC29SpeakerSignalIdx.Set(playerId, idx);
+			s_mEC29SpeakerSignalLast.Remove(playerId);
+
+			if (EC29_Debug.VERBOSE)
+				PrintFormat("[EC29-DBG][StreamSig] speaker %1 signal '%2' idx=%3 current=%4",
+					playerId, EC29_STREAM_SIGNAL_NAME, idx, signals.GetSignalValue(idx));
+		}
+
+		float last;
+		if (s_mEC29SpeakerSignalLast.Find(playerId, last) && last == value)
+			return;
+
+		signals.SetSignalValue(idx, value);
+		s_mEC29SpeakerSignalLast.Set(playerId, value);
+
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][StreamSig] speaker %1 '%2' <- %3 (readback %4)",
+				playerId, EC29_STREAM_SIGNAL_NAME, value, signals.GetSignalValue(idx));
 	}
 
 	protected float EC29_GetEarRoutingForTransceiver(BaseTransceiver transceiver)

@@ -116,6 +116,29 @@ AudioClass {
     1
    }
   }
+  SignalClass "200020" {
+   id 200020
+   name "Stream Routing"
+   comment "Per-stream ear/volume. Input RoomSize is a VonStream input the engine fills per packet from the SPEAKER entity's RoomSize signal (EC29 writes 10*ear + 9*volume there). No variable connection on purpose."
+   tl 122.001 -620
+   ctl 0 -24
+   res "{5E29A1C4D7B30F11}Sounds/VON/EC29_StreamRouting.sig"
+   inputsport {
+    1
+   }
+   outputsport {
+    30 31 32
+   }
+   inputvalues {
+    0
+   }
+   inputvaluesmin {
+    0
+   }
+   inputvaluesmax {
+    100
+   }
+  }
   SignalClass "105485" {
    id 105485
    name "Signal 103"
@@ -722,18 +745,18 @@ AudioClass {
     ConnectionsClass "con:2" {
      id 2
      links {
-      ConnectionClass "95245:22" {
-       id 95245
-       port 22
+      ConnectionClass "200020:30" {
+       id 200020
+       port 30
       }
      }
     }
     ConnectionsClass "con:3" {
      id 3
      links {
-      ConnectionClass "95245:2" {
-       id 95245
-       port 2
+      ConnectionClass "200020:31" {
+       id 200020
+       port 31
       }
      }
     }
@@ -958,9 +981,9 @@ AudioClass {
     ConnectionsClass "con:0" {
      id 0
      links {
-      ConnectionClass "108574:65" {
-       id 108574
-       port 65
+      ConnectionClass "200020:32" {
+       id 200020
+       port 32
       }
      }
     }
