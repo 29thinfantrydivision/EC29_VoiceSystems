@@ -86,6 +86,9 @@ class EC29_RadioTrace
 	//! RadioManagerEntity located by world query: 0 = not looked up yet, 1 = found, 2 = absent.
 	protected static int s_iManagerLookupState;
 	protected static RadioManagerEntity s_RadioManager;
+	//! Set by the manager's own constructor. Weak handle, so a deleted manager nulls it; kept
+	//! out of the world reset because the constructor can run before the new world is current.
+	protected static RadioManagerEntity s_RegisteredManager;
 
 	//! World-scoped reset for the static maps (world clocks restart, statics do not).
 	protected static BaseWorld s_OwnerWorld;
@@ -974,8 +977,18 @@ class EC29_RadioTrace
 	{
 		CheckWorldReset();
 
-		if (s_iManagerLookupState != 0)
+		if (s_iManagerLookupState == 1 || (s_iManagerLookupState == 2 && !s_RegisteredManager))
 			return s_RadioManager;
+
+		// Registered by the entity itself (modded RadioManagerEntity below) - the sphere query
+		// misses it, the manager has no bounds.
+		if (s_RegisteredManager && s_RegisteredManager.GetWorld() == GetGame().GetWorld())
+		{
+			s_RadioManager = s_RegisteredManager;
+			s_iManagerLookupState = 1;
+			PrintFormat("%1 RadioManagerEntity located by self-registration: %2 at %3", TAG, PrefabName(s_RadioManager), s_RadioManager.GetOrigin());
+			return s_RadioManager;
+		}
 
 		s_iManagerLookupState = 2;
 		BaseWorld world = GetGame().GetWorld();
@@ -995,6 +1008,15 @@ class EC29_RadioTrace
 		}
 
 		return s_RadioManager;
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Called from the RadioManagerEntity constructor: a real entity, never the native stub.
+	static void RegisterRadioManager(RadioManagerEntity manager)
+	{
+		s_RegisteredManager = manager;
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("%1 RadioManagerEntity registered itself: %2", TAG, manager);
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -1085,7 +1107,7 @@ class EC29_RadioTrace
 		pm.GetPlayers(players);
 
 		int expected = 0;
-		string hearers;
+		array<string> hearers = {};
 		foreach (int pid : players)
 		{
 			if (pid == senderPlayerId)
@@ -1118,15 +1140,20 @@ class EC29_RadioTrace
 					expected++;
 
 				string who = string.Format("{%1 source=%2 radio=%3 powered=%4 key='%5' keyMatch=%6 muted=%7", PlayerLabel(pid), SourceTypeLabel(pid, false), PrefabName(radio.GetOwner()), radio.IsPowered(), radio.GetEncryptionKey(), keyMatch, tsv.IsMuted());
-				hearers = string.Format("%1 %2 %3 inTxRange=%4 relayBridged=%5 expectedToHear=%6%7}", hearers, who, DistanceLabel(distance), inRange, bridged, hears, relays);
+				hearers.Insert(string.Format("%1 %2 inTxRange=%3 relayBridged=%4 expectedToHear=%5%6}", who, DistanceLabel(distance), inRange, bridged, hears, relays));
 			}
 		}
 
-		if (hearers.IsEmpty())
-			hearers = " <nobody holds a radio on this frequency>";
-
+		// Head plus one line per hearer: the console truncates a line at ~8.5 KB, which cut
+		// off everyone past the twentieth hearer on a busy net.
 		string head = string.Format("%1 server EXPECTED radio hearers: speaker %2 source=%3 radio=%4 freq=%5 key='%6'", TAG, PlayerLabel(senderPlayerId), SourceTypeLabel(senderPlayerId, false), senderRadio, frequency, senderKey);
-		PrintFormat("%1 txRange=%2m pos=%3 expected=%4:%5", head, range, senderPos, expected, hearers);
+		string none;
+		if (hearers.IsEmpty())
+			none = " <nobody holds a radio on this frequency>";
+		PrintFormat("%1 txRange=%2m pos=%3 expected=%4 listed=%5%6", head, range, senderPos, expected, hearers.Count(), none);
+
+		foreach (string hearer : hearers)
+			PrintFormat("%1 server EXPECTED radio hearer: speaker pid=%2 freq=%3 %4", TAG, senderPlayerId, frequency, hearer);
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -1205,6 +1232,7 @@ class EC29_RadioTrace
 
 		int expected = 0;
 		string hearers;
+		array<string> chunks = {};
 		foreach (int pid : players)
 		{
 			if (pid == senderPlayerId)
@@ -1220,13 +1248,26 @@ class EC29_RadioTrace
 
 			expected++;
 			hearers = string.Format("%1 {%2 %3}", hearers, PlayerLabel(pid), DistanceLabel(distance));
+			// Stay well under the console's ~8.5 KB line cut.
+			if (hearers.Length() > 3000)
+			{
+				chunks.Insert(hearers);
+				hearers = "";
+			}
 		}
 
-		if (hearers.IsEmpty())
-			hearers = " <nobody within range>";
+		if (!hearers.IsEmpty())
+			chunks.Insert(hearers);
+
+		string first = " <nobody within range>";
+		if (!chunks.IsEmpty())
+			first = chunks[0];
 
 		PrintFormat("%1 server transmission START: speaker %2 source=%3 method=DIRECT tier=%4 outer=%5m pos=%6 expected=%7:%8",
-			TAG, PlayerLabel(senderPlayerId), sourceType, TierLabel(senderPlayerId), outer, senderPos, expected, hearers);
+			TAG, PlayerLabel(senderPlayerId), sourceType, TierLabel(senderPlayerId), outer, senderPos, expected, first);
+
+		for (int i = 1, count = chunks.Count(); i < count; i++)
+			PrintFormat("%1 server transmission START (cont.): speaker pid=%2:%3", TAG, senderPlayerId, chunks[i]);
 	}
 }
 
@@ -1384,5 +1425,16 @@ modded class SCR_AntennaServicePointComponent
 			return;
 
 		EC29_RadioTrace.LogRelay(string.Format("faction -> %1 (faction freq=%2 key='%3')", faction.GetFactionKey(), faction.GetFactionRadioFrequency(), faction.GetFactionRadioEncryptionKey()), GetOwner(), m_RadioControl);
+	}
+}
+
+//------------------------------------------------------------------------------------------------
+//! Self-registration for the engine-view trace: the manager has no bounds, so a world sphere
+//! query never returns it. Not a VoN component - no effect on ear selection.
+modded class RadioManagerEntity
+{
+	void RadioManagerEntity(IEntitySource src, IEntity parent)
+	{
+		EC29_RadioTrace.RegisterRadioManager(this);
 	}
 }
