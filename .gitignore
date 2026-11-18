@@ -1,3 +1,11 @@
+# ---- Workbench ----
 resourceDatabase.rdb
+
+# ---- AI agents ----
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+
+# ---- This repo ----
 *.zip
-addon.gproj
