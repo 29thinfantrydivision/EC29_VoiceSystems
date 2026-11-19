@@ -5,7 +5,7 @@ SCR_EditorManagerEntity : "{788933FFDC706A68}Prefabs/Editor/EditorManager.et" {
    Transceivers {
     RadioTransceiver "{6A2C5D1E8B37F4D1}" {
      ChannelFrequency 28000
-     "Transmitting Range" 5000
+     "Transmitting Range" 2000
      "Min tunable frequency" 28000
      "Max tunable frequency" 29000
     }
