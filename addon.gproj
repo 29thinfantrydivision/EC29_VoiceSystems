@@ -1,7 +1,7 @@
 GameProject {
- ID "EC29_VoiceSystems"
+ ID "29th_Voice_Systems"
  GUID "6A8729056F081E31"
- TITLE "EC29 Voice Systems (VON Range + Earplugs + Radio)"
+ TITLE "29th Voice Systems"
  AUTHOR "Goldwep"
  VERSION "1.1.0"
  Dependencies {
