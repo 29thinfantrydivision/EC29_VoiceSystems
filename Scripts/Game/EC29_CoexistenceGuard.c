@@ -20,7 +20,7 @@ class EC29_CoexistenceGuard
 	protected static const int EC29_SPECIAL_NET_BAND_FLOOR_KHZ = 30000;
 	//! No physical radio in the modset reaches past ~6 km; a transceiver
 	//! engineered far beyond that is a magic net. The spectator net does NOT
-	//! rely on this half: it sits at 5 km, inside vanilla's own maximum (the
+	//! rely on this half: it sits at 2 km, inside vanilla's own maximum (the
 	//! large transmitter tower), so the frequency floor above is what catches
 	//! it. That is deliberate - range is a tunable, the frequency is the ABI.
 	protected static const float EC29_SPECIAL_NET_RANGE_M = 10000.0;
