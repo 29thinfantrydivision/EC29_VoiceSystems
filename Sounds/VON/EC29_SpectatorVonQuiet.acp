@@ -391,6 +391,8 @@ AudioClass {
      }
     }
    }
+   volume 0.316
+   volume_dB -10
   }
   BusClass "52231" {
    id 52231
