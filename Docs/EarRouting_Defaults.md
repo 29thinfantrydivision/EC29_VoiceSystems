@@ -71,6 +71,6 @@ the full `[EC29-DBG]` trace chain). Relevant lines:
 
 - `[EC29-DBG][RadioEar] Default routing L applied to transceiver at 42000 kHz (gadget=1)`
   — one line per transceiver, on first classification.
-- Existing routing-cycle, beep, squelch, jammer, and packet traces all remain active.
+- Existing routing-cycle, beep, squelch, and packet traces all remain active.
 
 Flip `Scripts/Game/EC29_Debug.c` back to `VERBOSE = false` for the wide release build.

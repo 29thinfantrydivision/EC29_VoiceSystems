@@ -1,7 +1,7 @@
 //! Central world-scoped service for all EC29 radio runtime state.
 //!
 //! One lifecycle rule instead of four: the sub-services (ear/beep/volume
-//! settings, RX squelch, jammer registry, RF propagation math) are plain
+//! settings, RX squelch, RF propagation math) are plain
 //! objects owned by this class, created together and discarded together when
 //! the world changes. Script statics survive mission restarts and server hops
 //! while world clocks, CallLater queues, and component pointers do not - so
@@ -23,7 +23,6 @@ class EC29_RadioState
 
 	protected ref EC29_RadioEarSettings m_EarSettings;
 	protected ref EC29_RadioRxSquelch m_Squelch;
-	protected ref EC29_JammerRegistry m_Jammers;
 	protected ref EC29_RFPropagationModel m_Propagation;
 	protected ref EC29_RadioReceiverGuard m_ReceiverGuard;
 	protected ref EC29_SpectatorVonService m_SpectatorVon;
@@ -61,7 +60,6 @@ class EC29_RadioState
 	{
 		m_EarSettings = new EC29_RadioEarSettings();
 		m_Squelch = new EC29_RadioRxSquelch();
-		m_Jammers = new EC29_JammerRegistry();
 		m_Propagation = new EC29_RFPropagationModel();
 		m_ReceiverGuard = new EC29_RadioReceiverGuard();
 		m_SpectatorVon = new EC29_SpectatorVonService();
@@ -104,12 +102,6 @@ class EC29_RadioState
 	}
 
 	//------------------------------------------------------------------------------------------------
-	EC29_JammerRegistry Jammers()
-	{
-		return m_Jammers;
-	}
-
-	//------------------------------------------------------------------------------------------------
 	//! RF propagation quality between two points, 0..1. Returns 1.0 when the
 	//! propagation simulation is disabled server-side.
 	//! Uncached - prefer GetSignalQualityCached on any per-packet path.
@@ -149,13 +141,6 @@ class EC29_RadioState
 		entry.m_fComputedAtMs = nowMs;
 		entry.m_fFrequencyKHz = frequencyKHz;
 		return entry.m_fQuality;
-	}
-
-	//------------------------------------------------------------------------------------------------
-	//! Worst jammer degradation at the receiver position: 0.0 = clean, 1.0 = fully jammed.
-	float GetJammerStrength(vector receiverPos)
-	{
-		return m_Jammers.CalculateJammerDegradation(receiverPos);
 	}
 }
 
