@@ -1,27 +1,5 @@
 AudioClass {
  signals {
-  SignalClass "30733" {
-   id 30733
-   name "Signal 1"
-   tl -768 -512
-   res "{CF1F9C4B120DE5F8}Sounds/VON/Von.sig"
-   inputsport {
-    1
-   }
-   outputsport {
-    5 8 12
-   }
-   inputvalues {
-    1
-   }
-   inputvaluesmin {
-    0
-   }
-   inputvaluesmax {
-    1
-   }
-   path "{CF1F9C4B120DE5F8}Sounds/VON/Von.sig"
-  }
   SignalClass "66573" {
    id 66573
    name "Signal Occlusion"
@@ -73,24 +51,10 @@ AudioClass {
    name "Filter Bitcrusher"
    version 5
    tl -512 -592
-   ins {
-    ConnectionsClass "con:0" {
-     id 0
-     links {
-      ConnectionClass "30733:5" {
-       id 30733
-       port 5
-      }
-     }
-    }
-   }
    pi {
     1 0
    }
-   pu {
-    1 0
-   }
-   wetDry 0
+   wetDry 0.2
    DSPObject BitCrusherDSPTypeClass dsp {
     bitMask "11010101"
    }
@@ -413,19 +377,10 @@ AudioClass {
  buses {
   BusClass "50183" {
    id 50183
-   name "Bus Voice + Noise"
+   name "Bus Voice"
    version 7
    tl -256 -256
    ins {
-    ConnectionsClass "con:0" {
-     id 0
-     links {
-      ConnectionClass "30733:12" {
-       id 30733
-       port 12
-      }
-     }
-    }
     ConnectionsClass "con:64" {
      id 64
      links {
@@ -433,18 +388,8 @@ AudioClass {
        id 52231
        port 65
       }
-      ConnectionClass "36869:65" {
-       id 36869
-       port 65
-      }
      }
     }
-   }
-   pi {
-    3 0
-   }
-   pu {
-    1 0
    }
   }
   BusClass "52231" {
@@ -511,36 +456,6 @@ AudioClass {
    pu {
     1 0
    }
-  }
- }
- generators {
-  GeneratorClass "36869" {
-   id 36869
-   name "Generator Noise"
-   version 6
-   tl -512 -256
-   ins {
-    ConnectionsClass "con:1" {
-     id 1
-     links {
-      ConnectionClass "30733:8" {
-       id 30733
-       port 8
-      }
-     }
-    }
-   }
-   pi {
-    2 0
-   }
-   pu {
-    2 0
-   }
-   function BrownianNoise
-   volume 0
-   volume_dB -100
-   time 10
-   infinite 1
   }
  }
  mixers {
