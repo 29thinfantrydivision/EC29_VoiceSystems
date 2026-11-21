@@ -7,13 +7,12 @@ modded class SCR_VoNComponent
 	static const string EC29_VAR_NAME   = "EC29_VonRange";
 	static const string EC29_VAR_CONFIG = "{33A27275C95E0302}Sounds/VON/EC29_LocalVariables_VON.conf";
 
-	// Radio path: ear routing / signal quality / jamming / per-channel volume
+	// Radio path: ear routing / signal quality / per-channel volume
 	// audio variables, refreshed per incoming radio packet.
 	protected static const string EC29_EAR_ROUTING_CONFIG = "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf";
 	protected static bool s_bEC29RadioVarsChecked;
 	protected static bool s_bEC29_EEarRoutingValid;
 	protected static bool s_bEC29SignalQualityValid;
-	protected static bool s_bEC29JamStrengthValid;
 	protected static bool s_bEC29ChannelVolumeValid;
 
 	protected static bool s_bEC29VarChecked;
@@ -212,7 +211,7 @@ modded class SCR_VoNComponent
 		// DIRECT packets (receiver == null) need NO per-packet work any more: the speaker's range
 		// is applied by the engine from the transmitting tier's ACP (EC29_VoiceTiers.c). The one
 		// thing left is pinning the retired gain variable to unity, once per world. Radio packets
-		// still own the ear-routing/quality/jam/volume set.
+		// still own the ear-routing/quality/volume set.
 		if (!receiver)
 		{
 			EC29_EnsureUnityRangeGain();
@@ -376,7 +375,7 @@ modded class SCR_VoNComponent
 
 	//------------------------------------------------------------------------------------------------
 	//! Radio-path audio variables: ear routing, RF signal
-	//! quality, jammer strength, per-channel volume. All are global external variables
+	//! quality, per-channel volume. All are global external variables
 	//! consumed by the merged von.acp graph; they must be refreshed per incoming packet.
 	protected void EC29_ApplyRadioAudioVars(int playerId, BaseTransceiver receiver, int frequency)
 	{
@@ -388,13 +387,12 @@ modded class SCR_VoNComponent
 			s_bEC29RadioVarsChecked = true;
 			s_bEC29_EEarRoutingValid    = (AudioSystem.GetVariableIDByName("EC29_EarRouting", EC29_EAR_ROUTING_CONFIG) != -1);
 			s_bEC29SignalQualityValid = (AudioSystem.GetVariableIDByName("EC29_SignalQuality", EC29_EAR_ROUTING_CONFIG) != -1);
-			s_bEC29JamStrengthValid   = (AudioSystem.GetVariableIDByName("EC29_JamStrength", EC29_EAR_ROUTING_CONFIG) != -1);
 			s_bEC29ChannelVolumeValid = (AudioSystem.GetVariableIDByName("EC29_ChannelVolume", EC29_EAR_ROUTING_CONFIG) != -1);
 			EC29_RFPropagationSettings.GetInstance();
 
 			if (EC29_Debug.VERBOSE)
-				PrintFormat("[EC29-DBG][Radio] audio var probe: earRouting=%1 signalQuality=%2 jamStrength=%3 channelVolume=%4",
-					s_bEC29_EEarRoutingValid, s_bEC29SignalQualityValid, s_bEC29JamStrengthValid, s_bEC29ChannelVolumeValid);
+				PrintFormat("[EC29-DBG][Radio] audio var probe: earRouting=%1 signalQuality=%2 channelVolume=%3",
+					s_bEC29_EEarRoutingValid, s_bEC29SignalQualityValid, s_bEC29ChannelVolumeValid);
 		}
 
 		if (s_bEC29_EEarRoutingValid)
@@ -403,12 +401,12 @@ modded class SCR_VoNComponent
 			AudioSystem.SetVariableByName("EC29_EarRouting", earRouting, EC29_EAR_ROUTING_CONFIG);
 		}
 
-		// Both position-based variables need a real listener position; with no
-		// controlled entity (dead, deploy screen) the old vector.Zero fallback
-		// raymarched from every speaker to world origin per packet. They are
-		// written NEUTRAL rather than skipped, or a listener who died inside a
-		// jammer would keep jammed static on radio audio for as long as they
-		// stay dead (the variables are global and nothing else refreshes them).
+		// Signal quality needs a real listener position; with no controlled
+		// entity (dead, deploy screen) the old vector.Zero fallback raymarched
+		// from every speaker to world origin per packet. It is written NEUTRAL
+		// rather than skipped, or a listener who died in poor reception would
+		// keep degraded radio audio for as long as they stay dead (the variable
+		// is global and nothing else refreshes it).
 		vector receiverPos = vector.Zero;
 		bool hasReceiverPos = false;
 		PlayerController playerController = GetGame().GetPlayerController();
@@ -423,7 +421,7 @@ modded class SCR_VoNComponent
 		}
 
 		// Special nets (the spectator net, admin-only nets) are engineered to be clean:
-		// running terrain propagation or jammer degradation on them fights the
+		// running terrain propagation on them fights the
 		// owning mod's audio design, so they get neutral values.
 		bool specialNet = EC29_CoexistenceGuard.EC29_IsSpecialNet(receiver);
 
@@ -433,14 +431,6 @@ modded class SCR_VoNComponent
 			if (hasReceiverPos && !specialNet)
 				signalQuality = EC29_GetSignalQuality(playerId, frequency, receiverPos);
 			AudioSystem.SetVariableByName("EC29_SignalQuality", signalQuality, EC29_EAR_ROUTING_CONFIG);
-		}
-
-		if (s_bEC29JamStrengthValid)
-		{
-			float jamStrength = 1.0;
-			if (hasReceiverPos && !specialNet)
-				jamStrength = EC29_GetJamStrength(receiverPos);
-			AudioSystem.SetVariableByName("EC29_JamStrength", jamStrength, EC29_EAR_ROUTING_CONFIG);
 		}
 
 		if (s_bEC29ChannelVolumeValid)
@@ -497,13 +487,5 @@ modded class SCR_VoNComponent
 		// uncached model raymarches up to 200 terrain samples per call.
 		EC29_RadioState signalManager = EC29_RadioState.GetInstance();
 		return signalManager.GetSignalQualityCached(senderId, transmitterPos, receiverPos, frequencyKHz);
-	}
-
-	protected float EC29_GetJamStrength(vector receiverPos)
-	{
-		EC29_RadioState signalManager = EC29_RadioState.GetInstance();
-		float jammerDegradation = signalManager.GetJammerStrength(receiverPos);
-		// CAREFUL THIS IS INVERTED!!!!
-		return 1.0 - jammerDegradation;
 	}
 }
