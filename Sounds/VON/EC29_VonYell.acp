@@ -1,42 +1,5 @@
 AudioClass {
  signals {
-  SignalClass "30733" {
-   id 30733
-   name "Signal 1"
-   tl -776.622 -515.118
-   res "{CF1F9C4B120DE5F8}Sounds/VON/EC29_Von.sig"
-   conns {
-    IOPConnectionClass "iop:1" {
-     port 1
-     conn {
-      ConnectionsClass connections {
-       id 26
-       links {
-        ConnectionClass "100382:65" {
-         id 100382
-         port 65
-        }
-       }
-      }
-     }
-    }
-   }
-   inputsport {
-    1
-   }
-   outputsport {
-    5 8 12 18 20 22
-   }
-   inputvalues {
-    1
-   }
-   inputvaluesmin {
-    0
-   }
-   inputvaluesmax {
-    1
-   }
-  }
   SignalClass "66573" {
    id 66573
    name "Signal Occlusion"
@@ -160,24 +123,10 @@ AudioClass {
    name "Filter Bitcrusher"
    version 5
    tl -522.05 -645.606
-   ins {
-    ConnectionsClass "con:0" {
-     id 0
-     links {
-      ConnectionClass "30733:5" {
-       id 30733
-       port 5
-      }
-     }
-    }
-   }
    pi {
     1 0
    }
-   pu {
-    1 0
-   }
-   wetDry 0
+   wetDry 0.2
    DSPObject BitCrusherDSPTypeClass dsp {
     bitMask "11010101"
    }
@@ -352,9 +301,9 @@ AudioClass {
     }
    }
    pi {
-    62 0
+    30 0
    }
-   ports 5
+   ports 4
   }
   FilterChainClass "53271" {
    id 53271
@@ -430,16 +379,6 @@ AudioClass {
    tl -64 -528
    ctl 0 -24
    varName "EC29_EarRouting"
-   varResource "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf"
-  }
-  VariableClass "100382" {
-   id 100382
-   name "Jamming Strength"
-   comment "0 = highest level of jamming"
-   version 5
-   tl -1029.777 -511.682
-   ctl 0 -24
-   varName "EC29_JamStrength"
    varResource "{3DA1A848EE00C426}Sounds/VON/RadioEarRouting.conf"
   }
   VariableClass "104478" {
@@ -604,51 +543,6 @@ AudioClass {
   }
  }
  buses {
-  BusClass "50183" {
-   id 50183
-   name "Bus Jamming Noise Only"
-   version 7
-   tl -247.452 -102.799
-   ins {
-    ConnectionsClass "con:0" {
-     id 0
-     links {
-      ConnectionClass "30733:12" {
-       id 30733
-       port 12
-      }
-     }
-    }
-    ConnectionsClass "con:1" {
-     id 1
-     links {
-      ConnectionClass "32791:65" {
-       id 32791
-       port 65
-      }
-     }
-    }
-    ConnectionsClass "con:64" {
-     id 64
-     links {
-      ConnectionClass "36869:65" {
-       id 36869
-       port 65
-      }
-      ConnectionClass "103429:65" {
-       id 103429
-       port 65
-      }
-     }
-    }
-   }
-   pi {
-    3 0
-   }
-   pu {
-    1 0
-   }
-  }
   BusClass "52231" {
    id 52231
    name "Bus Direct Processing"
@@ -761,7 +655,7 @@ AudioClass {
   BusClass "200003" {
    id 200003
    name "Spectator Radio Gate"
-   comment "Radio filter chain + noise, off for a spectating client"
+   comment "Radio filter chain, off for a spectating client"
    version 7
    tl -120 -300
    ctl 0 -24
@@ -778,10 +672,6 @@ AudioClass {
     ConnectionsClass "con:64" {
      id 64
      links {
-      ConnectionClass "50183:65" {
-       id 50183
-       port 65
-      }
       ConnectionClass "101383:65" {
        id 101383
        port 65
@@ -915,15 +805,6 @@ AudioClass {
    version 7
    tl -249.59 -233.825
    ins {
-    ConnectionsClass "con:0" {
-     id 0
-     links {
-      ConnectionClass "30733:18" {
-       id 30733
-       port 18
-      }
-     }
-    }
     ConnectionsClass "con:1" {
      id 1
      links {
@@ -944,10 +825,7 @@ AudioClass {
     }
    }
    pi {
-    3 0
-   }
-   pu {
-    1 0
+    2 0
    }
   }
   BusClass "107527" {
@@ -978,64 +856,6 @@ AudioClass {
    pi {
     1 0
    }
-  }
- }
- generators {
-  GeneratorClass "36869" {
-   id 36869
-   name "Generator Noise"
-   version 6
-   tl -511.271 -158.705
-   ins {
-    ConnectionsClass "con:1" {
-     id 1
-     links {
-      ConnectionClass "30733:8" {
-       id 30733
-       port 8
-      }
-     }
-    }
-   }
-   pi {
-    2 0
-   }
-   pu {
-    2 0
-   }
-   function BrownianNoise
-   volume 0.2
-   volume_dB -14
-   time 10
-   infinite 1
-  }
-  GeneratorClass "103429" {
-   id 103429
-   name "Generator Noise"
-   version 6
-   tl -513.496 -94.844
-   ins {
-    ConnectionsClass "con:1" {
-     id 1
-     links {
-      ConnectionClass "30733:8" {
-       id 30733
-       port 8
-      }
-     }
-    }
-   }
-   pi {
-    2 0
-   }
-   pu {
-    2 0
-   }
-   function PinkNoise
-   volume 0.2
-   volume_dB -14
-   time 10
-   infinite 1
   }
  }
  mixers {
