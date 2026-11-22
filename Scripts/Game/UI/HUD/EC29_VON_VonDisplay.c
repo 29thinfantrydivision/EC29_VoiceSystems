@@ -162,7 +162,7 @@ modded class SCR_VonDisplay
 
 	//------------------------------------------------------------------------------------------------
 	//! Show the speaker's voice mode in the channel slot for direct (proximity) transmissions.
-	//! NORMAL is intentionally blank to keep the overlay quiet for the common case.
+	//! All three levels are tagged, NORMAL included.
 	//! \param IsReceiving true for incoming - resolve speaker via data.m_iPlayerID;
 	//!                    false for outgoing - resolve speaker via the local PlayerController.
 	protected void ApplyVoiceModeLabel_C(TransmissionData data, bool IsReceiving)
@@ -194,6 +194,7 @@ modded class SCR_VonDisplay
 		switch (mode)
 		{
 			case EC29_EVoiceRange.WHISPER: label = "#EC29-VON_Mode_Whisper"; break;
+			case EC29_EVoiceRange.NORMAL:  label = "#EC29-VON_Mode_Normal"; break;
 			case EC29_EVoiceRange.YELL:    label = "#EC29-VON_Mode_Yelling"; break;
 		}
 
