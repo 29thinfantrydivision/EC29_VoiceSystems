@@ -151,6 +151,12 @@ modded class SCR_VonDisplay
 		if (settings.GetShowVoiceModeInOverlay() && !radioTransceiver)
 			ApplyVoiceModeLabel_C(data, IsReceiving);
 
+		// Radio: only the transmitter sees their own voice level (the tier still decides how far
+		// bystanders hear them while they key). Incoming radio entries are left alone, so nobody
+		// else learns it.
+		if (settings.GetShowVoiceModeInOverlay() && radioTransceiver && !IsReceiving)
+			EC29_ApplyRadioVoiceModeLabel(data);
+
 		return result;
 	}
 
@@ -198,6 +204,45 @@ modded class SCR_VonDisplay
 		}
 
 		data.m_Widgets.m_wChannelText.SetText(label);
+		data.m_Widgets.m_wChannelFrame.SetVisible(true);
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Outgoing radio entry: show the local speaker's voice level in the channel slot. All three
+	//! levels are named here, NORMAL included - on the radio there is no quiet default to infer.
+	//! Vanilla may already have put a channel name there (PLATOON, a task name); the level is
+	//! appended to it. super.UpdateTransmission rewrites the slot on every refresh, so the text
+	//! never accumulates.
+	protected void EC29_ApplyRadioVoiceModeLabel(TransmissionData data)
+	{
+		if (!data || !data.m_Widgets || !data.m_Widgets.m_wChannelText || !data.m_Widgets.m_wChannelFrame)
+			return;
+
+		PlayerController localPc = GetGame().GetPlayerController();
+		if (!localPc)
+			return;
+
+		// The stock component carries the mode; the transmitting one is a tier (EC29_VoiceTiers.c).
+		SCR_VoNComponent senderVon = EC29_VoiceTiers.StockVoN(localPc.GetControlledEntity());
+		if (!senderVon)
+			return;
+
+		string label;
+		switch (senderVon.EC29_GetVoiceRange())
+		{
+			case EC29_EVoiceRange.WHISPER: label = "#EC29-VON_Mode_Whisper"; break;
+			case EC29_EVoiceRange.NORMAL:  label = "#EC29-VON_Mode_Normal"; break;
+			case EC29_EVoiceRange.YELL:    label = "#EC29-VON_Mode_Yelling"; break;
+		}
+
+		if (label.IsEmpty())
+			return;
+
+		if (data.m_Widgets.m_wChannelFrame.IsVisible())
+			data.m_Widgets.m_wChannelText.SetTextFormat("%1 - %2", data.m_Widgets.m_wChannelText.GetText(), label);
+		else
+			data.m_Widgets.m_wChannelText.SetText(label);
+
 		data.m_Widgets.m_wChannelFrame.SetVisible(true);
 	}
 
