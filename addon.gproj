@@ -2,8 +2,6 @@ GameProject {
  ID "29th_Voice_Systems"
  GUID "6A8729056F081E31"
  TITLE "29th Voice Systems"
- AUTHOR "Goldwep"
- VERSION "1.1.0"
  Dependencies {
   "58D0FB3206B6F859"
  }
