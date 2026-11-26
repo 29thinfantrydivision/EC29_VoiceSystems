@@ -44,10 +44,10 @@ modded class SCR_EditorManagerEntity
 	}
 
 	//------------------------------------------------------------------------------------------------
-	override void Close(bool showErrorNotification = true)
+	override void Close(bool showErrorNotification = true, bool restoreCamera = true)
 	{
 		bool wasOpened = IsOpened();
-		super.Close(showErrorNotification);
+		super.Close(showErrorNotification, restoreCamera);
 
 		if (wasOpened && !IsOpened() && !EC29_RadioState.GetInstance().SpectatorVon().IsSpectating())
 			EC29_SetSpectatorNetMuted(false);
