@@ -9,6 +9,22 @@ class EC29_Earplugs_System extends WorldSystem
 	float EarplugsVolume;
 	bool bMuted;
 
+	// --- SFX bus ownership --------------------------------------------------------------------
+	// The SFX master bus is a single global knob, and other code writes ABSOLUTE values to it,
+	// which would silently undo the plugged level. Nothing polls the bus. Each known writer is
+	// hooked at its one write point and reports the value through OnExternalSFXWrite, which takes
+	// it as the new "open" level and re-applies the plug factor in the same call:
+	//   RHS Status Quo hearing model   EC29_RHS_HearingHook.c   (RHS_HearingManager.ApplyVolume)
+	//   vanilla deploy menu            EC29_SFXBusHooks.c       (SCR_DeployMenuBase.MuteSounds)
+	//   vanilla loading screen         EC29_SFXBusHooks.c       (ArmaReforgerLoadingAnim.EnableSounds)
+	// A writer with no hook (another mod, a scenario framework volume action) is picked up at the
+	// next plug toggle, which reads the bus back before it acts.
+	protected float m_fPlugFactor = 1.0;		//!< 1 - reduction%, applied multiplicatively to the base
+	protected float m_fBaseVolume = 1.0;		//!< "open" level (user slider, or the last external write)
+	protected float m_fLastWritten = -1.0;		//!< last value WE put on the bus; -1 = nothing yet
+
+	protected static const float BUS_EPSILON = 0.002;
+
 	//------------------------------------------------------------------------------------------------
 	override static void InitInfo(WorldSystemInfo outInfo)
 	{
@@ -55,8 +71,25 @@ class EC29_Earplugs_System extends WorldSystem
 				Print("[EC29-DBG][Earplugs] Action listener registered for 'EC29_ToggleEarplugs' (F2). If F2 does nothing and no keypress log appears, the input action did not load from chimeraInputCommon.conf", LogLevel.NORMAL);
 		}
 
+		m_fBaseVolume = SFX_DefaultVolume;
 		if (GetVolume() < SFX_DefaultVolume)
 			SetVolume(SFX_DefaultVolume);
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! A hooked writer reports that it has just put this value on the SFX bus (RHS hearing model,
+	//! deploy menu, loading screen). Take it as the open level and, while plugged, re-attenuate it
+	//! in the same call so the bus never holds an un-plugged value.
+	void OnExternalSFXWrite(float volume)
+	{
+		m_fBaseVolume = volume;
+		if (!bMuted)
+			return;
+
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][Earplugs] External SFX write reported (%1) - bus set to %2", volume, volume * m_fPlugFactor);
+
+		SetVolume(volume * m_fPlugFactor);
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -76,6 +109,7 @@ class EC29_Earplugs_System extends WorldSystem
 	{
 		SFX_DefaultVolume = FetchDefaultSFXVolume();
 		EarplugsVolume = FetchEarplugsVolume();
+		m_fBaseVolume = SFX_DefaultVolume;
 
 		if (bMuted)
 			SetVolume(EarplugsVolume);
@@ -125,11 +159,13 @@ class EC29_Earplugs_System extends WorldSystem
 			if (EC29_Debug.VERBOSE)
 				PrintFormat("[EC29-DBG][Earplugs] Settings module found: reduction slider=%1%%", volume);
 			volume = 1.0 - (volume * 0.01);
+			m_fPlugFactor = volume;
 			volume *= SFX_DefaultVolume;
 		}
 		else
 		{
 			Print("[EC29-DBG][Earplugs] Settings module 'EC29_EarplugSettings' NOT found - plugged volume will be 0 (full mute)", LogLevel.WARNING);
+			m_fPlugFactor = 0;
 		}
 
 		return volume;
@@ -138,11 +174,18 @@ class EC29_Earplugs_System extends WorldSystem
 	//------------------------------------------------------------------------------------------------
 	void ToggleSFXVolume()
 	{
+		// Pick up a write from a writer that has no hook.
+		float bus = GetVolume();
+		if (m_fLastWritten < 0 || Math.AbsFloat(bus - m_fLastWritten) >= BUS_EPSILON)
+			m_fBaseVolume = bus;
+
 		bMuted = !bMuted;
 
-		float targetVolume = SFX_DefaultVolume;
+		// Plug/unplug relative to the inferred open level, so unplugging mid-RHS-muffle hands the bus
+		// back at whatever the other writer last wanted rather than slamming it to the slider value.
+		float targetVolume = m_fBaseVolume;
 		if (bMuted)
-			targetVolume = EarplugsVolume;
+			targetVolume = m_fBaseVolume * m_fPlugFactor;
 
 		SetVolume(targetVolume);
 
@@ -154,6 +197,7 @@ class EC29_Earplugs_System extends WorldSystem
 	//------------------------------------------------------------------------------------------------
 	void SetVolume(float volume)
 	{
+		m_fLastWritten = volume;
 		AudioSystem.SetMasterVolume(AudioSystem.SFX, volume);
 	}
 
