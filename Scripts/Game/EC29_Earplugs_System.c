@@ -9,31 +9,21 @@ class EC29_Earplugs_System extends WorldSystem
 	float EarplugsVolume;
 	bool bMuted;
 
-	// --- Bus watchdog -----------------------------------------------------------------------
-	// The SFX master bus is a single global knob. Other mods (RHS Status Quo's RHS_HearingManager
-	// during its tinnitus/muffle effect) and vanilla (deploy menu, loading screen) write ABSOLUTE
-	// values to it, silently undoing the plugged level. While plugged we watch the bus each frame:
-	// a value we did not write is treated as the new "open" base and re-attenuated by our factor.
-	// RHS gates its own writes on its cached last value and never reads the bus back, so this
-	// converges in one correction per external change instead of ping-ponging.
+	// --- SFX bus ownership --------------------------------------------------------------------
+	// The SFX master bus is a single global knob, and other code writes ABSOLUTE values to it,
+	// which would silently undo the plugged level. Nothing polls the bus. Each known writer is
+	// hooked at its one write point and reports the value through OnExternalSFXWrite, which takes
+	// it as the new "open" level and re-applies the plug factor in the same call:
+	//   RHS Status Quo hearing model   EC29_RHS_HearingHook.c   (RHS_HearingManager.ApplyVolume)
+	//   vanilla deploy menu            EC29_SFXBusHooks.c       (SCR_DeployMenuBase.MuteSounds)
+	//   vanilla loading screen         EC29_SFXBusHooks.c       (ArmaReforgerLoadingAnim.EnableSounds)
+	// A writer with no hook (another mod, a scenario framework volume action) is picked up at the
+	// next plug toggle, which reads the bus back before it acts.
 	protected float m_fPlugFactor = 1.0;		//!< 1 - reduction%, applied multiplicatively to the base
-	protected float m_fBaseVolume = 1.0;		//!< inferred "open" level (user slider, or last external write)
+	protected float m_fBaseVolume = 1.0;		//!< "open" level (user slider, or the last external write)
 	protected float m_fLastWritten = -1.0;		//!< last value WE put on the bus; -1 = nothing yet
-	protected float m_fEpisodeQuietTimer;		//!< seconds since last correction (episode bookkeeping)
-	protected int m_iEpisodeCorrections;		//!< corrections in the current episode
-	protected int m_iRateCount;					//!< consecutive same-value re-asserts (ping-pong breaker)
-	protected float m_fLastExternal = -1.0;		//!< last foreign value we corrected; -1 = none yet
-	protected float m_fBackoffTimer;			//!< > 0: watchdog suspended (another writer is fighting back)
 
-	protected static const float WATCHDOG_EPSILON = 0.002;
-	// A fight is a writer putting the SAME value back after each correction. A ramp (RHS muffle
-	// attack/recovery) writes a new value every frame and is cache-gated, so it never repeats one;
-	// counting every correction would trip the breaker on any ramp above 30 fps. The count is of
-	// consecutive frames, not per second: the watchdog corrects once per frame at most, so a
-	// per-second limit above the frame rate could never be reached.
-	protected static const int WATCHDOG_MAX_REASSERTS = 30;
-	protected static const float WATCHDOG_BACKOFF_SECONDS = 5.0;
-	protected static const float WATCHDOG_EPISODE_QUIET = 1.0;
+	protected static const float BUS_EPSILON = 0.002;
 
 	//------------------------------------------------------------------------------------------------
 	override static void InitInfo(WorldSystemInfo outInfo)
@@ -42,8 +32,7 @@ class EC29_Earplugs_System extends WorldSystem
 		outInfo
 			.SetAbstract(false)
 			.SetUnique(true)
-			.SetLocation(WorldSystemLocation.Client)
-			.AddPoint(WorldSystemPoint.Frame);
+			.SetLocation(WorldSystemLocation.Client);
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -88,78 +77,19 @@ class EC29_Earplugs_System extends WorldSystem
 	}
 
 	//------------------------------------------------------------------------------------------------
-	//! Per-frame bus watchdog. Only active while plugged.
-	override void OnUpdatePoint(WorldUpdatePointArgs args)
+	//! A hooked writer reports that it has just put this value on the SFX bus (RHS hearing model,
+	//! deploy menu, loading screen). Take it as the open level and, while plugged, re-attenuate it
+	//! in the same call so the bus never holds an un-plugged value.
+	void OnExternalSFXWrite(float volume)
 	{
+		m_fBaseVolume = volume;
 		if (!bMuted)
 			return;
 
-		float dt = args.GetTimeSliceSeconds();
+		if (EC29_Debug.VERBOSE)
+			PrintFormat("[EC29-DBG][Earplugs] External SFX write reported (%1) - bus set to %2", volume, volume * m_fPlugFactor);
 
-		if (m_fBackoffTimer > 0)
-		{
-			m_fBackoffTimer -= dt;
-			if (m_fBackoffTimer <= 0)
-			{
-				m_iRateCount = 0;
-				// m_fLastWritten is kept: a plug toggle or settings change during the backoff put
-				// OUR value on the bus, and adopting that as a foreign base would attenuate twice.
-				if (EC29_Debug.VERBOSE)
-					PrintFormat("[EC29-DBG][Earplugs] Bus watchdog: backoff ended, re-armed (bus=%1, ours=%2)", GetVolume(), m_fLastWritten);
-			}
-			return;
-		}
-
-		// Episode bookkeeping: report once when a burst of corrections has gone quiet
-		if (m_iEpisodeCorrections > 0)
-		{
-			m_fEpisodeQuietTimer += dt;
-			if (m_fEpisodeQuietTimer >= WATCHDOG_EPISODE_QUIET)
-			{
-				Print(string.Format("[EC29][Earplugs] Bus watchdog: external SFX writes ended, %1 correction(s) applied, bus now %2 (base %3 x factor %4)", m_iEpisodeCorrections, GetVolume(), m_fBaseVolume, m_fPlugFactor), LogLevel.WARNING);
-				m_iEpisodeCorrections = 0;
-				m_fEpisodeQuietTimer = 0;
-				// A quiet second ends the run: the same value written again later (every RHS
-				// episode ends on 1.0) is a new event, not a fight.
-				m_iRateCount = 0;
-			}
-		}
-
-		float bus = GetVolume();
-		if (m_fLastWritten >= 0 && Math.AbsFloat(bus - m_fLastWritten) < WATCHDOG_EPSILON)
-			return;
-
-		// Someone else wrote the bus. Treat their value as the new open level and re-plug it.
-		m_fBaseVolume = bus;
-		float target = m_fBaseVolume * m_fPlugFactor;
-
-		if (Math.AbsFloat(target - bus) < WATCHDOG_EPSILON)
-		{
-			// Nothing to do (e.g. factor 1.0); just adopt the value as ours.
-			m_fLastWritten = bus;
-			return;
-		}
-
-		// Only an identical value coming back counts toward the breaker; a changing one is a ramp.
-		if (bus == m_fLastExternal)
-			m_iRateCount++;
-		else
-			m_iRateCount = 0;
-
-		m_fLastExternal = bus;
-		if (m_iRateCount > WATCHDOG_MAX_REASSERTS)
-		{
-			Print(string.Format("[EC29][Earplugs] Bus watchdog: the same value (%2) came back %1 times in a row - another mod is fighting for the SFX bus. Backing off for %3 s. Earplugs may sound open until it stops.", WATCHDOG_MAX_REASSERTS, bus, WATCHDOG_BACKOFF_SECONDS), LogLevel.WARNING);
-			m_fBackoffTimer = WATCHDOG_BACKOFF_SECONDS;
-			return;
-		}
-
-		if (m_iEpisodeCorrections == 0)
-			Print(string.Format("[EC29][Earplugs] Bus watchdog: external SFX write detected (bus=%1, ours was %2) - re-applying plug factor %3 -> %4", bus, m_fLastWritten, m_fPlugFactor, target), LogLevel.WARNING);
-
-		m_iEpisodeCorrections++;
-		m_fEpisodeQuietTimer = 0;
-		SetVolume(target);
+		SetVolume(volume * m_fPlugFactor);
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -244,9 +174,9 @@ class EC29_Earplugs_System extends WorldSystem
 	//------------------------------------------------------------------------------------------------
 	void ToggleSFXVolume()
 	{
-		// The watchdog sleeps while unplugged; pick up any external write made meanwhile.
+		// Pick up a write from a writer that has no hook.
 		float bus = GetVolume();
-		if (m_fLastWritten < 0 || Math.AbsFloat(bus - m_fLastWritten) >= WATCHDOG_EPSILON)
+		if (m_fLastWritten < 0 || Math.AbsFloat(bus - m_fLastWritten) >= BUS_EPSILON)
 			m_fBaseVolume = bus;
 
 		bMuted = !bMuted;
@@ -258,8 +188,6 @@ class EC29_Earplugs_System extends WorldSystem
 			targetVolume = m_fBaseVolume * m_fPlugFactor;
 
 		SetVolume(targetVolume);
-		m_iEpisodeCorrections = 0;
-		m_fEpisodeQuietTimer = 0;
 
 		if (EC29_Debug.VERBOSE)
 			PrintFormat("[EC29-DBG][Earplugs] Toggled: muted=%1 -> SFX master volume set to %2 (readback=%3)", bMuted, targetVolume, GetVolume());
