@@ -21,12 +21,17 @@ class EC29_Earplugs_System extends WorldSystem
 	protected float m_fLastWritten = -1.0;		//!< last value WE put on the bus; -1 = nothing yet
 	protected float m_fEpisodeQuietTimer;		//!< seconds since last correction (episode bookkeeping)
 	protected int m_iEpisodeCorrections;		//!< corrections in the current episode
-	protected float m_fRateWindow;				//!< rolling 1 s window for the ping-pong breaker
-	protected int m_iRateCount;
+	protected int m_iRateCount;					//!< consecutive same-value re-asserts (ping-pong breaker)
+	protected float m_fLastExternal = -1.0;		//!< last foreign value we corrected; -1 = none yet
 	protected float m_fBackoffTimer;			//!< > 0: watchdog suspended (another writer is fighting back)
 
 	protected static const float WATCHDOG_EPSILON = 0.002;
-	protected static const int WATCHDOG_MAX_PER_SECOND = 30;	//!< RHS muffle ramp writes ~1/frame; a real fight is far above this
+	// A fight is a writer putting the SAME value back after each correction. A ramp (RHS muffle
+	// attack/recovery) writes a new value every frame and is cache-gated, so it never repeats one;
+	// counting every correction would trip the breaker on any ramp above 30 fps. The count is of
+	// consecutive frames, not per second: the watchdog corrects once per frame at most, so a
+	// per-second limit above the frame rate could never be reached.
+	protected static const int WATCHDOG_MAX_REASSERTS = 30;
 	protected static const float WATCHDOG_BACKOFF_SECONDS = 5.0;
 	protected static const float WATCHDOG_EPISODE_QUIET = 1.0;
 
@@ -97,19 +102,12 @@ class EC29_Earplugs_System extends WorldSystem
 			if (m_fBackoffTimer <= 0)
 			{
 				m_iRateCount = 0;
-				m_fRateWindow = 0;
-				// Re-arm against whatever is on the bus now; one more correction is cheap.
-				m_fLastWritten = -1.0;
+				// m_fLastWritten is kept: a plug toggle or settings change during the backoff put
+				// OUR value on the bus, and adopting that as a foreign base would attenuate twice.
+				if (EC29_Debug.VERBOSE)
+					PrintFormat("[EC29-DBG][Earplugs] Bus watchdog: backoff ended, re-armed (bus=%1, ours=%2)", GetVolume(), m_fLastWritten);
 			}
 			return;
-		}
-
-		// Rolling rate window
-		m_fRateWindow += dt;
-		if (m_fRateWindow >= 1.0)
-		{
-			m_fRateWindow = 0;
-			m_iRateCount = 0;
 		}
 
 		// Episode bookkeeping: report once when a burst of corrections has gone quiet
@@ -121,6 +119,9 @@ class EC29_Earplugs_System extends WorldSystem
 				Print(string.Format("[EC29][Earplugs] Bus watchdog: external SFX writes ended, %1 correction(s) applied, bus now %2 (base %3 x factor %4)", m_iEpisodeCorrections, GetVolume(), m_fBaseVolume, m_fPlugFactor), LogLevel.WARNING);
 				m_iEpisodeCorrections = 0;
 				m_fEpisodeQuietTimer = 0;
+				// A quiet second ends the run: the same value written again later (every RHS
+				// episode ends on 1.0) is a new event, not a fight.
+				m_iRateCount = 0;
 			}
 		}
 
@@ -139,10 +140,16 @@ class EC29_Earplugs_System extends WorldSystem
 			return;
 		}
 
-		m_iRateCount++;
-		if (m_iRateCount > WATCHDOG_MAX_PER_SECOND)
+		// Only an identical value coming back counts toward the breaker; a changing one is a ramp.
+		if (bus == m_fLastExternal)
+			m_iRateCount++;
+		else
+			m_iRateCount = 0;
+
+		m_fLastExternal = bus;
+		if (m_iRateCount > WATCHDOG_MAX_REASSERTS)
 		{
-			Print(string.Format("[EC29][Earplugs] Bus watchdog: >%1 corrections/s - another mod is re-asserting the SFX bus. Backing off for %2 s. Earplugs may sound open until it stops.", WATCHDOG_MAX_PER_SECOND, WATCHDOG_BACKOFF_SECONDS), LogLevel.WARNING);
+			Print(string.Format("[EC29][Earplugs] Bus watchdog: the same value (%2) came back %1 times in a row - another mod is fighting for the SFX bus. Backing off for %3 s. Earplugs may sound open until it stops.", WATCHDOG_MAX_REASSERTS, bus, WATCHDOG_BACKOFF_SECONDS), LogLevel.WARNING);
 			m_fBackoffTimer = WATCHDOG_BACKOFF_SECONDS;
 			return;
 		}
@@ -237,6 +244,11 @@ class EC29_Earplugs_System extends WorldSystem
 	//------------------------------------------------------------------------------------------------
 	void ToggleSFXVolume()
 	{
+		// The watchdog sleeps while unplugged; pick up any external write made meanwhile.
+		float bus = GetVolume();
+		if (m_fLastWritten < 0 || Math.AbsFloat(bus - m_fLastWritten) >= WATCHDOG_EPSILON)
+			m_fBaseVolume = bus;
+
 		bMuted = !bMuted;
 
 		// Plug/unplug relative to the inferred open level, so unplugging mid-RHS-muffle hands the bus
